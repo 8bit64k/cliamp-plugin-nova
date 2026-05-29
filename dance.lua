@@ -17,16 +17,25 @@ local p = plugin.register({
 })
 
 -- ---------- Configuration (read once at load) --------------------------------
+-- Strip trailing inline comments from config values. Some TOML parsers (including
+-- the one cliamp may use) leak #-comments into the value string, so "vantablack"
+-- becomes "vantablack   # comment" — which fails exact key lookups.
 
-local cfg_art_path   = p:config("art_path")
-local cfg_bob_dir    = p:config("bob_direction") or "both"   -- reserved for v0.2 jitter
-local cfg_color_mode = p:config("color_mode") or "glow"       -- "glow" | "mono" | "passthrough"
-local cfg_mono_color = tonumber(p:config("mono_color")) or 11
-local cfg_attack     = tonumber(p:config("attack")) or 0.55
-local cfg_release    = tonumber(p:config("release")) or 0.18
-local cfg_overdrive  = tonumber(p:config("overdrive")) or 0.78
-local cfg_tilt       = tonumber(p:config("tilt")) or 0.0       -- per-band boost toward treble (0 = off)
-local cfg_theme_name = p:config("theme") or "amber"             -- "amber" | "crt" | "vantablack"
+local function clean(v)
+    if v == nil then return nil end
+    -- Strip trailing whitespace + optional #-comment
+    return (v:gsub("%s*#.*$", ""))
+end
+
+local cfg_art_path   = clean(p:config("art_path"))
+local cfg_bob_dir    = clean(p:config("bob_direction")) or "both"
+local cfg_color_mode = clean(p:config("color_mode")) or "glow"
+local cfg_mono_color = tonumber(clean(p:config("mono_color"))) or 11
+local cfg_attack     = tonumber(clean(p:config("attack"))) or 0.55
+local cfg_release    = tonumber(clean(p:config("release"))) or 0.18
+local cfg_overdrive  = tonumber(clean(p:config("overdrive"))) or 0.78
+local cfg_tilt       = tonumber(clean(p:config("tilt"))) or 0.0
+local cfg_theme_name = clean(p:config("theme")) or "amber"
 
 -- ---------- ANSI helpers -----------------------------------------------------
 
