@@ -52,17 +52,17 @@ local function reset()  return ESC .. "[0m" end
 local PRESETS = {
     amber = {
         name = "Amber (tubeamp family)",
-        glow      = { 232, 234, 52, 94, 130, 166, 202, 208, 214, 220, 226 },
+        glow      = { 232, 52, 94, 130, 166, 202, 214, 226 },
         overdrive = { 160, 196, 197, 198 },
     },
     crt = {
         name = "CRT Green Phosphor",
-        glow      = { 232, 233, 22, 28, 34, 40, 46, 48, 82, 154, 190 },
+        glow      = { 232, 22, 34, 46, 82, 118, 154, 190 },
         overdrive = { 46, 82, 118, 190 },
     },
     vantablack = {
         name = "Vantablack (mono-ish high contrast)",
-        glow      = { 232, 234, 235, 237, 240, 243, 247, 249, 251, 253, 255 },
+        glow      = { 232, 236, 240, 244, 248, 252, 254, 255 },
         overdrive = { 248, 252, 255, 231 },
     },
 }
