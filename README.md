@@ -26,10 +26,16 @@ cd cliamp-plugin-dance
 # 2. Copy the plugin into cliamp's plugins dir
 mkdir -p ~/.config/cliamp/plugins
 cp dance.lua ~/.config/cliamp/plugins/dance.lua
+```
 
-# 3. Copy a test art file too (the plugin needs one to render)
-mkdir -p ~/.config/cliamp/art
-cp ruby.txt ~/.config/cliamp/art/ruby.txt
+The **art file stays in the clone** — there's nothing to copy into cliamp's
+dirs. The plugin reads it directly from wherever you point `art_path` (the
+sandbox allows reads from any path, 1 MB cap). Just note the absolute path to
+`ruby.txt` in your clone for the config below, e.g.:
+
+```bash
+realpath ruby.txt
+# -> /home/you/code/cliamp-plugin-dance/ruby.txt
 ```
 
 To **update** after I push changes:
@@ -53,7 +59,7 @@ Add a `[plugins.dance]` block to your cliamp config:
 
 ```toml
 [plugins.dance]
-art_path = "~/.config/cliamp/art/ruby.txt"   # required — path to the ASCII art file
+art_path = "/abs/path/to/cliamp-plugin-dance/ruby.txt"   # required — absolute path to the ASCII art file (lives in your clone, not cliamp's dirs)
 bob_max = 2                                    # max vertical displacement, in chars
 bob_direction = "both"                         # "up" | "down" | "both"
 color_mode = "glow"                            # "glow" | "mono" | "passthrough"
