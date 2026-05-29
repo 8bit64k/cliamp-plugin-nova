@@ -88,6 +88,23 @@ local function char_at(s, col)
     return " "
 end
 
+-- Expand a leading ~ or $HOME / ${HOME} to the absolute home dir. cliamp's
+-- fs layer calls Go's os.ReadFile/os.Stat directly, which do NOT expand the
+-- shell tilde — so we must do it here or "~/foo" silently fails to load.
+local function expand_path(path)
+    if not path or path == "" then return path end
+    local home = os.getenv("HOME") or os.getenv("USERPROFILE")
+    if home then
+        if path == "~" then
+            return home
+        elseif path:sub(1, 2) == "~/" then
+            return home .. path:sub(2)
+        end
+        path = path:gsub("%${HOME}", home):gsub("%$HOME", home)
+    end
+    return path
+end
+
 local function load_art()
     art_lines, ring_of = nil, nil
     art_w, art_h, load_error = 0, 0, nil
@@ -96,12 +113,13 @@ local function load_art()
         load_error = "dance: no art_path configured"
         return
     end
-    if not (cliamp and cliamp.fs and cliamp.fs.exists(cfg_art_path)) then
-        load_error = "dance: art file not found: " .. tostring(cfg_art_path)
+    local path = expand_path(cfg_art_path)
+    if not (cliamp and cliamp.fs and cliamp.fs.exists(path)) then
+        load_error = "dance: art file not found: " .. tostring(path)
         return
     end
 
-    local data = cliamp.fs.read(cfg_art_path)
+    local data = cliamp.fs.read(path)
     if not data or data == "" then
         load_error = "dance: art file empty or unreadable"
         return
