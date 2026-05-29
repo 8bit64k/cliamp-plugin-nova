@@ -93,31 +93,70 @@ solid blob (dark=filled) or pure noise (edge-detect on busy background).
 
 ## OPEN QUESTION (waiting on 8bit64k — this is where we resume)
 
-8bit64k is comparing the 3 arts on the laptop (cliamp, real music, mini + full
-panes). Needs to report:
-- Which art reads best at mini (5-row) and full (Shift+V)?
-- Is braille Ruby worth more tuning (tighter crop / harder background knockout /
-  hand-clean stray dots), or is the CRT the keeper?
-- Earlier feedback: "on mini it's difficult; on full it's pretty good." Braille
-  was 8bit64k's idea to improve mini quality.
+RESOLVED: art comparison done. noise_braille.txt + art_max.txt are the primary test
+files. crt.txt is the crispest synthetic braille. ruby.txt kept for sentimental value.
 
-This decides whether braille-from-photo becomes part of the recommended pipeline
-or stays "synthetic art only."
+Next session: tackle ring shape (#1) and ring blend (#2) from the tuning list.
+Then jitter (#9, still deferred per 8bit64k's earlier call).
 
 ---
 
-## Next steps (after 8bit64k's art verdict)
+## v0.1 feature summary (shipped this session)
 
-1. Lock the default test art.
-2. Tune smoothing feel (attack/release) + spectral `tilt` (lifts outer/treble
-   rings) on real music.
-3. Add the DEFERRED bass-transient jitter (gate on low-band overdrive crossing,
-   fast decay — punch on kick, not continuous).
-4. THEN fold all session learnings into the `cliamp-plugin-development` skill in
-   ONE pass (pitfalls: tilde-no-expansion, init-may-not-fire/lazy-load, 5-row
-   default pane, downscale-to-fit pattern, braille-art generation pipeline).
-   8bit64k explicitly asked to wait until v0.1 is verified on their end before
-   documenting — do NOT document unverified.
+**Rendering:**
+- Square concentric rings (Chebyshev), bass=center, treble=edge
+- Downscale-to-fit any pane (nearest-neighbor, aspect-preserved)
+- Ring geometry computed per-output-cell (resolution-independent)
+- Preserves source glyphs, only color reacts
+
+**Config keys (current):**
+```toml
+[plugins.dance]
+art_path    = "~/Code/cliamp-plugin-dance/noise_braille.txt"
+color_mode  = "glow"       # glow | mono | passthrough
+theme       = "aurora"     # amber (warm tubeamp) | crt (green phosphor) | vantablack (grayscale) | aurora (teal-cyan-green)
+mono_color  = 11           # ANSI 256, for mono mode
+attack      = 0.55
+release     = 0.18
+overdrive   = 0.78
+tilt        = 0.0          # spectral boost for sparse treble; try 0.5
+```
+
+**Theme presets:** 4 built-in, all 11-stop ANSI 256 ramps:
+- `amber` — original tubeamp warm amber (232,234,52,94,130,166,202,208,214,220,226)
+- `crt` — green phosphor (232,22,28,34,40,46,48,82,118,154,190)
+- `vantablack` — mono-ish grayscale (232,234,238,242,246,249,251,253,254,255,231)
+- `aurora` — cool teal-cyan-green (232,23,30,36,42,48,83,119,155,191,195)
+
+Architecture: `PRESETS[name] = {glow={...}, overdrive={...}}`. Single swap point
+for future upstream theme integration (add `from_cliamp_theme()` that returns
+same shape, swap one line).
+
+**Bugs fixed this session (cliamp gotchas):**
+1. Tilde not expanded → Plugin expands `~`/`$HOME` itself
+2. Init may not fire → Lazy-load art on first render
+3. 5-row default pane → Downscale to fit, works at any pane size
+4. Inline comments leak into config values → `clean()` strips `#` comments defensively
+5. Monochrome presets blend together → Wide ANSI gaps between ramp stops
+
+**Test art files (5 in repo):**
+- `noise_braille.txt` — 28×150 random braille (best for color engine testing)
+- `art_max.txt` — 23-row stacked "PHOSPHOR" banner
+- `crt.txt` — braille CRT monitor (crispest synthetic)
+- `ruby.txt` — braille Ruby (Frenchie head)
+- `ruby_ascii.txt` — original hand-ASCII portrait (backup)
+
+**Tuning list (deferred):**
+1. Ring shape (square/circle/diamond)
+2. Ring blend (smooth band boundaries)
+3. Gamma / response curve
+4. Dead zone
+5. Aspect ratio
+6. Ring count
+7. Overdrive behavior
+8. Bass-transient jitter (still deferred per 8bit64k)
+
+*Checkpoint updated 2026-05-29. Resume at ring shape + ring blend.*
 
 ---
 
