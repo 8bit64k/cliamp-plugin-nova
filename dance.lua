@@ -1,4 +1,280 @@
--- dance.lua — cliamp visualizer: animate user-supplied ASCII art from the EQ feed.
+-- dance.lua — cliamp visualizer: animate a user-supplied ASCII art file from the EQ feed.
 --
--- STATUS: placeholder. No render logic yet — approach not finalized.
--- See BRAINSTORM.md for the design space and README.md for install/config.
+-- v0.1 "square rings": the art is mapped into 10 concentric SQUARE rings
+-- (Chebyshev distance from center). The innermost ring is driven by the lowest
+-- EQ band (32 Hz bass), each ring outward by the next band, the outermost by
+-- the highest band (16 kHz treble). Each cell is recolored by its ring's
+-- smoothed band level using the shared tubeamp glow ramp. The art's original
+-- glyphs are preserved (they carry the image density) — only color reacts.
+--
+-- No motion/jitter in v0.1 (deferred). See BRAINSTORM.md + README.md.
+
+local p = plugin.register({
+    name        = "dance",
+    type        = "visualizer",
+    version     = "0.1.0",
+    description = "ASCII art that glows to the EQ in concentric square rings",
+})
+
+-- ---------- Configuration (read once at load) --------------------------------
+
+local cfg_art_path   = p:config("art_path")
+local cfg_bob_dir    = p:config("bob_direction") or "both"   -- reserved for v0.2 jitter
+local cfg_color_mode = p:config("color_mode") or "glow"       -- "glow" | "mono" | "passthrough"
+local cfg_mono_color = tonumber(p:config("mono_color")) or 11
+local cfg_attack     = tonumber(p:config("attack")) or 0.55
+local cfg_release    = tonumber(p:config("release")) or 0.18
+local cfg_overdrive  = tonumber(p:config("overdrive")) or 0.78
+local cfg_tilt       = tonumber(p:config("tilt")) or 0.0       -- per-band boost toward treble (0 = off)
+
+-- ---------- ANSI helpers (family palette, copied verbatim) -------------------
+
+local ESC = string.char(27)
+local function fg256(n) return ESC .. "[38;5;" .. n .. "m" end
+local function reset()  return ESC .. "[0m" end
+
+local glow_ramp = {
+    232, 234, 52, 94, 130, 166, 202, 208, 214, 220, 226,
+}
+local overdrive_ramp = { 160, 196, 197, 198 }
+
+local function glow_color(level, hot)
+    local ramp = hot and overdrive_ramp or glow_ramp
+    local idx = math.floor(level * (#ramp - 1)) + 1
+    if idx < 1 then idx = 1 end
+    if idx > #ramp then idx = #ramp end
+    return ramp[idx]
+end
+
+-- ---------- Art loading + ring precompute ------------------------------------
+-- Loaded once. art_lines = {string,...}; ring_of[y][x] = band index 1..10.
+
+local art_lines   = nil
+local art_w       = 0      -- max display width across rows
+local art_h       = 0
+local ring_of     = nil    -- [y][x] -> band index (1..10)
+local load_error  = nil    -- non-nil string => render the placeholder
+
+-- Count display columns: UTF-8 lead bytes only (continuation bytes 0x80..0xBF
+-- don't advance a column). Single-width BMP assumption — fine for ASCII art.
+local function visible_cols(s)
+    local n = 0
+    for i = 1, #s do
+        local b = s:byte(i)
+        if b < 0x80 or b >= 0xC0 then n = n + 1 end
+    end
+    return n
+end
+
+-- Index the i-th display column's byte range in a (possibly UTF-8) string.
+-- Returns the substring for display column `col` (1-based), or " " past the end.
+local function char_at(s, col)
+    local seen = 0
+    local i = 1
+    local n = #s
+    while i <= n do
+        local b = s:byte(i)
+        -- width of this UTF-8 sequence in bytes
+        local len = 1
+        if b >= 0xF0 then len = 4
+        elseif b >= 0xE0 then len = 3
+        elseif b >= 0xC0 then len = 2 end
+        seen = seen + 1
+        if seen == col then
+            return s:sub(i, i + len - 1)
+        end
+        i = i + len
+    end
+    return " "
+end
+
+local function load_art()
+    art_lines, ring_of = nil, nil
+    art_w, art_h, load_error = 0, 0, nil
+
+    if not cfg_art_path or cfg_art_path == "" then
+        load_error = "dance: no art_path configured"
+        return
+    end
+    if not (cliamp and cliamp.fs and cliamp.fs.exists(cfg_art_path)) then
+        load_error = "dance: art file not found: " .. tostring(cfg_art_path)
+        return
+    end
+
+    local data = cliamp.fs.read(cfg_art_path)
+    if not data or data == "" then
+        load_error = "dance: art file empty or unreadable"
+        return
+    end
+
+    -- Split into lines (strip a trailing newline, tolerate CRLF).
+    local lines = {}
+    data = data:gsub("\r\n", "\n"):gsub("\r", "\n")
+    for line in (data .. "\n"):gmatch("(.-)\n") do
+        lines[#lines + 1] = line
+    end
+    -- Drop a single trailing empty line from the terminal newline.
+    if #lines > 0 and lines[#lines] == "" then lines[#lines] = nil end
+    if #lines == 0 then
+        load_error = "dance: art file has no rows"
+        return
+    end
+
+    art_lines = lines
+    art_h = #lines
+    for _, l in ipairs(lines) do
+        local w = visible_cols(l)
+        if w > art_w then art_w = w end
+    end
+    if art_w == 0 then
+        load_error = "dance: art file has zero width"
+        art_lines = nil
+        return
+    end
+
+    -- Precompute ring (band index) per cell. Square rings via Chebyshev
+    -- distance from center, with x scaled by 0.5 to correct for the ~2:1
+    -- terminal cell aspect ratio so the rings look square on screen.
+    local cx = (art_w + 1) / 2
+    local cy = (art_h + 1) / 2
+    local max_dist = 0
+    local dist = {}
+    for y = 1, art_h do
+        dist[y] = {}
+        for x = 1, art_w do
+            local dx = math.abs(x - cx) * 0.5
+            local dy = math.abs(y - cy)
+            local d = (dx > dy) and dx or dy   -- Chebyshev (square rings)
+            dist[y][x] = d
+            if d > max_dist then max_dist = d end
+        end
+    end
+    if max_dist == 0 then max_dist = 1 end
+
+    ring_of = {}
+    for y = 1, art_h do
+        ring_of[y] = {}
+        for x = 1, art_w do
+            local band = 1 + math.floor(dist[y][x] / max_dist * 9 + 0.5)
+            if band < 1 then band = 1 end
+            if band > 10 then band = 10 end
+            ring_of[y][x] = band
+        end
+    end
+end
+
+-- ---------- Per-instance state -----------------------------------------------
+
+local smoothed = {0,0,0,0,0,0,0,0,0,0}
+
+function p:init(rows, cols)
+    for i = 1, 10 do smoothed[i] = 0 end
+    load_art()
+end
+
+function p:destroy() end
+
+-- ---------- Render helpers ---------------------------------------------------
+
+local function placeholder(rows, cols, msg)
+    -- Centered single-line error/status message. Always a string.
+    local lines = {}
+    local mid = math.floor(rows / 2) + 1
+    local pad = math.max(0, math.floor((cols - #msg) / 2))
+    for r = 1, rows do
+        if r == mid then
+            lines[r] = string.rep(" ", pad) .. fg256(208) .. msg .. reset()
+        else
+            lines[r] = ""
+        end
+    end
+    return table.concat(lines, "\n")
+end
+
+-- ---------- The render loop --------------------------------------------------
+
+function p:render(bands, frame, rows, cols)
+    -- Always advance smoothing state, even on error/hidden paths, so a resume
+    -- never shows cold state.
+    for i = 1, 10 do
+        local raw = bands[i] or 0
+        -- spectral tilt: gently lift higher bands so sparse treble still lights
+        -- the outer rings. tilt=0 disables.
+        if cfg_tilt > 0 then
+            raw = raw * (1.0 + cfg_tilt * (i - 1) / 9)
+        end
+        if raw > 1.0 then raw = 1.0 end
+        if raw < 0.0 then raw = 0.0 end
+        if raw > smoothed[i] then
+            smoothed[i] = smoothed[i] + (raw - smoothed[i]) * cfg_attack
+        else
+            smoothed[i] = smoothed[i] - (smoothed[i] - raw) * cfg_release
+        end
+    end
+
+    if load_error then
+        return placeholder(rows, cols, load_error)
+    end
+    if not art_lines then
+        return placeholder(rows, cols, "dance: no art loaded")
+    end
+
+    -- Letterbox: if the art doesn't fit, hide cleanly (return "").
+    if art_w > cols or art_h > rows then
+        -- Too big for this pane. We could clip, but a half-face reads as broken;
+        -- hide instead and let a resize bring it back.
+        return ""
+    end
+
+    local left_pad = math.floor((cols - art_w) / 2)
+    local top_pad  = math.floor((rows - art_h) / 2)
+    local pad_str  = string.rep(" ", left_pad)
+
+    local out = {}
+    -- top padding (blank lines)
+    for _ = 1, top_pad do out[#out + 1] = "" end
+
+    for y = 1, art_h do
+        local src = art_lines[y]
+        local parts = { pad_str }
+        local last_color = nil
+        for x = 1, art_w do
+            local ch = char_at(src, x)
+            if ch == "" then ch = " " end
+
+            if cfg_color_mode == "passthrough" then
+                parts[#parts + 1] = ch
+            else
+                local band = ring_of[y][x]
+                local lvl  = smoothed[band]
+                local color
+                if cfg_color_mode == "mono" then
+                    -- mono: fixed hue, brightness gate (dim glyph at low level)
+                    color = cfg_mono_color
+                    if lvl < 0.12 and ch ~= " " then
+                        -- keep faint structure visible at silence
+                        color = 236
+                    end
+                else
+                    local hot = lvl >= cfg_overdrive
+                    color = glow_color(lvl, hot)
+                end
+                -- Only emit a color escape when it changes (smaller output).
+                if color ~= last_color then
+                    parts[#parts + 1] = fg256(color)
+                    last_color = color
+                end
+                parts[#parts + 1] = ch
+            end
+        end
+        if cfg_color_mode ~= "passthrough" then
+            parts[#parts + 1] = reset()
+        end
+        out[#out + 1] = table.concat(parts)
+    end
+
+    -- bottom padding to fill the pane (keeps prior frame from bleeding through)
+    for _ = #out + 1, rows do out[#out + 1] = "" end
+
+    return table.concat(out, "\n")
+end
