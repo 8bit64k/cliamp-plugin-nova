@@ -52,18 +52,23 @@ local function reset()  return ESC .. "[0m" end
 local PRESETS = {
     amber = {
         name = "Amber (tubeamp family)",
-        glow      = { 232, 52, 94, 130, 166, 202, 214, 226 },
+        -- Original 11-stop amber ramp from tubeamp. Rich distinct stops — kept verbatim.
+        glow      = { 232, 234, 52, 94, 130, 166, 202, 208, 214, 220, 226 },
         overdrive = { 160, 196, 197, 198 },
     },
     crt = {
         name = "CRT Green Phosphor",
-        glow      = { 232, 22, 34, 46, 82, 118, 154, 190 },
+        -- 11 stops spanning the full green range with wide gaps between adjacent stops.
+        -- 232 = near-black baseline; then jumps through the green ANSI block aggressively.
+        glow      = { 232, 22, 28, 34, 40, 46, 48, 82, 118, 154, 190 },
         overdrive = { 46, 82, 118, 190 },
     },
     vantablack = {
         name = "Vantablack (mono-ish high contrast)",
-        glow      = { 232, 236, 240, 244, 248, 252, 254, 255 },
-        overdrive = { 248, 252, 255, 231 },
+        -- 11 stops across the full grayscale range with 3-5 index gaps.
+        -- 232 = baseline; 234-254 = visible grayscale; 255 = pure white.
+        glow      = { 232, 234, 238, 242, 246, 249, 251, 253, 254, 255, 231 },
+        overdrive = { 249, 253, 255, 231 },
     },
 }
 
