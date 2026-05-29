@@ -233,6 +233,14 @@ function p:render(bands, frame, rows, cols)
     if load_error then
         return placeholder(rows, cols, load_error)
     end
+    -- Lazy-load: if init() didn't run (or hasn't yet), load on first render.
+    -- This makes the plugin robust to host init-timing differences.
+    if not art_lines and not load_error then
+        load_art()
+    end
+    if load_error then
+        return placeholder(rows, cols, load_error)
+    end
     if not art_lines then
         return placeholder(rows, cols, "dance: no art loaded")
     end
