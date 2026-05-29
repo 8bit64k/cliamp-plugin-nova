@@ -26,17 +26,42 @@ local cfg_attack     = tonumber(p:config("attack")) or 0.55
 local cfg_release    = tonumber(p:config("release")) or 0.18
 local cfg_overdrive  = tonumber(p:config("overdrive")) or 0.78
 local cfg_tilt       = tonumber(p:config("tilt")) or 0.0       -- per-band boost toward treble (0 = off)
+local cfg_theme_name = p:config("theme") or "amber"             -- "amber" | "crt" | "vantablack"
 
--- ---------- ANSI helpers (family palette, copied verbatim) -------------------
+-- ---------- ANSI helpers -----------------------------------------------------
 
 local ESC = string.char(27)
 local function fg256(n) return ESC .. "[38;5;" .. n .. "m" end
 local function reset()  return ESC .. "[0m" end
 
-local glow_ramp = {
-    232, 234, 52, 94, 130, 166, 202, 208, 214, 220, 226,
+-- ---------- Color presets (single swap point for upstream theme integration) ---
+-- Each preset: { glow = {11 ANSI 256 colors}, overdrive = {4 colors} }.
+-- When cliamp exposes theme_colors(), add a from_cliamp_theme() function that
+-- returns the same shape, then set active = from_cliamp_theme(name) here.
+-- Until then, config key "theme" picks from this table.
+
+local PRESETS = {
+    amber = {
+        name = "Amber (tubeamp family)",
+        glow      = { 232, 234, 52, 94, 130, 166, 202, 208, 214, 220, 226 },
+        overdrive = { 160, 196, 197, 198 },
+    },
+    crt = {
+        name = "CRT Green Phosphor",
+        glow      = { 232, 233, 22, 28, 34, 40, 46, 48, 82, 154, 190 },
+        overdrive = { 46, 82, 118, 190 },
+    },
+    vantablack = {
+        name = "Vantablack (mono-ish high contrast)",
+        glow      = { 232, 234, 235, 237, 240, 243, 247, 249, 251, 253, 255 },
+        overdrive = { 248, 252, 255, 231 },
+    },
 }
-local overdrive_ramp = { 160, 196, 197, 198 }
+
+-- Resolve active preset (fall back to amber on unknown name).
+local active_preset = PRESETS[cfg_theme_name] or PRESETS["amber"]
+local glow_ramp      = active_preset.glow
+local overdrive_ramp = active_preset.overdrive
 
 local function glow_color(level, hot)
     local ramp = hot and overdrive_ramp or glow_ramp
