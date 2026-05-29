@@ -348,6 +348,13 @@ function p:render(bands, frame, rows, cols)
     end
 
     for _ = #out + 1, rows do out[#out + 1] = "" end
+    -- Debug indicator: show theme on bottom-right (remove when verified)
+    if rows > 0 then
+        local indicator = cfg_theme_name .. " (" .. (active_preset.name or "?") .. ")"
+        local pad = cols - #indicator - 1
+        if pad < 0 then pad = 0 end
+        out[rows] = string.rep(" ", pad) .. fg256(240) .. indicator .. reset()
+    end
 
     return table.concat(out, "\n")
 end
