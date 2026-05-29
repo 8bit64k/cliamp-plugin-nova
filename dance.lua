@@ -70,6 +70,13 @@ local PRESETS = {
         glow      = { 232, 234, 238, 242, 246, 249, 251, 253, 254, 255, 231 },
         overdrive = { 249, 253, 255, 231 },
     },
+    aurora = {
+        name = "Aurora (teal-cyan-green)",
+        -- 11-stop cool palette: deep teal through cyan to bright green-yellow.
+        -- Every adjacent pair is visibly distinct — no monochrome blending.
+        glow      = { 232, 23, 30, 36, 42, 48, 83, 119, 155, 191, 195 },
+        overdrive = { 48, 87, 123, 195 },
+    },
 }
 
 -- Resolve active preset (fall back to amber on unknown name).
