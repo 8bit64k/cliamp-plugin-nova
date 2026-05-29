@@ -60,17 +60,22 @@ Add a `[plugins.dance]` block to your cliamp config:
 ```toml
 [plugins.dance]
 art_path = "/abs/path/to/cliamp-plugin-dance/ruby.txt"   # required — absolute path to the ASCII art file (lives in your clone, not cliamp's dirs)
-bob_max = 2                                    # max vertical displacement, in chars
-bob_direction = "both"                         # "up" | "down" | "both"
 color_mode = "glow"                            # "glow" | "mono" | "passthrough"
+theme = "amber"                                # "amber" | "crt" | "vantablack" | "aurora"
 mono_color = 11                                # ANSI 256 index, used when color_mode = "mono"
 attack = 0.55                                  # smoothing attack (shared defaults with tubeamp)
 release = 0.18                                 # smoothing release
 overdrive = 0.78                               # band level above which a column flares red + bobs extra
+tilt = 0.0                                     # per-band boost toward treble (0=off; try 0.5 if outer rings feel dead)
 ```
 
 If `art_path` is missing or the file can't be read, the plugin renders a visible
 placeholder message instead of crashing.
+
+> **Note:** Keep inline `#` comments on their own line in the TOML config.
+> cliamp's parser may leak comment text into the config value, causing preset
+> lookups or numeric parsing to fail. The plugin strips these defensively, but
+> clean config is cleaner.
 
 ---
 
