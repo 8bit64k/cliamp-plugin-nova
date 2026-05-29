@@ -205,6 +205,8 @@ local smoothed = {0,0,0,0,0,0,0,0,0,0}
 function p:init(rows, cols)
     for i = 1, 10 do smoothed[i] = 0 end
     load_art()
+    -- Diagnostic: log the resolved config so we can see what theme is active.
+    cliamp.log.info("theme=" .. cfg_theme_name .. " preset=" .. (active_preset.name or "?"))
 end
 
 function p:destroy() end
