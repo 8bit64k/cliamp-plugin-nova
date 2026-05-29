@@ -50,9 +50,9 @@ end
 -- Loaded once. art_lines = {string,...}; ring_of[y][x] = band index 1..10.
 
 local art_lines   = nil
+local art_cells   = nil    -- [y][x] -> single display-cell glyph string
 local art_w       = 0      -- max display width across rows
 local art_h       = 0
-local ring_of     = nil    -- [y][x] -> band index (1..10)
 local load_error  = nil    -- non-nil string => render the placeholder
 
 -- Count display columns: UTF-8 lead bytes only (continuation bytes 0x80..0xBF
@@ -106,7 +106,7 @@ local function expand_path(path)
 end
 
 local function load_art()
-    art_lines, ring_of = nil, nil
+    art_lines, art_cells = nil, nil
     art_w, art_h, load_error = 0, 0, nil
 
     if not cfg_art_path or cfg_art_path == "" then
@@ -150,34 +150,26 @@ local function load_art()
         return
     end
 
-    -- Precompute ring (band index) per cell. Square rings via Chebyshev
-    -- distance from center, with x scaled by 0.5 to correct for the ~2:1
-    -- terminal cell aspect ratio so the rings look square on screen.
-    local cx = (art_w + 1) / 2
-    local cy = (art_h + 1) / 2
-    local max_dist = 0
-    local dist = {}
+    -- Pre-extract each row into a flat array of display-cell glyphs so render
+    -- can index art cells in O(1) (avoids re-walking UTF-8 every frame).
+    art_cells = {}
     for y = 1, art_h do
-        dist[y] = {}
-        for x = 1, art_w do
-            local dx = math.abs(x - cx) * 0.5
-            local dy = math.abs(y - cy)
-            local d = (dx > dy) and dx or dy   -- Chebyshev (square rings)
-            dist[y][x] = d
-            if d > max_dist then max_dist = d end
+        local row = {}
+        local s = art_lines[y]
+        local seen, i, n = 0, 1, #s
+        while i <= n do
+            local b = s:byte(i)
+            local len = 1
+            if b >= 0xF0 then len = 4
+            elseif b >= 0xE0 then len = 3
+            elseif b >= 0xC0 then len = 2 end
+            seen = seen + 1
+            row[seen] = s:sub(i, i + len - 1)
+            i = i + len
         end
-    end
-    if max_dist == 0 then max_dist = 1 end
-
-    ring_of = {}
-    for y = 1, art_h do
-        ring_of[y] = {}
-        for x = 1, art_w do
-            local band = 1 + math.floor(dist[y][x] / max_dist * 9 + 0.5)
-            if band < 1 then band = 1 end
-            if band > 10 then band = 10 end
-            ring_of[y][x] = band
-        end
+        -- pad short rows with spaces to art_w
+        for x = seen + 1, art_w do row[x] = " " end
+        art_cells[y] = row
     end
 end
 
@@ -244,48 +236,77 @@ function p:render(bands, frame, rows, cols)
     if not art_lines then
         return placeholder(rows, cols, "dance: no art loaded")
     end
+    if rows < 1 or cols < 1 then return "" end
 
-    -- Letterbox: if the art doesn't fit, hide cleanly (return "").
-    if art_w > cols or art_h > rows then
-        -- Too big for this pane. We could clip, but a half-face reads as broken;
-        -- hide instead and let a resize bring it back.
-        return ""
+    -- Fit the art into the pane. Scale DOWN to fit (never up — keeps the art
+    -- crisp at its native size and centered when the pane is larger). Each
+    -- output cell maps to a source cell via nearest-neighbor, so this works at
+    -- any pane size from cliamp's default 5 rows up to fullscreen.
+    local draw_h = art_h
+    local draw_w = art_w
+    if draw_h > rows then draw_h = rows end
+    if draw_w > cols then draw_w = cols end
+    -- preserve aspect-ish: if one axis must shrink, shrink the other in step so
+    -- the face doesn't get grotesquely squished. Use the tighter ratio.
+    local sh = draw_h / art_h
+    local sw = draw_w / art_w
+    local s  = (sh < sw) and sh or sw
+    draw_h = math.max(1, math.floor(art_h * s + 0.5))
+    draw_w = math.max(1, math.floor(art_w * s + 0.5))
+    if draw_h > rows then draw_h = rows end
+    if draw_w > cols then draw_w = cols end
+
+    -- Ring geometry computed on the OUTPUT grid (resolution-independent).
+    -- Square rings via Chebyshev distance from center, x scaled 0.5 for the
+    -- ~2:1 terminal cell aspect ratio. Band 1 (bass) = center, 10 = edge.
+    local ocx = (draw_w + 1) / 2
+    local ocy = (draw_h + 1) / 2
+    local max_d = 0
+    do
+        local dx = (draw_w - ocx) * 0.5
+        local dy = (draw_h - ocy)
+        max_d = ((dx > dy) and dx or dy)
+        if max_d <= 0 then max_d = 1 end
     end
 
-    local left_pad = math.floor((cols - art_w) / 2)
-    local top_pad  = math.floor((rows - art_h) / 2)
+    local left_pad = math.floor((cols - draw_w) / 2)
+    local top_pad  = math.floor((rows - draw_h) / 2)
     local pad_str  = string.rep(" ", left_pad)
 
     local out = {}
-    -- top padding (blank lines)
     for _ = 1, top_pad do out[#out + 1] = "" end
 
-    for y = 1, art_h do
-        local src = art_lines[y]
+    for oy = 1, draw_h do
+        -- map output row -> source row (nearest neighbor)
+        local sy = math.floor((oy - 0.5) / draw_h * art_h) + 1
+        if sy < 1 then sy = 1 elseif sy > art_h then sy = art_h end
+        local srow = art_cells[sy]
+
         local parts = { pad_str }
         local last_color = nil
-        for x = 1, art_w do
-            local ch = char_at(src, x)
-            if ch == "" then ch = " " end
+        for ox = 1, draw_w do
+            local sx = math.floor((ox - 0.5) / draw_w * art_w) + 1
+            if sx < 1 then sx = 1 elseif sx > art_w then sx = art_w end
+            local ch = srow[sx] or " "
 
             if cfg_color_mode == "passthrough" then
                 parts[#parts + 1] = ch
             else
-                local band = ring_of[y][x]
-                local lvl  = smoothed[band]
+                -- ring/band for this output cell
+                local dx = math.abs(ox - ocx) * 0.5
+                local dy = math.abs(oy - ocy)
+                local d  = (dx > dy) and dx or dy
+                local band = 1 + math.floor(d / max_d * 9 + 0.5)
+                if band < 1 then band = 1 elseif band > 10 then band = 10 end
+
+                local lvl = smoothed[band]
                 local color
                 if cfg_color_mode == "mono" then
-                    -- mono: fixed hue, brightness gate (dim glyph at low level)
                     color = cfg_mono_color
-                    if lvl < 0.12 and ch ~= " " then
-                        -- keep faint structure visible at silence
-                        color = 236
-                    end
+                    if lvl < 0.12 and ch ~= " " then color = 236 end
                 else
-                    local hot = lvl >= cfg_overdrive
-                    color = glow_color(lvl, hot)
+                    color = glow_color(lvl, lvl >= cfg_overdrive)
                 end
-                -- Only emit a color escape when it changes (smaller output).
                 if color ~= last_color then
                     parts[#parts + 1] = fg256(color)
                     last_color = color
@@ -299,7 +320,6 @@ function p:render(bands, frame, rows, cols)
         out[#out + 1] = table.concat(parts)
     end
 
-    -- bottom padding to fill the pane (keeps prior frame from bleeding through)
     for _ = #out + 1, rows do out[#out + 1] = "" end
 
     return table.concat(out, "\n")
