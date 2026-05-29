@@ -1,0 +1,4 @@
+-- dance.lua — cliamp visualizer: animate user-supplied ASCII art from the EQ feed.
+--
+-- STATUS: placeholder. No render logic yet — approach not finalized.
+-- See BRAINSTORM.md for the design space and README.md for install/config.

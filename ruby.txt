@@ -1,0 +1,30 @@
++-------------------------------------------------------+
+|ddddddodddd.           8bit64k       .ddddddcoOOOxddddd|
+|ddddddoodddddddddddoddooddddddddddddddddddodkOOkxdddddd|
+|ddddddddddddddddddddddddddddddlccc:cdoooolkOOxddddddddd|
+|ddodddddddddddddddddddddddddl;codddl;ddlxOOkddddddddddd|
+|dddddddddddddddddddddddoddol:ldxkkdoc;oOOkdoodddddddddd|
+|ooddddddddddddddddddddooddo;oldkOOkol,ddollcldodddddddd|
+|ddl:ccc::cldddddddoddddddd:cdoodkOkdl;::::,.,cclodddddd|
+|dd;oddxdolcccddddddddddlll;loolloxddoo;ll;....',,cldddd|
+|dd;ddxOOxoodxoldoloolllodxkkOOxolcldkl;c:,.. .. . ldddd|
+|dd:lodkOOdoldxlodkkxxKddxkkkOOOOOOxdoxd.....''.  .;dddd|
+|ddd:lodkOxoccoxkOOxO0NKdkOxOOkocxodkkoo;:clc;'.....'odd|
+|oooo;ooodoccddkOOkkOOKN0xxdOxl.......cd::,cddoodl'...co|
+|ddodo;ddoclddxddkOkxxd0Xooll:'. . ....'o:::ckOkddd,...:|
+|ddddd;,ddcdolc..,lkdl:cxkc::;,'...   ,.dxx:ddkOkddo'. .|
+|dddddccxlol,.... .,:;c:;dc,,'',:lc,...cxOkklddkOxddo ..|
+|ddddddo:;l'  .... .::,.'..........;l:;okOkkooddkkddd.'c|
+|dddddoodl;..     ,o;.....'.'  ......':cxOOxO;dddOdoo;cc|
+|dddddddddc;..   'o,....  .... ........':ll,k.lddkOl;ccc|
+|ddoodddool:o;...l'......... .............  c..;ddOlccco|
+|dooooddddo;ooc;c,........... ...........  :. ..:dxo:lod|
+|ddodddddddc:occl...........     ...... ..c;  ..lddd:odd|
+|dddooddddddc;lc. .........  ..';d. ..'..c:',..'oddlcdoo|
+|dddodddolc:;..    .......xll::''.......l;';llcldddcdddo|
+|lc:;;,'..'.....         ...... ....;'.;,. .'codddx;lodd|
+|''.''''..'......  .............'',;'.'.  .:oxxxddd''odo|
+|'''''.'.'.''.. . ..... .'';;,,''....   ..'';::::;.'.,od|
+|'''.'''.'.'.......'..........  . .........';::cok'.'.,o|
+|'''.''''.''.... . '...........   ..........'doklk''.'':|
++-------------------------------------------------------+
