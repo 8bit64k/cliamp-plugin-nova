@@ -40,6 +40,22 @@ local cfg_cycle_secs = tonumber(clean(p:config("cycle_seconds"))) or 20
 if cfg_cycle_secs < 2 then cfg_cycle_secs = 2 end  -- guard against 0/typo thrash
 local cfg_fit        = clean(p:config("fit")) or "contain"
 
+-- Density mutation: as a braille cell climbs the level/color ramp, OR in dots so
+-- the glyph thickens toward solid (toward full). This makes the braille WALL not
+-- just brighten but gain matter on the peaks — a flare thickens the core. Only
+-- braille glyphs (U+2800..U+28FF) mutate; anything else is left as-is. Default ON
+-- (dance is a braille-wall plugin). Toggle off to keep the art's glyphs fixed.
+local cfg_density = true
+do
+    local raw = p:config("density")
+    if type(raw) == "boolean" then
+        cfg_density = raw
+    elseif raw ~= nil then
+        local v = clean(tostring(raw)):lower():gsub("%s+", "")
+        if v == "false" or v == "off" or v == "0" or v == "no" then cfg_density = false end
+    end
+end
+
 -- Overdrive flare: when bands 1-2 (bass) cross cfg_overdrive they latch hot and
 -- cool over time instead of snapping off, so a kick flashes-and-fades.
 -- overdrive_decay = fraction of heat RETAINED per frame: higher = longer tail.
@@ -126,6 +142,55 @@ local ESC = string.char(27)
 local function fg256(n) return ESC .. "[38;5;" .. n .. "m" end
 local function reset()  return ESC .. "[0m" end
 
+-- ---------- Braille density mutation ----------------------------------------
+-- A braille glyph is U+2800 + an 8-bit dot mask. "Toward full" = OR additional
+-- dots into the base glyph as level rises, ending at solid ⣿ (U+28FF). Dots are
+-- added in a bottom-up visual order so the cell appears to FILL UP, like a tiny
+-- sub-cell level meter. Only braille codepoints mutate; callers pass nil for
+-- non-braille cells (which are never touched).
+--
+-- IMPORTANT: cliamp runs gopher-lua (Lua 5.1) — NO native bitwise operators
+-- (>> << | &) and no bit32. All bit work below is plain arithmetic on powers of
+-- two, which is 5.1-safe. (Local `lua` may be 5.3+ and parse bitops fine; the
+-- host would silently fail to load them. Verified gopher-lua = yuin/gopher-lua.)
+--
+-- Braille dot bit layout (cell is 2 cols x 4 rows):
+--   col0: r0=1 r1=2 r2=4 r3=64    col1: r0=8 r1=16 r2=32 r3=128
+-- Bottom-up fill order: bottom row first (64,128), then up.
+local FILL_ORDER = { 64, 128, 4, 32, 2, 16, 1, 8 }
+
+-- Encode a codepoint in 0x2800..0x28FF as 3-byte UTF-8 (no bitops; div/mod).
+-- All braille codepoints are 3-byte: lead 0xE2, then two continuation bytes.
+local braille_cache = {}   -- [codepoint] -> utf8 string, memoized
+local function braille_char(cp)
+    local s = braille_cache[cp]
+    if s then return s end
+    local b1 = 0xE0 + math.floor(cp / 4096)
+    local b2 = 0x80 + (math.floor(cp / 64) % 64)
+    local b3 = 0x80 + (cp % 64)
+    s = string.char(b1, b2, b3)
+    braille_cache[cp] = s
+    return s
+end
+
+-- OR a single power-of-two bit into a mask (5.1-safe): add it only if not set.
+local function set_bit(mask, bit)
+    if math.floor(mask / bit) % 2 == 0 then return mask + bit end
+    return mask
+end
+
+-- Given a base braille codepoint and a level 0..1, return the thickened glyph:
+-- base dots with the first round(level*8) fill-order dots OR'd in.
+local function thicken(base_cp, level)
+    if level <= 0 then return braille_char(base_cp) end
+    local add = math.floor(level * 8 + 0.5)
+    if add <= 0 then return braille_char(base_cp) end
+    if add > 8 then add = 8 end
+    local mask = base_cp - 0x2800
+    for k = 1, add do mask = set_bit(mask, FILL_ORDER[k]) end
+    return braille_char(0x2800 + mask)
+end
+
 -- ---------- Color presets (single swap point for upstream theme integration) ---
 -- Each preset: { glow = {11 ANSI 256 colors}, overdrive = {4 colors} }.
 -- When cliamp exposes theme_colors(), add a from_cliamp_theme() function that
@@ -184,6 +249,7 @@ end
 
 local art_lines   = nil
 local art_cells   = nil    -- [y][x] -> single display-cell glyph string
+local art_code    = nil    -- [y][x] -> braille codepoint if braille cell, else nil
 local art_w       = 0      -- max display width across rows
 local art_h       = 0
 local load_error  = nil    -- non-nil string => render the placeholder
@@ -239,7 +305,7 @@ local function expand_path(path)
 end
 
 local function load_art()
-    art_lines, art_cells = nil, nil
+    art_lines, art_cells, art_code = nil, nil, nil
     art_w, art_h, load_error = 0, 0, nil
 
     if not cfg_art_path or cfg_art_path == "" then
@@ -285,9 +351,14 @@ local function load_art()
 
     -- Pre-extract each row into a flat array of display-cell glyphs so render
     -- can index art cells in O(1) (avoids re-walking UTF-8 every frame).
+    -- art_code[y][x] = the braille codepoint (0x2800..0x28FF) if the cell is a
+    -- braille glyph, else nil. Precomputed so density mutation never decodes
+    -- UTF-8 in the hot loop.
     art_cells = {}
+    art_code  = {}
     for y = 1, art_h do
         local row = {}
+        local crow = {}
         local s = art_lines[y]
         local seen, i, n = 0, 1, #s
         while i <= n do
@@ -298,11 +369,23 @@ local function load_art()
             elseif b >= 0xC0 then len = 2 end
             seen = seen + 1
             row[seen] = s:sub(i, i + len - 1)
+            -- braille is the 3-byte sequence 0xE2 0xA0..0xA3 0x80..0xBF =>
+            -- codepoint 0x2800..0x28FF. Decode without bitops (5.1-safe).
+            if len == 3 and b == 0xE2 then
+                local b2 = s:byte(i + 1)
+                local b3 = s:byte(i + 2)
+                if b2 and b3 then
+                    local cp = ((b - 0xE0) * 4096)
+                             + ((b2 - 0x80) * 64) + (b3 - 0x80)
+                    if cp >= 0x2800 and cp <= 0x28FF then crow[seen] = cp end
+                end
+            end
             i = i + len
         end
         -- pad short rows with spaces to art_w
         for x = seen + 1, art_w do row[x] = " " end
         art_cells[y] = row
+        art_code[y]  = crow
     end
 end
 
@@ -490,7 +573,8 @@ function p:render(bands, frame, rows, cols)
         -- map output row -> source row (nearest neighbor)
         local sy = math.floor((oy - 0.5) / draw_h * art_h) + 1
         if sy < 1 then sy = 1 elseif sy > art_h then sy = art_h end
-        local srow = art_cells[sy]
+        local srow  = art_cells[sy]
+        local scode = art_code[sy]
 
         local parts = { pad_str }
         local last_color = nil
@@ -534,6 +618,17 @@ function p:render(bands, frame, rows, cols)
                 else
                     color = glow_color(lvl, lvl >= cfg_overdrive)
                 end
+
+                -- Density mutation: thicken the braille glyph toward solid as the
+                -- cell heats. Braille cells only (scode[sx] is nil otherwise), so
+                -- non-braille art is never touched. Glyph gains matter on peaks
+                -- in lockstep with color, so a bass flare both brightens AND
+                -- thickens the core.
+                if cfg_density and scode then
+                    local base_cp = scode[sx]
+                    if base_cp then ch = thicken(base_cp, lvl) end
+                end
+
                 if color ~= last_color then
                     parts[#parts + 1] = fg256(color)
                     last_color = color

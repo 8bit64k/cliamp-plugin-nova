@@ -202,7 +202,12 @@ FIT MODES (added 2026-05-29, between #1 and #2): new `fit` config.
   fit="fill" + Shift+V full-screen. NOTE: the 5-row default pane is a cliamp
   constant (DefaultVisRows); big pane = Shift+V, not a plugin setting.
 3. Gamma / response curve
-4. Dead zone
+4. Dead zone — PRIORITY (revisit soon). The round fix (commit 3d661cf) bumped
+   low-level signal up one ramp stop, which surfaced more treble/outer-ring
+   activity (faint highs that used to floor to black now show). 8bit64k noticed
+   the higher bands got more active. A `dead_zone` config (clamp levels below a
+   floor, ~0.10-0.12, to true off) is the right fix: keeps the correct round
+   mapping AND restores a clean noise floor. New config knob.
 5. Aspect ratio
 6. Ring count
 7. ~~Overdrive behavior~~ — DONE 2026-05-29. Bass bands (1,2) only. TRANSIENT-
@@ -222,7 +227,19 @@ FIT MODES (added 2026-05-29, between #1 and #2): new `fit` config.
    cost). Verified scratchpad/test_overdrive.lua: sustained bass does NOT re-flare,
    kick-from-quiet DOES and the tail outlives the hit; no overflow all modes.
    Tuning constants (BASE_RATE/ONSET_MARGIN/spill) hardcoded — kept config surface lean.
-8. Bass-transient jitter (still deferred per 8bit64k)
+8. ~~Bass-transient jitter~~ SHELVED 2026-05-29 — displaced by DENSITY mutation,
+   which is far more braille-native. Instead of MOVING the art on a kick, braille
+   glyphs THICKEN toward solid ⣿ as they heat (`density` config, default on; OR dots
+   in "toward full"; only braille cells mutate; precomputed art_code[y][x] avoids
+   per-frame UTF-8 decode). So the wall gains matter on peaks, not just brightness,
+   and a bass flare thickens the core. CRITICAL impl note: cliamp = gopher-lua (Lua
+   5.1) — NO bitwise operators (>> << | &), no bit32. All dot math is arithmetic on
+   powers of two (set_bit via div/mod). Local `lua` is 5.3+ and parses bitops fine,
+   but the HOST would silently fail to load them — always write 5.1-safe. Verified
+   scratchpad/test_density.lua (codepoint roundtrip, monotonic thicken, base
+   preserved, level 1.0 = solid ⣿) and harness (full-blast wall fills to ⣿⣿⣿,
+   density=off stays base ⠡⠡⠡). Jitter (positional punch) remains POSSIBLE later if
+   ever wanted, but density is the headline texture reaction now.
 
 *Checkpoint updated 2026-05-29. Resume at ring shape + ring blend.*
 

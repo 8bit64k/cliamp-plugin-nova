@@ -2,8 +2,11 @@
 
 ## Status
 
-**Working v0.1.** A cliamp visualizer that recolors a user-supplied ASCII/braille
-art file from the 10-band EQ. The art's glyphs are preserved — only color reacts.
+**Working v0.1.** dance is a **braille-wall visualizer**: a dense braille texture
+(e.g. `dots_braille.txt`) under `fit="fill"` that the 10-band EQ lights AND
+thickens. SCOPE DECISION (2026-05-29): dance is braille-wall ONLY. ASCII portrait
+art (Ruby, the CRT) has real problems at cliamp's tiny default pane and will be a
+SEPARATE plugin. Don't re-add portrait-preservation hedging here.
 
 - Local dir: `/home/nick/builds/cliamp-plugin-ascii-eq/` (NOT renamed; repo IS `cliamp-plugin-dance`)
 - Repo: `github.com/8bit64k/cliamp-plugin-dance` (PRIVATE, manual install — clone + cp)
@@ -28,10 +31,14 @@ art file from the 10-band EQ. The art's glyphs are preserved — only color reac
    character. When a tuning knob trades "correct" for "more polished but less retro,"
    lean retro and make the polish OPT-IN, not the default.
 
-2. **The art is an immutable canvas.** The visualizer never moves or replaces the
-   user's glyphs — they carry the image density. Audio drives COLOR only (with the
-   deferred exception of bass-transient jitter, which would shift the whole field
-   briefly on a kick, then settle — see tuning backlog).
+2. **Audio drives color AND density; it does not move the art.** Color: each cell
+   recolors by its ring's level. Density (`density`, default on): braille glyphs
+   thicken toward solid ⣿ as they heat (OR dots in, "toward full"), so the wall
+   gains matter on peaks, not just brightness. Only braille glyphs mutate; the art
+   is never translated/shaken (positional jitter #8 is shelved — density displaced
+   it as the texture reaction). NOTE: this is the deliberate exception to the old
+   "immutable canvas" rule — that rule protected PORTRAITS, and dance is now
+   braille-wall-only, so glyph mutation is correct here.
 
 3. **User content stays in the user's clone.** `art_path` is an absolute path the
    plugin reads in place. Never copy art into cliamp's own dirs (`~/.config/cliamp/...`).
