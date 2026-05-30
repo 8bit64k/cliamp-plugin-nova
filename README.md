@@ -61,7 +61,8 @@ Add a `[plugins.dance]` block to your cliamp config:
 [plugins.dance]
 art_path = "/abs/path/to/cliamp-plugin-dance/ruby.txt"   # required — absolute path to the ASCII art file (lives in your clone, not cliamp's dirs)
 color_mode = "glow"                            # "glow" | "mono" | "passthrough"
-ring_shape = "square"                          # "square" | "diamond" | "circle" — geometry of the concentric bands
+ring_shape = "square"                          # "square" | "diamond" | "circle" | "cycle" — geometry of the concentric bands
+cycle_seconds = 20                             # when ring_shape="cycle", seconds per shape before rotating (min 2)
 theme = "amber"                                # "amber" | "crt" | "vantablack" | "aurora"
 mono_color = 11                                # ANSI 256 index, used when color_mode = "mono"
 attack = 0.55                                  # smoothing attack (shared defaults with tubeamp)
@@ -72,6 +73,16 @@ tilt = 0.0                                     # per-band boost toward treble (0
 
 If `art_path` is missing or the file can't be read, the plugin renders a visible
 placeholder message instead of crashing.
+
+### Reviewing shapes: `ring_shape = "cycle"`
+
+Set `ring_shape = "cycle"` to auto-rotate through square → diamond → circle every
+`cycle_seconds` (default 20). The active shape is labelled `[square]` / `[diamond]`
+/ `[circle]` in the bottom-right corner so you can tell them apart as it rotates.
+This needs **no restart between shapes** — cliamp doesn't hot-reload config, but
+the cycle runs off the wall clock while the plugin is live, so it keeps rotating
+within a single session. Use it to pick the shape you like, then set
+`ring_shape` to that fixed value (the label only shows in cycle mode).
 
 > **Note:** Keep inline `#` comments on their own line in the TOML config.
 > cliamp's parser may leak comment text into the config value, causing preset

@@ -152,6 +152,13 @@ same shape, swap one line).
    metric can never diverge. Geometry verified numerically via
    `scratchpad/band_map_probe_allshapes.lua` BEFORE color (skill mandate). Unknown
    shape falls back to square. Default = square (no behavior change for existing configs).
+   Also added `ring_shape="cycle"`: rotates square->diamond->circle every
+   `cycle_seconds` (default 20, min 2) off `os.time()` (one of the 4 os fns the
+   sandbox keeps). Resolves metric ONCE per frame via `active_dist()` so the whole
+   frame stays on one shape and max_d stays consistent. Bottom-right `[shape]` label
+   shown in cycle mode only. No restart needed between shapes — wall clock advances
+   live. Cycle rotation verified deterministically with a fake-clock test
+   (`scratchpad/test_cycle.lua`): boundaries + wrap-around all correct.
 2. Ring blend (smooth band boundaries) — NEXT. Plan: interpolate LEVEL between the
    two nearest bands by fractional ring position (`pos=d/max_d*9`, lo=floor, frac=pos-lo,
    lvl=smoothed[lo+1]*(1-frac)+smoothed[lo+2]*frac, clamped at ends). Make it a

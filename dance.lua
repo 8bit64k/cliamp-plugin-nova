@@ -36,6 +36,8 @@ local cfg_overdrive  = tonumber(clean(p:config("overdrive"))) or 0.78
 local cfg_tilt       = tonumber(clean(p:config("tilt"))) or 0.0
 local cfg_theme_name = clean(p:config("theme")) or "amber"
 local cfg_ring_shape = clean(p:config("ring_shape")) or "square"
+local cfg_cycle_secs = tonumber(clean(p:config("cycle_seconds"))) or 20
+if cfg_cycle_secs < 2 then cfg_cycle_secs = 2 end  -- guard against 0/typo thrash
 
 -- ---------- Ring distance metric --------------------------------------------
 -- Rings are level sets of a distance-from-center metric on the OUTPUT grid.
@@ -53,7 +55,32 @@ local DIST = {
     diamond = function(adx, ady) return adx + ady end,
     circle  = function(adx, ady) return math.sqrt(adx * adx + ady * ady) end,
 }
-local dist = DIST[cfg_ring_shape] or DIST["square"]
+
+-- ring_shape = "cycle" rotates square -> diamond -> circle every
+-- cfg_cycle_secs seconds for hands-off visual review (no restart needed:
+-- cliamp doesn't hot-reload config, but os.time() advances live while the
+-- plugin runs, so the shape changes within a single session). os.time() is
+-- one of the four os functions the cliamp sandbox keeps (time/date/clock/
+-- getenv). The cycle is anchored to a load-time baseline so it always starts
+-- on "square" when the visualizer is (re)selected.
+local CYCLE_ORDER = { "square", "diamond", "circle" }
+local cycle_mode  = (cfg_ring_shape == "cycle")
+local cycle_t0    = os.time()
+
+-- Resolve the active distance metric for THIS frame. In fixed-shape mode this
+-- is constant; in cycle mode it advances with wall-clock time. Returns both
+-- the metric function and the shape name (so render can label the active shape).
+local function active_dist()
+    if cycle_mode then
+        local elapsed = os.time() - cycle_t0
+        if elapsed < 0 then elapsed = 0 end  -- clock skew guard
+        local idx = (math.floor(elapsed / cfg_cycle_secs) % #CYCLE_ORDER) + 1
+        local name = CYCLE_ORDER[idx]
+        return DIST[name], name
+    end
+    return (DIST[cfg_ring_shape] or DIST["square"]),
+           (DIST[cfg_ring_shape] and cfg_ring_shape or "square")
+end
 
 -- ---------- ANSI helpers -----------------------------------------------------
 
@@ -324,6 +351,10 @@ function p:render(bands, frame, rows, cols)
     -- Rings are level sets of the selected distance metric (square/diamond/
     -- circle); x scaled 0.5 for the ~2:1 terminal cell aspect ratio so circles
     -- read as circles, not eggs. Band 1 (bass) = center, 10 = edge.
+    -- Resolve the metric ONCE per frame (in cycle mode it advances with the
+    -- wall clock; resolving once keeps the whole frame on a single shape and
+    -- keeps max_d consistent with the per-cell lookup).
+    local dist, shape_name = active_dist()
     local ocx = (draw_w + 1) / 2
     local ocy = (draw_h + 1) / 2
     local max_d = 0
@@ -386,6 +417,16 @@ function p:render(bands, frame, rows, cols)
     end
 
     for _ = #out + 1, rows do out[#out + 1] = "" end
+
+    -- In cycle mode only, label the active shape on the bottom row so you can
+    -- tell which metric you're looking at as it rotates. Fixed-shape mode stays
+    -- label-free (clean output). Dim gray, right-aligned, never overflows.
+    if cycle_mode and rows > 0 and cfg_color_mode ~= "passthrough" then
+        local label = "[" .. shape_name .. "]"
+        local pad = cols - #label
+        if pad < 0 then pad = 0 end
+        out[rows] = string.rep(" ", pad) .. fg256(240) .. label .. reset()
+    end
 
     return table.concat(out, "\n")
 end
