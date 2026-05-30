@@ -169,7 +169,11 @@ local overdrive_ramp = active_preset.overdrive
 
 local function glow_color(level, hot)
     local ramp = hot and overdrive_ramp or glow_ramp
-    local idx = math.floor(level * (#ramp - 1)) + 1
+    -- Round (not floor) so the TOP ramp stop is reachable below level==1.0.
+    -- With floor, the brightest color only appeared at an exact 1.0, which the
+    -- smoothed/heat level basically never hits — so the peak (e.g. white) was
+    -- effectively unreachable. Rounding spreads stops evenly across [0,1].
+    local idx = math.floor(level * (#ramp - 1) + 0.5) + 1
     if idx < 1 then idx = 1 end
     if idx > #ramp then idx = #ramp end
     return ramp[idx]
