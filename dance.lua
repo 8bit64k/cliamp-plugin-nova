@@ -40,6 +40,23 @@ local cfg_cycle_secs = tonumber(clean(p:config("cycle_seconds"))) or 20
 if cfg_cycle_secs < 2 then cfg_cycle_secs = 2 end  -- guard against 0/typo thrash
 local cfg_fit        = clean(p:config("fit")) or "contain"
 
+-- ring_blend: smooth the band boundaries by interpolating the LEVEL between the
+-- two bands a cell sits between, instead of snapping to the nearest. Default ON.
+-- Config comes in as a string ("true"/"false") or possibly a real bool; treat
+-- anything explicitly falsey as off, everything else (incl. nil) as on.
+local cfg_ring_blend = true
+do
+    local raw = p:config("ring_blend")
+    if type(raw) == "boolean" then
+        cfg_ring_blend = raw
+    elseif raw ~= nil then
+        local v = clean(tostring(raw)):lower():gsub("%s+", "")
+        if v == "false" or v == "off" or v == "0" or v == "no" then
+            cfg_ring_blend = false
+        end
+    end
+end
+
 -- ---------- Ring distance metric --------------------------------------------
 -- Rings are level sets of a distance-from-center metric on the OUTPUT grid.
 -- The shape of a ring is determined entirely by which metric we use; band
@@ -402,10 +419,27 @@ function p:render(bands, frame, rows, cols)
                 local dx = math.abs(ox - ocx) * 0.5
                 local dy = math.abs(oy - ocy)
                 local d  = dist(dx, dy)
-                local band = 1 + math.floor(d / max_d * 9 + 0.5)
-                if band < 1 then band = 1 elseif band > 10 then band = 10 end
 
-                local lvl = smoothed[band]
+                -- Continuous ring position in [0,9]. With blend ON we interpolate
+                -- the level between the two bands the cell sits between, so ring
+                -- boundaries dissolve into a smooth gradient. With blend OFF we
+                -- snap to the nearest band (hard concentric steps).
+                local pos = d / max_d * 9
+                if pos < 0 then pos = 0 elseif pos > 9 then pos = 9 end
+                local lvl
+                if cfg_ring_blend then
+                    local lo = math.floor(pos)
+                    if lo > 8 then lo = 8 end          -- keep lo+1 (Lua lo+2) <= 10
+                    local frac = pos - lo
+                    local a = smoothed[lo + 1]
+                    local b = smoothed[lo + 2]
+                    lvl = a + (b - a) * frac
+                else
+                    local band = 1 + math.floor(pos + 0.5)
+                    if band < 1 then band = 1 elseif band > 10 then band = 10 end
+                    lvl = smoothed[band]
+                end
+
                 local color
                 if cfg_color_mode == "mono" then
                     color = cfg_mono_color

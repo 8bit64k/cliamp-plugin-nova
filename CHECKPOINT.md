@@ -1,8 +1,9 @@
 # CHECKPOINT — cliamp-plugin-dance (formerly cliamp-plugin-ascii-eq)
 
 **Status:** v0.1 working. Square-ring concentric glow visualizer renders at all
-pane sizes. Ring SHAPE now selectable (square/diamond/circle). Debug scaffolding
-removed. Three test arts in repo. Next: ring blend.
+pane sizes. Ring SHAPE selectable (square/diamond/circle/cycle). fit=contain/fill.
+ring_blend smooths band boundaries (default on). Debug scaffolding removed.
+Next: gamma curve, jitter, or truecolor ramp.
 
 **Last commit:** see `git log --oneline -1` (latest = braille ruby.txt swap).
 **Branch:** master. **Repo:** github.com/8bit64k/cliamp-plugin-dance (PRIVATE).
@@ -96,8 +97,9 @@ solid blob (dark=filled) or pure noise (edge-detect on busy background).
 RESOLVED: art comparison done. noise_braille.txt + art_max.txt are the primary test
 files. crt.txt is the crispest synthetic braille. ruby.txt kept for sentimental value.
 
-Next session: ring blend (#2) — see Tuning list for the level-interpolation plan.
-Then jitter (#8, still deferred per 8bit64k's earlier call).
+Next session: ring blend done — next tuning item is gamma/response curve (#3) or
+the deferred bass-transient jitter (#8). Possible bigger item: truecolor 24-bit
+ramp interpolation (removes the 11-stop brightness ceiling that blend can't).
 
 ---
 
@@ -160,11 +162,19 @@ same shape, swap one line).
    shown in cycle mode only. No restart needed between shapes — wall clock advances
    live. Cycle rotation verified deterministically with a fake-clock test
    (`scratchpad/test_cycle.lua`): boundaries + wrap-around all correct.
-2. Ring blend (smooth band boundaries) — NEXT. Plan: interpolate LEVEL between the
-   two nearest bands by fractional ring position (`pos=d/max_d*9`, lo=floor, frac=pos-lo,
-   lvl=smoothed[lo+1]*(1-frac)+smoothed[lo+2]*frac, clamped at ends). Make it a
-   toggle (`ring_blend`, default on) so stepped vs smooth is A/B-able. Tune against
-   whichever shape 8bit64k picks.
+2. ~~Ring blend (smooth band boundaries)~~ — DONE 2026-05-29. `ring_blend` config,
+   default ON, toggle off with `ring_blend = false`. Per cell: compute continuous
+   `pos = d/max_d*9`; blend ON interpolates LEVEL between the two bracketing bands
+   (`lo=floor(pos)` clamped to 8 so lo+2<=10, `frac=pos-lo`, `lvl=a+(b-a)*frac`);
+   blend OFF keeps the old snap (`band=1+floor(pos+0.5)`). Endpoints identical both
+   ways (center=band1, edge=band10) — blend only smooths transitions, doesn't shift
+   the bass-center/treble-edge mapping. Bool parsed defensively (string or real
+   bool; false/off/0/no => off, else on). Verified: parses; blend math proven
+   smoother than snap with matching endpoints (`scratchpad/test_blend.lua`); no
+   overflow across blend on/off + cycle + fill. NOTE: smooths SPATIAL banding only;
+   still bounded by the 11-stop ramp (up to 11 brightness steps remain in the ANSI).
+   Truecolor 24-bit inter-stop interpolation would remove that ceiling — separate
+   future item, NOT part of blend.
 
 FIT MODES (added 2026-05-29, between #1 and #2): new `fit` config.
 - `contain` (default) = aspect-preserving scale-down, letterboxed. For pictures.

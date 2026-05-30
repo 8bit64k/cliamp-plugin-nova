@@ -64,6 +64,7 @@ color_mode = "glow"                            # "glow" | "mono" | "passthrough"
 ring_shape = "square"                          # "square" | "diamond" | "circle" | "cycle" — geometry of the concentric bands
 cycle_seconds = 20                             # when ring_shape="cycle", seconds per shape before rotating (min 2)
 fit = "contain"                                # "contain" = preserve aspect, letterboxed (pictures) | "fill" = stretch to fill the whole pane (textures)
+ring_blend = true                              # true = smooth gradient across rings (default) | false = hard stepped band boundaries
 theme = "amber"                                # "amber" | "crt" | "vantablack" | "aurora"
 mono_color = 11                                # ANSI 256 index, used when color_mode = "mono"
 attack = 0.55                                  # smoothing attack (shared defaults with tubeamp)
