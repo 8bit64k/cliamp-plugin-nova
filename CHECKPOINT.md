@@ -240,6 +240,12 @@ FIT MODES (added 2026-05-29, between #1 and #2): new `fit` config.
    preserved, level 1.0 = solid ⣿) and harness (full-blast wall fills to ⣿⣿⣿,
    density=off stays base ⠡⠡⠡). Jitter (positional punch) remains POSSIBLE later if
    ever wanted, but density is the headline texture reaction now.
+   DENSITY ENVELOPE (added 2026-05-29): density has its OWN attack/release,
+   separate from color smoothing — `density_attack` (0.6, fill speed) and
+   `density_release` (0.15, shed speed). Per-band `dens[]` chases effective[] with
+   these; the per-cell glyph reads a `dlvl` interpolated from dens[] (same ring
+   blend/snap as color's lvl, but its own envelope). Low release = dots melt slowly
+   after a hit = CRT phosphor persistence. Both 1.0 = instant tracking (old behavior).
 
 *Checkpoint updated 2026-05-29. Resume at ring shape + ring blend.*
 

@@ -56,7 +56,14 @@ do
     end
 end
 
--- Overdrive flare: when bands 1-2 (bass) cross cfg_overdrive they latch hot and
+-- Density envelope: dots fill/shed on their OWN attack/release, separate from
+-- color smoothing — so the wall can pop dots in fast and melt them away slowly,
+-- like CRT phosphor persistence. density_attack = fill speed (high=snappy),
+-- density_release = shed speed (low=lingering trail). Both 1.0 = track instantly.
+local cfg_dens_attack  = tonumber(clean(p:config("density_attack")))  or 0.6
+local cfg_dens_release = tonumber(clean(p:config("density_release"))) or 0.15
+if cfg_dens_attack  < 0 then cfg_dens_attack  = 0 elseif cfg_dens_attack  > 1 then cfg_dens_attack  = 1 end
+if cfg_dens_release < 0 then cfg_dens_release = 0 elseif cfg_dens_release > 1 then cfg_dens_release = 1 end
 -- cool over time instead of snapping off, so a kick flashes-and-fades.
 -- overdrive_decay = fraction of heat RETAINED per frame: higher = longer tail.
 -- 0 = no retention = instant snap (old behavior); ~0.85 = long glowing tail.
@@ -407,9 +414,13 @@ local bass_base = {0, 0}
 -- per frame; the per-cell color path reads this instead of smoothed[] so the
 -- flare is uniform across each concentric ring (correct) and costs nothing per cell.
 local effective = {0,0,0,0,0,0,0,0,0,0}
+-- Density envelope per band: chases effective[] with its own attack/release so
+-- dots fill/shed on a separate timescale from color (phosphor-persistence feel).
+-- This is the level density mutation reads (NOT effective[] directly).
+local dens      = {0,0,0,0,0,0,0,0,0,0}
 
 function p:init(rows, cols)
-    for i = 1, 10 do smoothed[i] = 0; effective[i] = 0 end
+    for i = 1, 10 do smoothed[i] = 0; effective[i] = 0; dens[i] = 0 end
     heat[1], heat[2] = 0, 0
     bass_base[1], bass_base[2] = 0, 0
     load_art()
@@ -501,6 +512,19 @@ function p:render(bands, frame, rows, cols)
         end
     end
 
+    -- Density envelope: chase effective[] with its OWN attack/release so dots
+    -- fill fast and shed slow (CRT phosphor persistence) independent of color.
+    -- Only advanced when density is on. dens[] is what the glyph mutation reads.
+    if cfg_density then
+        for i = 1, 10 do
+            local target = effective[i]
+            if target > dens[i] then
+                dens[i] = dens[i] + (target - dens[i]) * cfg_dens_attack
+            else
+                dens[i] = dens[i] - (dens[i] - target) * cfg_dens_release
+            end
+        end
+    end
     if load_error then
         return placeholder(rows, cols, load_error)
     end
@@ -597,7 +621,7 @@ function p:render(bands, frame, rows, cols)
                 -- snap to the nearest band (hard concentric steps).
                 local pos = d / max_d * 9
                 if pos < 0 then pos = 0 elseif pos > 9 then pos = 9 end
-                local lvl
+                local lvl, dlvl
                 if cfg_ring_blend then
                     local lo = math.floor(pos)
                     if lo > 8 then lo = 8 end          -- keep lo+1 (Lua lo+2) <= 10
@@ -605,10 +629,16 @@ function p:render(bands, frame, rows, cols)
                     local a = effective[lo + 1]
                     local b = effective[lo + 2]
                     lvl = a + (b - a) * frac
+                    -- density level uses the SAME ring interpolation but its own
+                    -- envelope (dens[]) so dots fill/shed independently of color.
+                    local da = dens[lo + 1]
+                    local db = dens[lo + 2]
+                    dlvl = da + (db - da) * frac
                 else
                     local band = 1 + math.floor(pos + 0.5)
                     if band < 1 then band = 1 elseif band > 10 then band = 10 end
                     lvl = effective[band]
+                    dlvl = dens[band]
                 end
 
                 local color
@@ -626,7 +656,7 @@ function p:render(bands, frame, rows, cols)
                 -- thickens the core.
                 if cfg_density and scode then
                     local base_cp = scode[sx]
-                    if base_cp then ch = thicken(base_cp, lvl) end
+                    if base_cp then ch = thicken(base_cp, dlvl) end
                 end
 
                 if color ~= last_color then
