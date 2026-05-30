@@ -1,0 +1,393 @@
+# CHECKPOINT — cliamp-plugin-dance (formerly cliamp-plugin-ascii-eq)
+
+**Status:** v0.1 working, feeling good ("it's dancing"). Braille-wall visualizer:
+concentric EQ rings (bass=center, treble=edge) LIGHT and THICKEN a braille wall.
+Features: ring shape square/diamond/circle/cycle; fit contain/fill; ring_blend
+(smooth gradient); transient-triggered overdrive flare w/ decay tail + white-hot
+bleed; density mutation (glyphs thicken toward solid ⣿) with its own attack/release
+envelope (phosphor persistence). Render hot loop optimized ~2.2x. Amber hot peak =
+magenta 198 (white experiment reverted). All pushed.
+
+RESUME POINT — next session: tuning backlog #4 DEAD ZONE is flagged PRIORITY (the
+round fix surfaced extra low-level treble activity; a `dead_zone` config to clamp
+sub-floor levels to off is the clean fix). Also open: gamma/response curve (#3),
+aspect ratio knob (#5), ring count (#6), truecolor 24-bit ramp (removes 11-stop
+ceiling). Defaults (flare onset margin 0.18/baseline 0.05, density 0.6/0.15) are
+reasoned but NOT yet validated against lots of real music — tune by ear when ready.
+
+## PERF WORK (2026-05-30) — render cost profiling + canvas cap / frame-skip
+
+Plugin runs ~20% CPU heavier than native visualizers; heaviest at fit=fill on a
+big screen. Profiled the real render path (scratchpad/bench_render.lua — reusable;
+run with PLAIN `lua`, NOT luajit: host is gopher-lua 5.1, no JIT, so numbers are
+RELATIVE cost indicators, not host fps).
+
+cliamp ticks a Lua visualizer at TickFast = 50ms = **20 FPS** while playing
+(TickSlow 200ms/5fps when paused/overlay). Source: ui/tick.go + luaModeDriver in
+ui/visualizer.go (TickInterval -> defaultDriverTickInterval). No host "skip" API;
+returning a NON-string from render() triggers cliamp's silent frame-REUSE (repaint
+last) — that's the mechanism a plugin-side frame-skip uses.
+
+KEY FINDING — cost is almost PERFECTLY LINEAR in drawn cells (draw_w*draw_h):
+  70x5  (350)   0.14ms   0.458 ms/1000cells
+ 120x30 (3600)  1.38ms   0.418
+ 200x50 (10000) 3.63ms   0.412
+ 320x80 (25600) 10.30ms  0.410   <- 4K-ish worst case
+Flat ms/1000cells across 73x size range => no fixed overhead to chase; the cost
+IS the per-cell loop. Both your levers (cap cells / skip frames) attack this.
+
+Component breakdown @200x50 (~4.16ms baseline):
+ density mutation ~23% | color+ring math ~20% (passthrough floor=0.84ms=20%) |
+ blend ~7% | circle-sqrt ~7% over square. density + color are the real work
+ (don't gut). fit=contain already ~35% cheaper than fill (letterboxes -> fewer cells).
+
+TRADEOFF the data exposes: capping fit=fill on a huge screen necessarily makes
+the wall a CENTERED BLOCK instead of edge-to-edge (you can't fill 320 cols with
+fewer than 320 cols of glyphs). Frame-skip is the lever that KEEPS fill edge-to-
+edge while cutting AVERAGE cpu (trades refresh rate, not coverage). So: cap =
+per-frame ceiling (changes fill look on huge panes), skip = average-rate cut
+(preserves fill look). They compose.
+
+BUILD ORDER: (1) canvas cap [DONE], (2) render_rate (1-in-N w/ cached frame)
+[DONE], (3) transient-override so bass FLARES never drop while skipping [DONE —
+folded into render_rate]. Knobs default OFF (max 0/0, render_rate 1.0) =
+byte-for-byte old behavior. Verified results:
+ - cost linear in cells; cap 4K 320x80 -> 160x48 = -69%
+ - render_rate avg cut ~(1-rate): 0.5 -51%, 0.33 -68%, 0.25 -75%
+ - COMBINED cap160x48 + rate0.33 on 4K: 9.88 -> 1.07 ms avg (-89%)
+ - tests: scratchpad/test_cap.lua + test_frameskip.lua pass; render harness
+   unchanged across themes/fit/cycle; bench tools in scratchpad/bench_*.lua.
+RENDER_RATE SEMANTICS: it's the FRACTION of frames rendered (0..1), not a skip
+count — 8bit64k finds the 0->1 dial more natural than "skip N". 1.0=every frame,
+0.5=half, 0.25=quarter. Values <0.25 bump to 0.25 (a rate of 0='never' is
+meaningless). Internally maps to integer skip=round(1/rate)-1.
+STILL TODO for these knobs: README config table + docs/DESIGN.md not yet updated
+with max_cols/max_rows/render_rate (batched at session end per 8bit64k). Then
+back to the tuning backlog (#4 dead_zone PRIORITY).
+
+## TOWARD-CENTER DENSITY FILL (2026-05-30) — aesthetic, but reinforces the design
+
+8bit64k noticed braille glyphs thickened but NOT toward the center (some did by
+coincidence). Since dance maps art into concentric rings around the pane center,
+density should accrete TOWARD center as the wall heats — reinforcing the radial
+structure instead of fighting it. DONE: replaced the single bottom-up FILL_ORDER
+with 9 direction-specific orders (FILL_ORDERS[dirx][diry], dirx/diry in {-1,0,1}),
+picked per-cell by the SIGN of the cell's offset from center. A cell left of
+center fills from its RIGHT edge inward; above-center fills from the BOTTOM up;
+corners from the dot nearest center. thicken() now takes (fill_order, dkey);
+cache is thicken_cache[dkey][base_cp][add] (9 dirs x 256 x 9, still tiny, no
+per-frame bit loop). Orders derived by sorting dots toward the center-facing
+edge then VISUALLY verified (scratchpad/viz_fill.lua + show_final.lua: a
+bass-heavy radial gradient shows all 4 quadrants leaning inward toward the solid
+core). Perf unchanged (a couple comparisons + 1 table index per cell; thicken
+still memoized). No new config knob — folded under existing `density` toggle.
+GOTCHA confirmed: passthrough color_mode SKIPS density entirely (the is_pass
+branch bypasses the else-block) — use glow/mono to see thickening.
+Verified: scratchpad/test_center_fill.lua asserts L/R/T/B dot mass leans toward
+center in all 4 regions; cap + frameskip suites still pass; no overflow.
+This is a DURABLE design decision -> promoted to AGENTS.md.
+
+## PROCEDURAL WALL — NO FILE NEEDED (2026-05-30)
+
+8bit64k's realization: the uniform braille wall starts at a known state and
+changes under known conditions, so it doesn't need a pre-defined file — generate
+a blank canvas on load. DONE: `generate_wall()` fills art_cells/art_code with a
+single base glyph at a fixed 35x188 source grid (matches old dots_braille dims so
+fit=contain/fill behave identically); the existing fit/downscale/ring/density path
+renders it exactly as it would a file. Config: `start = "black" | "stipple"`
+(default stipple). black = base ⠀ (U+2800, empty -> blooms dots in from nothing);
+stipple = base ⠡ (U+2821, the old dots_braille least-dense look -> faint resting
+texture that thickens). Naming: 8bit64k picked black|stipple over black|full
+(full read as "solid/maxed", misleading). art_path KEPT as optional override
+(set -> load file; unset -> generate). Default needs ZERO files.
+- Render-loop sentinel changed from art_lines to ART_CELLS (art_lines is only set
+  on the file path; generator sets art_cells/art_code only). Both lazy-load
+  checks now gate on art_cells.
+- The 5 generated wall .txt files (dots_braille, dots_dense_braille, noise_braille,
+  weave_braille, art_max) MOVED to scratchpad/ (gitignored) + untracked from git.
+  Portrait files (crt.txt, ruby.txt, ruby_ascii.txt) LEFT at root — different
+  lineage, headed for the future separate portrait plugin. noise/weave still
+  available as optional art_path targets from scratchpad if needed.
+- README updated: leads with procedural wall (no file), art_path optional, documents
+  start + the perf knobs (max_cols/max_rows/render_rate), drops stale "columns bob"
+  intro + ruby.txt test-art references.
+- 8bit64k picked BLACK as the default (2026-05-30, "it's beautiful") — empty
+  canvas, dots bloom in from nothing. stipple remains available via config.
+  DECISION RESOLVED: default start = "black".
+
+**Last commit:** HEAD = "perf: max_cols/max_rows canvas cap + render_rate (both
+default off)". Local == remote, verified after push.
+**Branch:** master. **Repo:** github.com/8bit64k/cliamp-plugin-dance (PRIVATE).
+**Durable design rules live in AGENTS.md** (not here — CHECKPOINT rolls over).
+
+---
+
+## What this project is
+
+A cliamp Lua visualizer that loads a user-supplied ASCII/braille art file and
+makes it glow to the 10-band EQ. The art is mapped into 10 concentric SQUARE
+rings (Chebyshev distance from center): band 1 (32 Hz bass) drives the center,
+each band outward, band 10 (16 kHz treble) the outer edge. Bass-heavy music
+keeps the center lit/throbbing; sparse treble makes the edges flare occasionally.
+Reuses tubeamp's amber glow ramp so the plugins feel like one family.
+
+- Local dir: `/home/nick/builds/cliamp-plugin-ascii-eq/` (dir NOT renamed; repo IS `cliamp-plugin-dance`)
+- Entry file: `dance.lua` (repo root — required by cliamp plugin manager)
+- Sibling: `~/builds/cliamp-plugin-tubeamp/` (shipped v1.2.0; its docs/DESIGN.md is the gold standard)
+- Upstream cliamp checkout: `~/builds/cliamp/` (read luaplugin/*.go for ground truth)
+
+---
+
+## Design decisions (locked with 8bit64k)
+
+1. **Approach:** concentric SQUARE rings (Chebyshev), bass=center / treble=edge.
+   This came from 8bit64k's own idea ("lowest bands map to inner areas, next
+   around that") + the keystone observation that music is bass-heavy / treble-
+   sparse. Chosen over the originally-recommended #1+#3 (column-bob + glow).
+2. **Square rings**, not circles/diamond. x scaled 0.5 to correct ~2:1 cell aspect.
+3. **Glyphs preserved, only color reacts** (don't replace art chars — they carry
+   the image density). passthrough/glow/mono modes.
+4. **Jitter DEFERRED** to a later version. Build/tune color moods first, then add
+   bass-transient-gated global jitter (punches on the kick, otherwise still —
+   NOT continuous bass shake).
+5. **Name:** "dance" (provisional, renameable). Installs as visualizer `dance`.
+6. **Private repo + manual install** (clone + cp, README has commands). NOT public.
+7. **Art lives in the clone**, not in cliamp's app dirs. `art_path` = absolute
+   path (tilde-expanded by the plugin).
+
+---
+
+## Bugs found + fixed this session (all real cliamp gotchas)
+
+1. **Tilde not expanded.** `cliamp.fs.read/exists` call Go `os.ReadFile/os.Stat`
+   directly — no shell `~` expansion. Plugin now expands `~`, `~/`, `$HOME`,
+   `${HOME}` via `os.getenv("HOME")`. (`os.getenv` IS available in the sandbox;
+   only os.execute/remove/rename/exit/setlocale/tmpname are stripped.)
+2. **init may not populate state / fire as expected.** "no art loaded" appeared
+   because art only loaded in `p:init`. Plugin now LAZY-LOADS art on first
+   `render()` if not already loaded. Robust to host init-timing.
+3. **5-row default pane.** cliamp gives visualizers `DefaultVisRows = 5` normally;
+   fullscreen (Shift+V) = `max(5, (termheight-10)*4/5)`. Width = `PanelWidth`.
+   ruby was 30 rows → old code returned "" (blank) when art > pane. FIXED:
+   render now DOWNSCALES art to fit ANY pane (nearest-neighbor, aspect-preserved).
+   Ring geometry computed per-OUTPUT-cell, so it's resolution-independent.
+
+Render call signature (verified in ui/visualizer.go:871 + luaplugin/visualizer.go):
+`render(bands, frame, rows, cols)` — bands 1-indexed table, returns string.
+cliamp reuses last frame silently on render error; errors go to
+`~/.config/cliamp/plugins.log` as `[dance] error: ...`, NEVER the UI.
+
+---
+
+## Current state of the art files (3 in repo)
+
+| File | What | Notes |
+|------|------|-------|
+| `ruby.txt` | Braille render of Ruby (8bit64k's French bulldog) head | NEW. Cropped from ruby.jpeg + stylized. Reads as a Frenchie but left edge has some leftover background fill. |
+| `ruby_ascii.txt` | Original hand-ASCII portrait | Backup of the first test art. |
+| `crt.txt` | Braille CRT monitor, generated from scratch (SVG) | Crispest — synthetic high-contrast source brailles cleanest. Screen centered = bass glow. |
+
+**Braille-from-photo recipe (in scratchpad, NOT committed):**
+- Source: `scratchpad/ruby.jpeg` (3024x4032 iPhone photo, Frenchie in orange harness)
+- Crop head: `magick ruby.jpeg -crop 2400x2400+80+900 +repage ruby_head.png`
+- Stylize: `magick ruby_head.png -colorspace Gray -morphology Convolve Gaussian:0x2 -sigmoidal-contrast 10x52% -level 8%,72% -posterize 5 ruby_style2.png`
+- Convert: `chafa --symbols braille --fill braille -c none --size 46x26 ruby_style2.png | sed 's/[[:space:]]*$//'`
+
+**Braille-from-SVG recipe (CRT):**
+- `scratchpad/crt.svg` → `rsvg-convert crt.svg -o crt.png --width=560 --height=600`
+- `chafa --symbols braille --fill braille -c none --size 50x30 crt.png`
+
+KEY INSIGHT: braille (2x4 dots/cell, ~8x resolution) survives downscaling far
+better than single-glyph ASCII. Synthetic high-contrast art brailles cleanly;
+casual photos need background-knockout (level) + posterize or they come out as a
+solid blob (dark=filled) or pure noise (edge-detect on busy background).
+
+---
+
+## OPEN QUESTION (waiting on 8bit64k — this is where we resume)
+
+RESOLVED: art comparison done. noise_braille.txt + art_max.txt are the primary test
+files. crt.txt is the crispest synthetic braille. ruby.txt kept for sentimental value.
+
+Next session: ring blend done — next tuning item is gamma/response curve (#3) or
+the deferred bass-transient jitter (#8). Possible bigger item: truecolor 24-bit
+ramp interpolation (removes the 11-stop brightness ceiling that blend can't).
+
+---
+
+## v0.1 feature summary (shipped this session)
+
+**Rendering:**
+- Square concentric rings (Chebyshev), bass=center, treble=edge
+- Downscale-to-fit any pane (nearest-neighbor, aspect-preserved)
+- Ring geometry computed per-output-cell (resolution-independent)
+- Preserves source glyphs, only color reacts
+
+**Config keys (current):**
+```toml
+[plugins.dance]
+art_path    = "~/Code/cliamp-plugin-dance/noise_braille.txt"
+color_mode  = "glow"       # glow | mono | passthrough
+theme       = "aurora"     # amber (warm tubeamp) | crt (green phosphor) | vantablack (grayscale) | aurora (teal-cyan-green)
+mono_color  = 11           # ANSI 256, for mono mode
+attack      = 0.55
+release     = 0.18
+overdrive   = 0.78
+tilt        = 0.0          # spectral boost for sparse treble; try 0.5
+```
+
+**Theme presets:** 4 built-in, all 11-stop ANSI 256 ramps:
+- `amber` — original tubeamp warm amber (232,234,52,94,130,166,202,208,214,220,226)
+- `crt` — green phosphor (232,22,28,34,40,46,48,82,118,154,190)
+- `vantablack` — mono-ish grayscale (232,234,238,242,246,249,251,253,254,255,231)
+- `aurora` — cool teal-cyan-green (232,23,30,36,42,48,83,119,155,191,195)
+
+Architecture: `PRESETS[name] = {glow={...}, overdrive={...}}`. Single swap point
+for future upstream theme integration (add `from_cliamp_theme()` that returns
+same shape, swap one line).
+
+**Bugs fixed this session (cliamp gotchas):**
+1. Tilde not expanded → Plugin expands `~`/`$HOME` itself
+2. Init may not fire → Lazy-load art on first render
+3. 5-row default pane → Downscale to fit, works at any pane size
+4. Inline comments leak into config values → `clean()` strips `#` comments defensively
+5. Monochrome presets blend together → Wide ANSI gaps between ramp stops
+
+**Test art files (5 in repo):**
+- `noise_braille.txt` — 35×188 random braille (the "braille wall" — a real
+  visualization, not just a fixture; pair with fit="fill" + Shift+V)
+- `weave_braille.txt` — 35×188 DETERMINISTIC twill weave (consistent, structured
+  alternative to the noise wall; even diagonal texture, bloom reads cleaner).
+  Generated by ((gx+gy)%6)<3 over the 2x4 braille dot grid. Same dims as noise so
+  it's a drop-in swap for art_path. NOTE: 8bit64k found the diagonal grain
+  DISTRACTING — fights the bloom. Superseded by dots_braille.txt below.
+- `dots_braille.txt` — 35×188 UNIFORM sparse braille (every cell = ⠡ U+2821, dots
+  1+6). Even flat stipple, NO visible lines/stripes/structure — the blend gradient
+  is the star. This is the preferred calm "braille wall" (8bit64k's pick over weave
+  and noise). Drop-in dims.
+- `dots_dense_braille.txt` — 35×188 UNIFORM checker braille (⢕ U+2895). Fuller-body
+  alternate to dots_braille if the sparse one feels too thin; still even, no stripes.
+- `art_max.txt` — 23-row stacked "PHOSPHOR" banner
+- `crt.txt` — braille CRT monitor (crispest synthetic)
+- `ruby.txt` — braille Ruby (Frenchie head)
+- `ruby_ascii.txt` — original hand-ASCII portrait (backup)
+
+**Tuning list:**
+
+DESIGN PRINCIPLES governing all tuning below live in AGENTS.md (durable home —
+retro-faithful > pixel-perfect, immutable canvas, etc.). Do NOT duplicate them
+here; CHECKPOINT rolls over and they'd die. Read AGENTS.md.
+
+1. ~~Ring shape (square/circle/diamond)~~ — DONE 2026-05-29. `ring_shape` config,
+   single `dist(adx,ady)` dispatch table reused for both max_d + per-cell so the
+   metric can never diverge. Geometry verified numerically via
+   `scratchpad/band_map_probe_allshapes.lua` BEFORE color (skill mandate). Unknown
+   shape falls back to square. Default = square (no behavior change for existing configs).
+   Also added `ring_shape="cycle"`: rotates square->diamond->circle every
+   `cycle_seconds` (default 20, min 2) off `os.time()` (one of the 4 os fns the
+   sandbox keeps). Resolves metric ONCE per frame via `active_dist()` so the whole
+   frame stays on one shape and max_d stays consistent. Bottom-right `[shape]` label
+   shown in cycle mode only. No restart needed between shapes — wall clock advances
+   live. Cycle rotation verified deterministically with a fake-clock test
+   (`scratchpad/test_cycle.lua`): boundaries + wrap-around all correct.
+2. ~~Ring blend (smooth band boundaries)~~ — DONE 2026-05-29. `ring_blend` config,
+   default ON, toggle off with `ring_blend = false`. Per cell: compute continuous
+   `pos = d/max_d*9`; blend ON interpolates LEVEL between the two bracketing bands
+   (`lo=floor(pos)` clamped to 8 so lo+2<=10, `frac=pos-lo`, `lvl=a+(b-a)*frac`);
+   blend OFF keeps the old snap (`band=1+floor(pos+0.5)`). Endpoints identical both
+   ways (center=band1, edge=band10) — blend only smooths transitions, doesn't shift
+   the bass-center/treble-edge mapping. Bool parsed defensively (string or real
+   bool; false/off/0/no => off, else on). Verified: parses; blend math proven
+   smoother than snap with matching endpoints (`scratchpad/test_blend.lua`); no
+   overflow across blend on/off + cycle + fill. NOTE: smooths SPATIAL banding only;
+   still bounded by the 11-stop ramp (up to 11 brightness steps remain in the ANSI).
+   Truecolor 24-bit inter-stop interpolation would remove that ceiling — separate
+   future item, NOT part of blend.
+
+FIT MODES (added 2026-05-29, between #1 and #2): new `fit` config.
+- `contain` (default) = aspect-preserving scale-down, letterboxed. For pictures.
+- `fill` = stretch each axis independently to the full rows x cols, edge to edge,
+  upscales when pane > source. For textures (the braille wall). Verified both modes
+  render no-overflow at panes smaller AND larger than the art (fill reaches
+  non-empty rows = ROWS; contain letterboxes). 8bit64k wants the braille wall
+  (noise_braille.txt) treated as a real visualization, not a fixture — pair
+  fit="fill" + Shift+V full-screen. NOTE: the 5-row default pane is a cliamp
+  constant (DefaultVisRows); big pane = Shift+V, not a plugin setting.
+3. Gamma / response curve
+4. Dead zone — PRIORITY (revisit soon). The round fix (commit 3d661cf) bumped
+   low-level signal up one ramp stop, which surfaced more treble/outer-ring
+   activity (faint highs that used to floor to black now show). 8bit64k noticed
+   the higher bands got more active. A `dead_zone` config (clamp levels below a
+   floor, ~0.10-0.12, to true off) is the right fix: keeps the correct round
+   mapping AND restores a clean noise floor. New config knob.
+5. Aspect ratio
+6. Ring count
+7. ~~Overdrive behavior~~ — DONE 2026-05-29. Bass bands (1,2) only. TRANSIENT-
+   triggered: a flare fires on a kick ONSET — when smoothed jumps ONSET_MARGIN
+   (0.18) above a slow baseline EMA (BASE_RATE 0.05) AND clears the `overdrive`
+   floor — NOT merely when bass sits high. (First version triggered on absolute
+   level; 8bit64k correctly flagged "they peak a lot" — cliamp bands are pre-smoothed
+   and peg near top, so absolute-threshold fired constantly and the flare/bleed
+   stopped reading as events. Re-based on a transient detector, which is also the
+   shared signal jitter #8 will use.) On a fired onset heat latches to the live level,
+   then is RETAINED at `overdrive_decay` per frame (default 0.82; 0=snap) so it
+   flashes-and-fades. Flare COLOR = the active theme's overdrive ramp (amber: red ->
+   magenta-pink peak; NOT literally white — the cutoff constant is named FLARE_PEAK,
+   not "white-hot"). Bleed (`overdrive_bleed`, default on): only at FLARE_PEAK (heat
+   >= 0.92) does a ring warm the ring OUTSIDE it (1->2, 2->3), proportional, max 0.45.
+   effective[] built once/frame; per-cell reads it (uniform per ring, zero per-cell
+   cost). Verified scratchpad/test_overdrive.lua: sustained bass does NOT re-flare,
+   kick-from-quiet DOES and the tail outlives the hit; no overflow all modes.
+   Tuning constants (BASE_RATE/ONSET_MARGIN/spill) hardcoded — kept config surface lean.
+8. ~~Bass-transient jitter~~ SHELVED 2026-05-29 — displaced by DENSITY mutation,
+   which is far more braille-native. Instead of MOVING the art on a kick, braille
+   glyphs THICKEN toward solid ⣿ as they heat (`density` config, default on; OR dots
+   in "toward full"; only braille cells mutate; precomputed art_code[y][x] avoids
+   per-frame UTF-8 decode). So the wall gains matter on peaks, not just brightness,
+   and a bass flare thickens the core. CRITICAL impl note: cliamp = gopher-lua (Lua
+   5.1) — NO bitwise operators (>> << | &), no bit32. All dot math is arithmetic on
+   powers of two (set_bit via div/mod). Local `lua` is 5.3+ and parses bitops fine,
+   but the HOST would silently fail to load them — always write 5.1-safe. Verified
+   scratchpad/test_density.lua (codepoint roundtrip, monotonic thicken, base
+   preserved, level 1.0 = solid ⣿) and harness (full-blast wall fills to ⣿⣿⣿,
+   density=off stays base ⠡⠡⠡). Jitter (positional punch) remains POSSIBLE later if
+   ever wanted, but density is the headline texture reaction now.
+   DENSITY ENVELOPE (added 2026-05-29): density has its OWN attack/release,
+   separate from color smoothing — `density_attack` (0.6, fill speed) and
+   `density_release` (0.15, shed speed). Per-band `dens[]` chases effective[] with
+   these; the per-cell glyph reads a `dlvl` interpolated from dens[] (same ring
+   blend/snap as color's lvl, but its own envelope). Low release = dots melt slowly
+   after a hit = CRT phosphor persistence. Both 1.0 = instant tracking (old behavior).
+
+*Checkpoint updated 2026-05-29. Resume at ring shape + ring blend.*
+
+---
+
+## Config (README has full version)
+
+```toml
+[plugins.dance]
+art_path = "~/Code/cliamp-plugin-dance/ruby.txt"   # or crt.txt / ruby_ascii.txt
+color_mode = "glow"        # "glow" | "mono" | "passthrough"
+attack = 0.55
+release = 0.18
+overdrive = 0.78
+tilt = 0.0                 # >0 lifts higher bands so sparse treble lights edges
+```
+
+## Install / update on remote laptop
+
+```bash
+cd cliamp-plugin-dance && git pull
+cp dance.lua ~/.config/cliamp/plugins/dance.lua   # cliamp does NOT hot-reload; restart after copy
+```
+
+---
+
+## Conventions reminder (from builds/AGENTS.md)
+
+- Git author = 8bit64k ALWAYS (never Nick). Already configured local user.name/email.
+- scratchpad/ is gitignored — working notes (harnesses, source jpeg, SVG, PNGs) stay local.
+- Verify end-to-end, not just syntax. Harness lives at scratchpad/render_harness.lua.
+
+*Checkpoint written 2026-05-29 mid-session. Resume at the OPEN QUESTION above.*
