@@ -28,7 +28,6 @@ local function clean(v)
 end
 
 local cfg_art_path   = clean(p:config("art_path"))
-local cfg_bob_dir    = clean(p:config("bob_direction")) or "both"
 local cfg_color_mode = clean(p:config("color_mode")) or "glow"
 local cfg_mono_color = tonumber(clean(p:config("mono_color"))) or 11
 local cfg_attack     = tonumber(clean(p:config("attack"))) or 0.55
@@ -226,8 +225,6 @@ local smoothed = {0,0,0,0,0,0,0,0,0,0}
 function p:init(rows, cols)
     for i = 1, 10 do smoothed[i] = 0 end
     load_art()
-    -- Diagnostic: log the resolved config so we can see what theme is active.
-    cliamp.log.info("theme=" .. cfg_theme_name .. " preset=" .. (active_preset.name or "?"))
 end
 
 function p:destroy() end
@@ -369,13 +366,6 @@ function p:render(bands, frame, rows, cols)
     end
 
     for _ = #out + 1, rows do out[#out + 1] = "" end
-    -- Debug indicator: show theme on bottom-right (remove when verified)
-    if rows > 0 then
-        local indicator = cfg_theme_name .. " (" .. (active_preset.name or "?") .. ")"
-        local pad = cols - #indicator - 1
-        if pad < 0 then pad = 0 end
-        out[rows] = string.rep(" ", pad) .. fg256(240) .. indicator .. reset()
-    end
 
     return table.concat(out, "\n")
 end
