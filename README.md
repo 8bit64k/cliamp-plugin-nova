@@ -6,9 +6,16 @@
 > versioning, no support. Here so 8bit64k can test against live cliamp from a
 > remote machine.
 
-A cliamp visualizer that takes a user-supplied ASCII art file and makes it
-**dance** to the 10-band EQ feed — vertical columns bob with the beat and glow
-with an amber-to-white-hot ramp (shared with the sibling `tubeamp` plugin).
+A cliamp visualizer that renders a **braille wall** reacting to the 10-band EQ
+feed. The wall lights AND thickens with the music: each concentric ring (bass at
+the center, treble at the edge) recolors by its band level on an amber-to-hot
+ramp (shared with the sibling `tubeamp` plugin), and braille glyphs gain dots
+**toward the center** as they heat, so the wall gains matter on the peaks — not
+just brightness.
+
+The wall is **generated procedurally** — no art file required. You can optionally
+point it at your own ASCII/braille art via `art_path`, but the default needs
+nothing but the plugin.
 
 ---
 
@@ -28,15 +35,10 @@ mkdir -p ~/.config/cliamp/plugins
 cp dance.lua ~/.config/cliamp/plugins/dance.lua
 ```
 
-The **art file stays in the clone** — there's nothing to copy into cliamp's
-dirs. The plugin reads it directly from wherever you point `art_path` (the
-sandbox allows reads from any path, 1 MB cap). Just note the absolute path to
-`ruby.txt` in your clone for the config below, e.g.:
-
-```bash
-realpath ruby.txt
-# -> /home/you/code/cliamp-plugin-dance/ruby.txt
-```
+That's it — the wall is generated procedurally, so there is **no art file to
+copy or configure** for the default experience. (If you want to drive a custom
+art file instead, see `art_path` under Configure; the file stays in your clone
+and the plugin reads it in place — nothing gets copied into cliamp's dirs.)
 
 To **update** after I push changes:
 
@@ -55,31 +57,40 @@ Then restart cliamp and press `v` to cycle visualizers until you reach **dance**
 
 ## Configure
 
-Add a `[plugins.dance]` block to your cliamp config:
+A `[plugins.dance]` block is **optional** — with no config the plugin renders the
+default procedural wall (`start = "stipple"`, `fit = "contain"`). Add a block to
+tune it:
 
 ```toml
 [plugins.dance]
-art_path = "/abs/path/to/cliamp-plugin-dance/ruby.txt"   # required — absolute path to the ASCII art file (lives in your clone, not cliamp's dirs)
-color_mode = "glow"                            # "glow" | "mono" | "passthrough"
+start = "stipple"                              # procedural wall when no art_path: "stipple" = faint resting texture that thickens (default) | "black" = empty canvas, dots bloom in from nothing
+# art_path = "/abs/path/to/your_art.txt"       # OPTIONAL — drive a custom ASCII/braille file instead of the generated wall (lives in your clone, read in place)
+color_mode = "glow"                            # "glow" | "mono" | "passthrough"  (NOTE: passthrough shows raw glyphs — no color OR density thickening)
 ring_shape = "square"                          # "square" | "diamond" | "circle" | "cycle" — geometry of the concentric bands
 cycle_seconds = 20                             # when ring_shape="cycle", seconds per shape before rotating (min 2)
-fit = "contain"                                # "contain" = preserve aspect, letterboxed (pictures) | "fill" = stretch to fill the whole pane (textures)
+fit = "contain"                                # "contain" = preserve aspect, letterboxed (pictures) | "fill" = stretch to fill the whole pane (textures / the wall)
 ring_blend = true                              # true = smooth gradient across rings (default) | false = hard stepped band boundaries
-density = true                                  # true = braille glyphs thicken toward solid as they heat (default) | false = glyphs fixed, color only
+density = true                                  # true = braille glyphs thicken toward center as they heat (default) | false = glyphs fixed, color only
 density_attack = 0.6                            # how fast dots FILL toward the level (high = snappy; 1.0 = instant)
 density_release = 0.15                          # how fast dots SHED when level drops (low = lingering CRT-phosphor trail; 1.0 = instant)
 theme = "amber"                                # "amber" | "crt" | "vantablack" | "aurora"
 mono_color = 11                                # ANSI 256 index, used when color_mode = "mono"
 attack = 0.55                                  # smoothing attack (shared defaults with tubeamp)
 release = 0.18                                 # smoothing release
-overdrive = 0.78                               # band level above which a bass ring (bands 1-2) flares hot and bobs extra
+overdrive = 0.78                               # band level above which a bass ring (bands 1-2) flares hot
 overdrive_decay = 0.82                          # bass flare tail: fraction of heat retained per frame (0 = instant snap, ~0.85 = long glowing fade)
-overdrive_bleed = true                          # when a bass ring punches white-hot, bleed warmth into the ring just outside it (true | false)
+overdrive_bleed = true                          # when a bass ring punches hot, bleed warmth into the ring just outside it (true | false)
 tilt = 0.0                                     # per-band boost toward treble (0=off; try 0.5 if outer rings feel dead)
+
+# --- performance (all default OFF / full rate; only needed on very large panes) ---
+max_cols = 0                                   # cap the DRAWN width (0 = unlimited). On a huge fit=fill pane this bounds per-frame cost; the wall becomes a centered block.
+max_rows = 0                                   # cap the DRAWN height (0 = unlimited)
+render_rate = 1.0                              # fraction of frames actually rendered, 0.25..1.0. 1.0 = every frame (~20 FPS); 0.5 = ~10 FPS; 0.25 = ~5 FPS. Reuses the last frame in between; keeps fit=fill edge-to-edge. Values below 0.25 are clamped.
 ```
 
-If `art_path` is missing or the file can't be read, the plugin renders a visible
-placeholder message instead of crashing.
+If a configured `art_path` can't be read, the plugin renders a visible
+placeholder message instead of crashing. With no `art_path`, it always has the
+generated wall to fall back on.
 
 ### Bigger pane / filling the screen
 
@@ -91,11 +102,10 @@ plugin setting.
 
 By default (`fit = "contain"`) the art is scaled to fit while preserving its
 aspect ratio, so a wide source gets letterboxed (empty rows top/bottom) in a
-tall pane — correct for pictures like Ruby or the CRT. For a **texture** like a
-braille wall, where there's no shape to preserve, set `fit = "fill"` to stretch
-each axis independently and fill the entire pane edge to edge (it upscales when
-the pane is bigger than the source). Pair `fit = "fill"` with a dense noise/
-braille source and Shift+V for a full-screen reactive wall.
+tall pane. For the **braille wall** (the procedural default, or any texture with
+no shape to preserve) set `fit = "fill"` to stretch each axis independently and
+fill the entire pane edge to edge. Pair `fit = "fill"` with Shift+V for a
+full-screen reactive wall.
 
 ### Reviewing shapes: `ring_shape = "cycle"`
 
@@ -134,7 +144,7 @@ Look for `[dance] error: ...` lines.
 | State | In development — not released |
 | Repo | `8bit64k/cliamp-plugin-dance` (private) |
 | Entry file | `dance.lua` (repo root) |
-| Test art | `ruby.txt` |
+| Wall | procedural (no art file needed); `start = "stipple"` \| `"black"` |
 | Sibling plugin | [`cliamp-plugin-tubeamp`](https://github.com/8bit64k/cliamp-plugin-tubeamp) (shipped, v1.2.0) |
 
 License: MIT © 8bit64k (added at release time).

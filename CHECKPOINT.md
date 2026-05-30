@@ -87,6 +87,35 @@ Verified: scratchpad/test_center_fill.lua asserts L/R/T/B dot mass leans toward
 center in all 4 regions; cap + frameskip suites still pass; no overflow.
 This is a DURABLE design decision -> promoted to AGENTS.md.
 
+## PROCEDURAL WALL — NO FILE NEEDED (2026-05-30)
+
+8bit64k's realization: the uniform braille wall starts at a known state and
+changes under known conditions, so it doesn't need a pre-defined file — generate
+a blank canvas on load. DONE: `generate_wall()` fills art_cells/art_code with a
+single base glyph at a fixed 35x188 source grid (matches old dots_braille dims so
+fit=contain/fill behave identically); the existing fit/downscale/ring/density path
+renders it exactly as it would a file. Config: `start = "black" | "stipple"`
+(default stipple). black = base ⠀ (U+2800, empty -> blooms dots in from nothing);
+stipple = base ⠡ (U+2821, the old dots_braille least-dense look -> faint resting
+texture that thickens). Naming: 8bit64k picked black|stipple over black|full
+(full read as "solid/maxed", misleading). art_path KEPT as optional override
+(set -> load file; unset -> generate). Default needs ZERO files.
+- Render-loop sentinel changed from art_lines to ART_CELLS (art_lines is only set
+  on the file path; generator sets art_cells/art_code only). Both lazy-load
+  checks now gate on art_cells.
+- The 5 generated wall .txt files (dots_braille, dots_dense_braille, noise_braille,
+  weave_braille, art_max) MOVED to scratchpad/ (gitignored) + untracked from git.
+  Portrait files (crt.txt, ruby.txt, ruby_ascii.txt) LEFT at root — different
+  lineage, headed for the future separate portrait plugin. noise/weave still
+  available as optional art_path targets from scratchpad if needed.
+- README updated: leads with procedural wall (no file), art_path optional, documents
+  start + the perf knobs (max_cols/max_rows/render_rate), drops stale "columns bob"
+  intro + ruby.txt test-art references.
+- 8bit64k will eyeball black vs stipple live and pick the default. Currently stipple.
+- DECISION STILL OPEN: which becomes the default `start`. Verified both render with
+  fs fully stubbed to fail (zero file dependency); scratchpad/test_generator.lua +
+  show_starts.lua. All prior suites (cap/frameskip/center-fill) still pass.
+
 **Last commit:** HEAD = "perf: max_cols/max_rows canvas cap + render_rate (both
 default off)". Local == remote, verified after push.
 **Branch:** master. **Repo:** github.com/8bit64k/cliamp-plugin-dance (PRIVATE).

@@ -28,6 +28,15 @@ local function clean(v)
 end
 
 local cfg_art_path   = clean(p:config("art_path"))
+-- start: the procedural wall's resting glyph when no art_path is given. The wall
+-- is generated on load (no file needed) -- "black" starts empty (⠀, U+2800) and
+-- blooms dots in from nothing as the music lights each ring; "stipple" starts at
+-- the faint least-dense texture (⠡, U+2821, the old dots_braille look) that
+-- thickens toward solid. Same additive toward-center density either way; only the
+-- resting floor differs. art_path (if set) overrides this with a loaded file.
+local cfg_start = clean(p:config("start")) or "stipple"
+local START_GLYPH = { black = 0x2800, stipple = 0x2821 }
+local start_cp = START_GLYPH[cfg_start] or START_GLYPH["stipple"]
 local cfg_color_mode = clean(p:config("color_mode")) or "glow"
 local cfg_mono_color = tonumber(clean(p:config("mono_color"))) or 11
 local cfg_attack     = tonumber(clean(p:config("attack"))) or 0.55
@@ -402,12 +411,39 @@ local function expand_path(path)
     return path
 end
 
+-- Procedurally generate a uniform braille wall -- no file needed. Every cell is
+-- the same `start_cp` base glyph; the render loop then lights + thickens it from
+-- the EQ exactly as it would a loaded file. We fill a fixed source grid (35x188,
+-- matching the old dots_braille.txt dims) so fit=contain/fill behave identically
+-- to the file the wall used to ship as. art_code[y][x] = start_cp everywhere
+-- (uniform), so density mutation has its base with zero per-cell decode.
+local GEN_W, GEN_H = 188, 35
+local function generate_wall()
+    art_lines, load_error = nil, nil
+    art_w, art_h = GEN_W, GEN_H
+    local glyph = braille_char(start_cp)
+    local is_braille = (start_cp >= 0x2800 and start_cp <= 0x28FF)
+    art_cells = {}
+    art_code  = {}
+    for y = 1, art_h do
+        local row  = {}
+        local crow = {}
+        for x = 1, art_w do
+            row[x] = glyph
+            if is_braille then crow[x] = start_cp end
+        end
+        art_cells[y] = row
+        art_code[y]  = crow
+    end
+end
+
 local function load_art()
     art_lines, art_cells, art_code = nil, nil, nil
     art_w, art_h, load_error = 0, 0, nil
 
+    -- No art_path => procedural wall (the default; no file dependency).
     if not cfg_art_path or cfg_art_path == "" then
-        load_error = "dance: no art_path configured"
+        generate_wall()
         return
     end
     local path = expand_path(cfg_art_path)
@@ -632,14 +668,16 @@ function p:render(bands, frame, rows, cols)
         return placeholder(rows, cols, load_error)
     end
     -- Lazy-load: if init() didn't run (or hasn't yet), load on first render.
-    -- This makes the plugin robust to host init-timing differences.
-    if not art_lines and not load_error then
+    -- This makes the plugin robust to host init-timing differences. art_cells is
+    -- the sentinel (set by BOTH the file loader and the procedural generator);
+    -- art_lines is only set on the file path, so don't gate on it here.
+    if not art_cells and not load_error then
         load_art()
     end
     if load_error then
         return placeholder(rows, cols, load_error)
     end
-    if not art_lines then
+    if not art_cells then
         return placeholder(rows, cols, "dance: no art loaded")
     end
     if rows < 1 or cols < 1 then return "" end
