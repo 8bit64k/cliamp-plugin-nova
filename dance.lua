@@ -137,7 +137,7 @@ local PRESETS = {
         name = "Amber (tubeamp family)",
         -- Original 11-stop amber ramp from tubeamp. Rich distinct stops — kept verbatim.
         glow      = { 232, 234, 52, 94, 130, 166, 202, 208, 214, 220, 226 },
-        overdrive = { 160, 196, 197, 198 },
+        overdrive = { 160, 196, 197, 231 },
     },
     crt = {
         name = "CRT Green Phosphor",
