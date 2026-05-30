@@ -205,18 +205,23 @@ FIT MODES (added 2026-05-29, between #1 and #2): new `fit` config.
 4. Dead zone
 5. Aspect ratio
 6. Ring count
-7. ~~Overdrive behavior~~ — DONE 2026-05-29. Bass bands (1,2) only. When smoothed
-   crosses `overdrive`, per-band `heat` latches hot (fast attack) then is retained at
-   `overdrive_decay` per frame (default 0.82; 0=instant snap=old behavior) so a kick
-   flashes-and-fades instead of strobing. White-hot bleed (`overdrive_bleed`, default
-   on): only when heat >= 0.92 (top of overdrive ramp) does a ring warm the ring just
-   OUTSIDE it (1->2, 2->3), proportional to how far past the cutoff, max 0.45 spill.
-   Architecture: build `effective[]` once per frame (smoothed + heat + bleed); per-cell
-   color reads effective[] instead of smoothed[] so flare is uniform per ring and costs
-   nothing per cell. Verified: flare holds glow above a sharply-collapsing smoothed
-   level (scratchpad/test_overdrive.lua); decay=0 snaps; bleed=off leaves neighbors
-   untouched; no overflow across all modes. (Retro lens: bloom-and-decay is MORE
-   faithful than the old clean switch.)
+7. ~~Overdrive behavior~~ — DONE 2026-05-29. Bass bands (1,2) only. TRANSIENT-
+   triggered: a flare fires on a kick ONSET — when smoothed jumps ONSET_MARGIN
+   (0.18) above a slow baseline EMA (BASE_RATE 0.05) AND clears the `overdrive`
+   floor — NOT merely when bass sits high. (First version triggered on absolute
+   level; 8bit64k correctly flagged "they peak a lot" — cliamp bands are pre-smoothed
+   and peg near top, so absolute-threshold fired constantly and the flare/bleed
+   stopped reading as events. Re-based on a transient detector, which is also the
+   shared signal jitter #8 will use.) On a fired onset heat latches to the live level,
+   then is RETAINED at `overdrive_decay` per frame (default 0.82; 0=snap) so it
+   flashes-and-fades. Flare COLOR = the active theme's overdrive ramp (amber: red ->
+   magenta-pink peak; NOT literally white — the cutoff constant is named FLARE_PEAK,
+   not "white-hot"). Bleed (`overdrive_bleed`, default on): only at FLARE_PEAK (heat
+   >= 0.92) does a ring warm the ring OUTSIDE it (1->2, 2->3), proportional, max 0.45.
+   effective[] built once/frame; per-cell reads it (uniform per ring, zero per-cell
+   cost). Verified scratchpad/test_overdrive.lua: sustained bass does NOT re-flare,
+   kick-from-quiet DOES and the tail outlives the hit; no overflow all modes.
+   Tuning constants (BASE_RATE/ONSET_MARGIN/spill) hardcoded — kept config surface lean.
 8. Bass-transient jitter (still deferred per 8bit64k)
 
 *Checkpoint updated 2026-05-29. Resume at ring shape + ring blend.*

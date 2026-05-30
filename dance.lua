@@ -305,9 +305,16 @@ end
 -- ---------- Per-instance state -----------------------------------------------
 
 local smoothed  = {0,0,0,0,0,0,0,0,0,0}
--- Overdrive "heat" for the two bass bands: latches when the band crosses the
--- overdrive threshold, decays slowly so the flare flashes-and-fades.
+-- Overdrive "heat" for the two bass bands: latches on a transient ONSET, then
+-- decays slowly so the flare flashes-and-fades.
 local heat      = {0, 0}
+-- Slow-moving baseline of each bass band's level. A flare fires only when the
+-- live level jumps a margin ABOVE this baseline (a transient onset = a kick),
+-- NOT when bass merely sits high — cliamp's bands are pre-smoothed and often
+-- peg near the top, so an absolute-threshold trigger fires constantly and the
+-- flare/bleed stop reading as events. The baseline tracks the recent average so
+-- only genuine punches stand out.
+local bass_base = {0, 0}
 -- effective[] = the level the COLOR uses per band each frame: smoothed plus any
 -- overdrive heat (bands 1-2) and white-hot bleed (into bands 2-3). Built once
 -- per frame; the per-cell color path reads this instead of smoothed[] so the
@@ -317,6 +324,7 @@ local effective = {0,0,0,0,0,0,0,0,0,0}
 function p:init(rows, cols)
     for i = 1, 10 do smoothed[i] = 0; effective[i] = 0 end
     heat[1], heat[2] = 0, 0
+    bass_base[1], bass_base[2] = 0, 0
     load_art()
 end
 
@@ -364,30 +372,39 @@ function p:render(bands, frame, rows, cols)
     -- smoothed levels, then layer overdrive flare + white-hot bleed on the bass.
     for i = 1, 10 do effective[i] = smoothed[i] end
 
-    -- Overdrive flare on the two bass bands (1,2): when smoothed crosses the
-    -- threshold, heat latches up to that level instantly (fast attack); otherwise
-    -- heat is RETAINED at cfg_od_decay per frame and bleeds off, so the flare
-    -- flashes then cools. effective = max(smoothed, heat), so a fading tail never
-    -- dims below the live level. cfg_od_decay=0 => no retention => old snap.
+    -- Overdrive flare on the two bass bands (1,2), TRANSIENT-triggered. A flare
+    -- fires on a kick ONSET — when the live level jumps a margin above its slow
+    -- baseline AND clears the overdrive floor — not merely when bass sits high
+    -- (which it often does). On a fired onset, heat latches to the live level
+    -- (fast attack); otherwise heat is RETAINED at cfg_od_decay per frame so the
+    -- flare flashes then cools. effective = max(smoothed, heat), so the fading
+    -- tail never dims below the live level. cfg_od_decay=0 => no tail => snap.
+    local BASE_RATE   = 0.05   -- baseline EMA: slow, so it tracks recent average
+    local ONSET_MARGIN = 0.18  -- live must exceed baseline by this to be an onset
     for i = 1, 2 do
-        if smoothed[i] >= cfg_overdrive and smoothed[i] > heat[i] then
-            heat[i] = smoothed[i]                 -- latch hot
+        local onset = (smoothed[i] >= cfg_overdrive)
+                      and (smoothed[i] >= bass_base[i] + ONSET_MARGIN)
+        if onset and smoothed[i] > heat[i] then
+            heat[i] = smoothed[i]                 -- latch hot on the punch
         else
             heat[i] = heat[i] * cfg_od_decay      -- retain a fraction; tail cools
             if heat[i] < smoothed[i] then heat[i] = smoothed[i] end
         end
         if heat[i] > effective[i] then effective[i] = heat[i] end
+        -- advance the slow baseline AFTER the onset test (so the spike itself
+        -- doesn't immediately raise the bar it has to clear).
+        bass_base[i] = bass_base[i] + (smoothed[i] - bass_base[i]) * BASE_RATE
     end
 
-    -- Bleed: ONLY when a bass ring is WHITE-HOT (heat at the very top of the
-    -- range) does it warm the ring just outside it (1->2, 2->3). A modest flare
-    -- stays put; only a full slam blooms outward. Scaled by how far past the
-    -- white-hot cutoff we are, so it's proportional, and clamped to <= 1.
+    -- Bleed: ONLY when a bass ring reaches PEAK FLARE (heat at the very top of
+    -- the overdrive ramp) does it warm the ring just outside it (1->2, 2->3).
+    -- A modest flare stays put; only a full slam blooms outward. Scaled by how
+    -- far past the peak-flare cutoff we are, so it's proportional, clamped to <= 1.
     if cfg_od_bleed then
-        local WHITE_HOT = 0.92      -- top-of-overdrive-ramp cutoff
+        local FLARE_PEAK = 0.92     -- top-of-overdrive-ramp cutoff
         for i = 1, 2 do
-            if heat[i] >= WHITE_HOT then
-                local over = (heat[i] - WHITE_HOT) / (1 - WHITE_HOT)  -- 0..1
+            if heat[i] >= FLARE_PEAK then
+                local over = (heat[i] - FLARE_PEAK) / (1 - FLARE_PEAK)  -- 0..1
                 local spill = 0.45 * over            -- partial warmth, never full
                 local tgt = i + 1                    -- ring just outside
                 local v = effective[tgt] + spill
