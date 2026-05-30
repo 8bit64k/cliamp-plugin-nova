@@ -1,12 +1,23 @@
 # CHECKPOINT — cliamp-plugin-dance (formerly cliamp-plugin-ascii-eq)
 
-**Status:** v0.1 working. Square-ring concentric glow visualizer renders at all
-pane sizes. Ring SHAPE selectable (square/diamond/circle/cycle). fit=contain/fill.
-ring_blend smooths band boundaries (default on). Debug scaffolding removed.
-Next: gamma curve, jitter, or truecolor ramp.
+**Status:** v0.1 working, feeling good ("it's dancing"). Braille-wall visualizer:
+concentric EQ rings (bass=center, treble=edge) LIGHT and THICKEN a braille wall.
+Features: ring shape square/diamond/circle/cycle; fit contain/fill; ring_blend
+(smooth gradient); transient-triggered overdrive flare w/ decay tail + white-hot
+bleed; density mutation (glyphs thicken toward solid ⣿) with its own attack/release
+envelope (phosphor persistence). Render hot loop optimized ~2.2x. Amber hot peak =
+magenta 198 (white experiment reverted). All pushed.
 
-**Last commit:** see `git log --oneline -1` (latest = braille ruby.txt swap).
+RESUME POINT — next session: tuning backlog #4 DEAD ZONE is flagged PRIORITY (the
+round fix surfaced extra low-level treble activity; a `dead_zone` config to clamp
+sub-floor levels to off is the clean fix). Also open: gamma/response curve (#3),
+aspect ratio knob (#5), ring count (#6), truecolor 24-bit ramp (removes 11-stop
+ceiling). Defaults (flare onset margin 0.18/baseline 0.05, density 0.6/0.15) are
+reasoned but NOT yet validated against lots of real music — tune by ear when ready.
+
+**Last commit:** 3c38abe (revert amber peak to magenta). Local == remote, verified.
 **Branch:** master. **Repo:** github.com/8bit64k/cliamp-plugin-dance (PRIVATE).
+**Durable design rules live in AGENTS.md** (not here — CHECKPOINT rolls over).
 
 ---
 
