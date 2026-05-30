@@ -140,7 +140,8 @@ same shape, swap one line).
 5. Monochrome presets blend together → Wide ANSI gaps between ramp stops
 
 **Test art files (5 in repo):**
-- `noise_braille.txt` — 28×150 random braille (best for color engine testing)
+- `noise_braille.txt` — 35×188 random braille (the "braille wall" — a real
+  visualization, not just a fixture; pair with fit="fill" + Shift+V)
 - `art_max.txt` — 23-row stacked "PHOSPHOR" banner
 - `crt.txt` — braille CRT monitor (crispest synthetic)
 - `ruby.txt` — braille Ruby (Frenchie head)
@@ -164,6 +165,16 @@ same shape, swap one line).
    lvl=smoothed[lo+1]*(1-frac)+smoothed[lo+2]*frac, clamped at ends). Make it a
    toggle (`ring_blend`, default on) so stepped vs smooth is A/B-able. Tune against
    whichever shape 8bit64k picks.
+
+FIT MODES (added 2026-05-29, between #1 and #2): new `fit` config.
+- `contain` (default) = aspect-preserving scale-down, letterboxed. For pictures.
+- `fill` = stretch each axis independently to the full rows x cols, edge to edge,
+  upscales when pane > source. For textures (the braille wall). Verified both modes
+  render no-overflow at panes smaller AND larger than the art (fill reaches
+  non-empty rows = ROWS; contain letterboxes). 8bit64k wants the braille wall
+  (noise_braille.txt) treated as a real visualization, not a fixture — pair
+  fit="fill" + Shift+V full-screen. NOTE: the 5-row default pane is a cliamp
+  constant (DefaultVisRows); big pane = Shift+V, not a plugin setting.
 3. Gamma / response curve
 4. Dead zone
 5. Aspect ratio

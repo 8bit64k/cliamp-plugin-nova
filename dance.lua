@@ -38,6 +38,7 @@ local cfg_theme_name = clean(p:config("theme")) or "amber"
 local cfg_ring_shape = clean(p:config("ring_shape")) or "square"
 local cfg_cycle_secs = tonumber(clean(p:config("cycle_seconds"))) or 20
 if cfg_cycle_secs < 2 then cfg_cycle_secs = 2 end  -- guard against 0/typo thrash
+local cfg_fit        = clean(p:config("fit")) or "contain"
 
 -- ---------- Ring distance metric --------------------------------------------
 -- Rings are level sets of a distance-from-center metric on the OUTPUT grid.
@@ -329,23 +330,32 @@ function p:render(bands, frame, rows, cols)
     end
     if rows < 1 or cols < 1 then return "" end
 
-    -- Fit the art into the pane. Scale DOWN to fit (never up — keeps the art
-    -- crisp at its native size and centered when the pane is larger). Each
-    -- output cell maps to a source cell via nearest-neighbor, so this works at
-    -- any pane size from cliamp's default 5 rows up to fullscreen.
-    local draw_h = art_h
-    local draw_w = art_w
-    if draw_h > rows then draw_h = rows end
-    if draw_w > cols then draw_w = cols end
-    -- preserve aspect-ish: if one axis must shrink, shrink the other in step so
-    -- the face doesn't get grotesquely squished. Use the tighter ratio.
-    local sh = draw_h / art_h
-    local sw = draw_w / art_w
-    local s  = (sh < sw) and sh or sw
-    draw_h = math.max(1, math.floor(art_h * s + 0.5))
-    draw_w = math.max(1, math.floor(art_w * s + 0.5))
-    if draw_h > rows then draw_h = rows end
-    if draw_w > cols then draw_w = cols end
+    -- Fit the art into the pane. Two modes:
+    --   contain (default): scale DOWN preserving aspect, centered, letterboxed.
+    --     Right for pictures (Ruby, CRT) where the shape must be preserved.
+    --   fill: stretch each axis independently to the FULL pane (rows x cols),
+    --     edge to edge, no letterbox. Right for textures like the braille wall
+    --     where there's no "correct" shape to keep -- it fills the whole screen.
+    -- Never scales a source axis beyond the pane in either mode.
+    local draw_h, draw_w
+    if cfg_fit == "fill" then
+        draw_h = rows
+        draw_w = cols
+    else
+        draw_h = art_h
+        draw_w = art_w
+        if draw_h > rows then draw_h = rows end
+        if draw_w > cols then draw_w = cols end
+        -- preserve aspect-ish: if one axis must shrink, shrink the other in step
+        -- so the face doesn't get grotesquely squished. Use the tighter ratio.
+        local sh = draw_h / art_h
+        local sw = draw_w / art_w
+        local s  = (sh < sw) and sh or sw
+        draw_h = math.max(1, math.floor(art_h * s + 0.5))
+        draw_w = math.max(1, math.floor(art_w * s + 0.5))
+        if draw_h > rows then draw_h = rows end
+        if draw_w > cols then draw_w = cols end
+    end
 
     -- Ring geometry computed on the OUTPUT grid (resolution-independent).
     -- Rings are level sets of the selected distance metric (square/diamond/

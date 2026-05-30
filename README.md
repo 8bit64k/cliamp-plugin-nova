@@ -63,6 +63,7 @@ art_path = "/abs/path/to/cliamp-plugin-dance/ruby.txt"   # required — absolute
 color_mode = "glow"                            # "glow" | "mono" | "passthrough"
 ring_shape = "square"                          # "square" | "diamond" | "circle" | "cycle" — geometry of the concentric bands
 cycle_seconds = 20                             # when ring_shape="cycle", seconds per shape before rotating (min 2)
+fit = "contain"                                # "contain" = preserve aspect, letterboxed (pictures) | "fill" = stretch to fill the whole pane (textures)
 theme = "amber"                                # "amber" | "crt" | "vantablack" | "aurora"
 mono_color = 11                                # ANSI 256 index, used when color_mode = "mono"
 attack = 0.55                                  # smoothing attack (shared defaults with tubeamp)
@@ -73,6 +74,22 @@ tilt = 0.0                                     # per-band boost toward treble (0
 
 If `art_path` is missing or the file can't be read, the plugin renders a visible
 placeholder message instead of crashing.
+
+### Bigger pane / filling the screen
+
+The plugin only fills the pane cliamp hands it. cliamp gives visualizers **5 rows**
+in the normal layout — press **Shift+V** for the full-screen visualizer, which
+grows the pane to roughly `(terminal_height - 10) * 4/5` rows by your full
+terminal width. That's the path to a big canvas; it's a cliamp keybinding, not a
+plugin setting.
+
+By default (`fit = "contain"`) the art is scaled to fit while preserving its
+aspect ratio, so a wide source gets letterboxed (empty rows top/bottom) in a
+tall pane — correct for pictures like Ruby or the CRT. For a **texture** like a
+braille wall, where there's no shape to preserve, set `fit = "fill"` to stretch
+each axis independently and fill the entire pane edge to edge (it upscales when
+the pane is bigger than the source). Pair `fit = "fill"` with a dense noise/
+braille source and Shift+V for a full-screen reactive wall.
 
 ### Reviewing shapes: `ring_shape = "cycle"`
 
