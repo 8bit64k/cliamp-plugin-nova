@@ -40,6 +40,26 @@ local cfg_cycle_secs = tonumber(clean(p:config("cycle_seconds"))) or 20
 if cfg_cycle_secs < 2 then cfg_cycle_secs = 2 end  -- guard against 0/typo thrash
 local cfg_fit        = clean(p:config("fit")) or "contain"
 
+-- Overdrive flare: when bands 1-2 (bass) cross cfg_overdrive they latch hot and
+-- cool over time instead of snapping off, so a kick flashes-and-fades.
+-- overdrive_decay = fraction of heat RETAINED per frame: higher = longer tail.
+-- 0 = no retention = instant snap (old behavior); ~0.85 = long glowing tail.
+local cfg_od_decay = tonumber(clean(p:config("overdrive_decay"))) or 0.82
+if cfg_od_decay < 0 then cfg_od_decay = 0 elseif cfg_od_decay > 0.97 then cfg_od_decay = 0.97 end
+-- Bleed: only when a bass ring punches WHITE-HOT does it warm the ring just
+-- outside it (band1->band2, band2->band3). Modest flares stay in place; only a
+-- full slam blooms outward. Default on; toggle off for clean rings (e.g. CRT art).
+local cfg_od_bleed = true
+do
+    local raw = p:config("overdrive_bleed")
+    if type(raw) == "boolean" then
+        cfg_od_bleed = raw
+    elseif raw ~= nil then
+        local v = clean(tostring(raw)):lower():gsub("%s+", "")
+        if v == "false" or v == "off" or v == "0" or v == "no" then cfg_od_bleed = false end
+    end
+end
+
 -- ring_blend: smooth the band boundaries by interpolating the LEVEL between the
 -- two bands a cell sits between, instead of snapping to the nearest. Default ON.
 -- Config comes in as a string ("true"/"false") or possibly a real bool; treat
@@ -284,10 +304,19 @@ end
 
 -- ---------- Per-instance state -----------------------------------------------
 
-local smoothed = {0,0,0,0,0,0,0,0,0,0}
+local smoothed  = {0,0,0,0,0,0,0,0,0,0}
+-- Overdrive "heat" for the two bass bands: latches when the band crosses the
+-- overdrive threshold, decays slowly so the flare flashes-and-fades.
+local heat      = {0, 0}
+-- effective[] = the level the COLOR uses per band each frame: smoothed plus any
+-- overdrive heat (bands 1-2) and white-hot bleed (into bands 2-3). Built once
+-- per frame; the per-cell color path reads this instead of smoothed[] so the
+-- flare is uniform across each concentric ring (correct) and costs nothing per cell.
+local effective = {0,0,0,0,0,0,0,0,0,0}
 
 function p:init(rows, cols)
-    for i = 1, 10 do smoothed[i] = 0 end
+    for i = 1, 10 do smoothed[i] = 0; effective[i] = 0 end
+    heat[1], heat[2] = 0, 0
     load_art()
 end
 
@@ -328,6 +357,43 @@ function p:render(bands, frame, rows, cols)
             smoothed[i] = smoothed[i] + (raw - smoothed[i]) * cfg_attack
         else
             smoothed[i] = smoothed[i] - (smoothed[i] - raw) * cfg_release
+        end
+    end
+
+    -- Build effective[] = the level the COLOR uses this frame. Start from the
+    -- smoothed levels, then layer overdrive flare + white-hot bleed on the bass.
+    for i = 1, 10 do effective[i] = smoothed[i] end
+
+    -- Overdrive flare on the two bass bands (1,2): when smoothed crosses the
+    -- threshold, heat latches up to that level instantly (fast attack); otherwise
+    -- heat is RETAINED at cfg_od_decay per frame and bleeds off, so the flare
+    -- flashes then cools. effective = max(smoothed, heat), so a fading tail never
+    -- dims below the live level. cfg_od_decay=0 => no retention => old snap.
+    for i = 1, 2 do
+        if smoothed[i] >= cfg_overdrive and smoothed[i] > heat[i] then
+            heat[i] = smoothed[i]                 -- latch hot
+        else
+            heat[i] = heat[i] * cfg_od_decay      -- retain a fraction; tail cools
+            if heat[i] < smoothed[i] then heat[i] = smoothed[i] end
+        end
+        if heat[i] > effective[i] then effective[i] = heat[i] end
+    end
+
+    -- Bleed: ONLY when a bass ring is WHITE-HOT (heat at the very top of the
+    -- range) does it warm the ring just outside it (1->2, 2->3). A modest flare
+    -- stays put; only a full slam blooms outward. Scaled by how far past the
+    -- white-hot cutoff we are, so it's proportional, and clamped to <= 1.
+    if cfg_od_bleed then
+        local WHITE_HOT = 0.92      -- top-of-overdrive-ramp cutoff
+        for i = 1, 2 do
+            if heat[i] >= WHITE_HOT then
+                local over = (heat[i] - WHITE_HOT) / (1 - WHITE_HOT)  -- 0..1
+                local spill = 0.45 * over            -- partial warmth, never full
+                local tgt = i + 1                    -- ring just outside
+                local v = effective[tgt] + spill
+                if v > 1 then v = 1 end
+                if v > effective[tgt] then effective[tgt] = v end
+            end
         end
     end
 
@@ -431,13 +497,13 @@ function p:render(bands, frame, rows, cols)
                     local lo = math.floor(pos)
                     if lo > 8 then lo = 8 end          -- keep lo+1 (Lua lo+2) <= 10
                     local frac = pos - lo
-                    local a = smoothed[lo + 1]
-                    local b = smoothed[lo + 2]
+                    local a = effective[lo + 1]
+                    local b = effective[lo + 2]
                     lvl = a + (b - a) * frac
                 else
                     local band = 1 + math.floor(pos + 0.5)
                     if band < 1 then band = 1 elseif band > 10 then band = 10 end
-                    lvl = smoothed[band]
+                    lvl = effective[band]
                 end
 
                 local color

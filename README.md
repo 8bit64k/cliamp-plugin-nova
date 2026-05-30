@@ -69,7 +69,9 @@ theme = "amber"                                # "amber" | "crt" | "vantablack" 
 mono_color = 11                                # ANSI 256 index, used when color_mode = "mono"
 attack = 0.55                                  # smoothing attack (shared defaults with tubeamp)
 release = 0.18                                 # smoothing release
-overdrive = 0.78                               # band level above which a column flares red + bobs extra
+overdrive = 0.78                               # band level above which a bass ring (bands 1-2) flares hot and bobs extra
+overdrive_decay = 0.82                          # bass flare tail: fraction of heat retained per frame (0 = instant snap, ~0.85 = long glowing fade)
+overdrive_bleed = true                          # when a bass ring punches white-hot, bleed warmth into the ring just outside it (true | false)
 tilt = 0.0                                     # per-band boost toward treble (0=off; try 0.5 if outer rings feel dead)
 ```
 
