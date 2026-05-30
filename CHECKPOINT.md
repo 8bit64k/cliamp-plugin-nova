@@ -111,10 +111,9 @@ texture that thickens). Naming: 8bit64k picked black|stipple over black|full
 - README updated: leads with procedural wall (no file), art_path optional, documents
   start + the perf knobs (max_cols/max_rows/render_rate), drops stale "columns bob"
   intro + ruby.txt test-art references.
-- 8bit64k will eyeball black vs stipple live and pick the default. Currently stipple.
-- DECISION STILL OPEN: which becomes the default `start`. Verified both render with
-  fs fully stubbed to fail (zero file dependency); scratchpad/test_generator.lua +
-  show_starts.lua. All prior suites (cap/frameskip/center-fill) still pass.
+- 8bit64k picked BLACK as the default (2026-05-30, "it's beautiful") — empty
+  canvas, dots bloom in from nothing. stipple remains available via config.
+  DECISION RESOLVED: default start = "black".
 
 **Last commit:** HEAD = "perf: max_cols/max_rows canvas cap + render_rate (both
 default off)". Local == remote, verified after push.

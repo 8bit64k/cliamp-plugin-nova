@@ -34,7 +34,7 @@ local cfg_art_path   = clean(p:config("art_path"))
 -- the faint least-dense texture (⠡, U+2821, the old dots_braille look) that
 -- thickens toward solid. Same additive toward-center density either way; only the
 -- resting floor differs. art_path (if set) overrides this with a loaded file.
-local cfg_start = clean(p:config("start")) or "stipple"
+local cfg_start = clean(p:config("start")) or "black"
 local START_GLYPH = { black = 0x2800, stipple = 0x2821 }
 local start_cp = START_GLYPH[cfg_start] or START_GLYPH["stipple"]
 local cfg_color_mode = clean(p:config("color_mode")) or "glow"

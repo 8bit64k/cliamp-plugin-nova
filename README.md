@@ -58,12 +58,12 @@ Then restart cliamp and press `v` to cycle visualizers until you reach **dance**
 ## Configure
 
 A `[plugins.dance]` block is **optional** — with no config the plugin renders the
-default procedural wall (`start = "stipple"`, `fit = "contain"`). Add a block to
+default procedural wall (`start = "black"`, `fit = "contain"`). Add a block to
 tune it:
 
 ```toml
 [plugins.dance]
-start = "stipple"                              # procedural wall when no art_path: "stipple" = faint resting texture that thickens (default) | "black" = empty canvas, dots bloom in from nothing
+start = "black"                                # procedural wall when no art_path: "black" = empty canvas, dots bloom in from nothing (default) | "stipple" = faint resting texture that thickens
 # art_path = "/abs/path/to/your_art.txt"       # OPTIONAL — drive a custom ASCII/braille file instead of the generated wall (lives in your clone, read in place)
 color_mode = "glow"                            # "glow" | "mono" | "passthrough"  (NOTE: passthrough shows raw glyphs — no color OR density thickening)
 ring_shape = "square"                          # "square" | "diamond" | "circle" | "cycle" — geometry of the concentric bands
@@ -144,7 +144,7 @@ Look for `[dance] error: ...` lines.
 | State | In development — not released |
 | Repo | `8bit64k/cliamp-plugin-dance` (private) |
 | Entry file | `dance.lua` (repo root) |
-| Wall | procedural (no art file needed); `start = "stipple"` \| `"black"` |
+| Wall | procedural (no art file needed); `start = "black"` (default) \| `"stipple"` |
 | Sibling plugin | [`cliamp-plugin-tubeamp`](https://github.com/8bit64k/cliamp-plugin-tubeamp) (shipped, v1.2.0) |
 
 License: MIT © 8bit64k (added at release time).
