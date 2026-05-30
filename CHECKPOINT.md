@@ -1,8 +1,8 @@
 # CHECKPOINT — cliamp-plugin-dance (formerly cliamp-plugin-ascii-eq)
 
 **Status:** v0.1 working. Square-ring concentric glow visualizer renders at all
-pane sizes. Three test arts in repo. Paused mid-art-comparison while 8bit64k
-runs errands.
+pane sizes. Ring SHAPE now selectable (square/diamond/circle). Debug scaffolding
+removed. Three test arts in repo. Next: ring blend.
 
 **Last commit:** see `git log --oneline -1` (latest = braille ruby.txt swap).
 **Branch:** master. **Repo:** github.com/8bit64k/cliamp-plugin-dance (PRIVATE).
@@ -96,8 +96,8 @@ solid blob (dark=filled) or pure noise (edge-detect on busy background).
 RESOLVED: art comparison done. noise_braille.txt + art_max.txt are the primary test
 files. crt.txt is the crispest synthetic braille. ruby.txt kept for sentimental value.
 
-Next session: tackle ring shape (#1) and ring blend (#2) from the tuning list.
-Then jitter (#9, still deferred per 8bit64k's earlier call).
+Next session: ring blend (#2) — see Tuning list for the level-interpolation plan.
+Then jitter (#8, still deferred per 8bit64k's earlier call).
 
 ---
 
@@ -146,9 +146,17 @@ same shape, swap one line).
 - `ruby.txt` — braille Ruby (Frenchie head)
 - `ruby_ascii.txt` — original hand-ASCII portrait (backup)
 
-**Tuning list (deferred):**
-1. Ring shape (square/circle/diamond)
-2. Ring blend (smooth band boundaries)
+**Tuning list:**
+1. ~~Ring shape (square/circle/diamond)~~ — DONE 2026-05-29. `ring_shape` config,
+   single `dist(adx,ady)` dispatch table reused for both max_d + per-cell so the
+   metric can never diverge. Geometry verified numerically via
+   `scratchpad/band_map_probe_allshapes.lua` BEFORE color (skill mandate). Unknown
+   shape falls back to square. Default = square (no behavior change for existing configs).
+2. Ring blend (smooth band boundaries) — NEXT. Plan: interpolate LEVEL between the
+   two nearest bands by fractional ring position (`pos=d/max_d*9`, lo=floor, frac=pos-lo,
+   lvl=smoothed[lo+1]*(1-frac)+smoothed[lo+2]*frac, clamped at ends). Make it a
+   toggle (`ring_blend`, default on) so stepped vs smooth is A/B-able. Tune against
+   whichever shape 8bit64k picks.
 3. Gamma / response curve
 4. Dead zone
 5. Aspect ratio

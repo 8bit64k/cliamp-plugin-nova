@@ -35,6 +35,25 @@ local cfg_release    = tonumber(clean(p:config("release"))) or 0.18
 local cfg_overdrive  = tonumber(clean(p:config("overdrive"))) or 0.78
 local cfg_tilt       = tonumber(clean(p:config("tilt"))) or 0.0
 local cfg_theme_name = clean(p:config("theme")) or "amber"
+local cfg_ring_shape = clean(p:config("ring_shape")) or "square"
+
+-- ---------- Ring distance metric --------------------------------------------
+-- Rings are level sets of a distance-from-center metric on the OUTPUT grid.
+-- The shape of a ring is determined entirely by which metric we use; band
+-- index, color, and everything downstream are identical across shapes.
+--   square  : Chebyshev  d = max(|dx|, |dy|)  -> nested square frames (default)
+--   diamond : Manhattan  d = |dx| + |dy|       -> nested diamonds (rotated squares)
+--   circle  : Euclidean  d = sqrt(dx^2 + dy^2) -> nested circles/ellipses
+-- dist() receives deltas that are ALREADY absolute AND already x-scaled (the
+-- caller applies the *0.5 terminal-cell aspect correction before calling), so
+-- this function is pure geometry and is reused verbatim for both the max_d
+-- normalization and the per-cell band lookup -- they can never diverge.
+local DIST = {
+    square  = function(adx, ady) return (adx > ady) and adx or ady end,
+    diamond = function(adx, ady) return adx + ady end,
+    circle  = function(adx, ady) return math.sqrt(adx * adx + ady * ady) end,
+}
+local dist = DIST[cfg_ring_shape] or DIST["square"]
 
 -- ---------- ANSI helpers -----------------------------------------------------
 
@@ -302,15 +321,16 @@ function p:render(bands, frame, rows, cols)
     if draw_w > cols then draw_w = cols end
 
     -- Ring geometry computed on the OUTPUT grid (resolution-independent).
-    -- Square rings via Chebyshev distance from center, x scaled 0.5 for the
-    -- ~2:1 terminal cell aspect ratio. Band 1 (bass) = center, 10 = edge.
+    -- Rings are level sets of the selected distance metric (square/diamond/
+    -- circle); x scaled 0.5 for the ~2:1 terminal cell aspect ratio so circles
+    -- read as circles, not eggs. Band 1 (bass) = center, 10 = edge.
     local ocx = (draw_w + 1) / 2
     local ocy = (draw_h + 1) / 2
     local max_d = 0
     do
         local dx = (draw_w - ocx) * 0.5
         local dy = (draw_h - ocy)
-        max_d = ((dx > dy) and dx or dy)
+        max_d = dist(dx, dy)
         if max_d <= 0 then max_d = 1 end
     end
 
@@ -340,7 +360,7 @@ function p:render(bands, frame, rows, cols)
                 -- ring/band for this output cell
                 local dx = math.abs(ox - ocx) * 0.5
                 local dy = math.abs(oy - ocy)
-                local d  = (dx > dy) and dx or dy
+                local d  = dist(dx, dy)
                 local band = 1 + math.floor(d / max_d * 9 + 0.5)
                 if band < 1 then band = 1 elseif band > 10 then band = 10 end
 

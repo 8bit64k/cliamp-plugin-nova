@@ -61,6 +61,7 @@ Add a `[plugins.dance]` block to your cliamp config:
 [plugins.dance]
 art_path = "/abs/path/to/cliamp-plugin-dance/ruby.txt"   # required — absolute path to the ASCII art file (lives in your clone, not cliamp's dirs)
 color_mode = "glow"                            # "glow" | "mono" | "passthrough"
+ring_shape = "square"                          # "square" | "diamond" | "circle" — geometry of the concentric bands
 theme = "amber"                                # "amber" | "crt" | "vantablack" | "aurora"
 mono_color = 11                                # ANSI 256 index, used when color_mode = "mono"
 attack = 0.55                                  # smoothing attack (shared defaults with tubeamp)
