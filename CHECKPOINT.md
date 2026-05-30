@@ -161,6 +161,14 @@ same shape, swap one line).
 - `ruby_ascii.txt` — original hand-ASCII portrait (backup)
 
 **Tuning list:**
+
+DESIGN PRINCIPLE (applies to ALL tuning below): cliamp pays homage to old-school
+computing, and these plugins do by extension. Do NOT chase a perfect/clean aesthetic
+in every case. Retro-faithful > pixel-perfect: don't over-smooth, don't force flawless
+circles, let some CRT-era roughness/banding stand where it reads as character. When a
+tuning knob trades "correct" for "more polished but less retro," lean retro and make
+the polish opt-in, not the default.
+
 1. ~~Ring shape (square/circle/diamond)~~ — DONE 2026-05-29. `ring_shape` config,
    single `dist(adx,ady)` dispatch table reused for both max_d + per-cell so the
    metric can never diverge. Geometry verified numerically via
