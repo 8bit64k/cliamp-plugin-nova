@@ -145,8 +145,19 @@ end
 
 -- ---------- ANSI helpers -----------------------------------------------------
 
+-- Hoist hot math functions to file-scope locals: in Lua a `math.floor` call is
+-- two hash lookups (math, then floor) every time; locals skip that. Matters in
+-- the per-cell render loop (thousands of cells per frame at fullscreen).
+local floor = math.floor
+local abs   = math.abs
+local sqrt  = math.sqrt
+
 local ESC = string.char(27)
-local function fg256(n) return ESC .. "[38;5;" .. n .. "m" end
+-- Precompute all 256 SGR foreground escapes once, so the hot loop never rebuilds
+-- the "\27[38;5;Nm" string via concatenation (which allocated per color change).
+local FG = {}
+for n = 0, 255 do FG[n] = ESC .. "[38;5;" .. n .. "m" end
+local function fg256(n) return FG[n] or (ESC .. "[38;5;" .. n .. "m") end
 local function reset()  return ESC .. "[0m" end
 
 -- ---------- Braille density mutation ----------------------------------------
@@ -172,8 +183,8 @@ local braille_cache = {}   -- [codepoint] -> utf8 string, memoized
 local function braille_char(cp)
     local s = braille_cache[cp]
     if s then return s end
-    local b1 = 0xE0 + math.floor(cp / 4096)
-    local b2 = 0x80 + (math.floor(cp / 64) % 64)
+    local b1 = 0xE0 + floor(cp / 4096)
+    local b2 = 0x80 + (floor(cp / 64) % 64)
     local b3 = 0x80 + (cp % 64)
     s = string.char(b1, b2, b3)
     braille_cache[cp] = s
@@ -182,20 +193,31 @@ end
 
 -- OR a single power-of-two bit into a mask (5.1-safe): add it only if not set.
 local function set_bit(mask, bit)
-    if math.floor(mask / bit) % 2 == 0 then return mask + bit end
+    if floor(mask / bit) % 2 == 0 then return mask + bit end
     return mask
 end
 
--- Given a base braille codepoint and a level 0..1, return the thickened glyph:
--- base dots with the first round(level*8) fill-order dots OR'd in.
+-- thicken(base_cp, level) -> thickened glyph string, MEMOIZED. The result
+-- depends only on (base_cp, add) where add = round(level*8) in 0..8 — at most
+-- 256 base glyphs x 9 buckets. After warmup this is two table lookups, no bit
+-- loop and no allocation in the hot render path. thicken_cache[base_cp][add].
+local thicken_cache = {}
 local function thicken(base_cp, level)
-    if level <= 0 then return braille_char(base_cp) end
-    local add = math.floor(level * 8 + 0.5)
-    if add <= 0 then return braille_char(base_cp) end
-    if add > 8 then add = 8 end
+    local add = floor(level * 8 + 0.5)
+    if add < 0 then add = 0 elseif add > 8 then add = 8 end
+    local row = thicken_cache[base_cp]
+    if row then
+        local hit = row[add]
+        if hit then return hit end
+    else
+        row = {}
+        thicken_cache[base_cp] = row
+    end
     local mask = base_cp - 0x2800
     for k = 1, add do mask = set_bit(mask, FILL_ORDER[k]) end
-    return braille_char(0x2800 + mask)
+    local s = braille_char(0x2800 + mask)
+    row[add] = s
+    return s
 end
 
 -- ---------- Color presets (single swap point for upstream theme integration) ---
@@ -238,16 +260,19 @@ local PRESETS = {
 local active_preset = PRESETS[cfg_theme_name] or PRESETS["amber"]
 local glow_ramp      = active_preset.glow
 local overdrive_ramp = active_preset.overdrive
+local glow_n         = #glow_ramp       -- cached lengths (avoid # in hot path)
+local overdrive_n    = #overdrive_ramp
 
 local function glow_color(level, hot)
-    local ramp = hot and overdrive_ramp or glow_ramp
+    local ramp, n
+    if hot then ramp, n = overdrive_ramp, overdrive_n
+    else        ramp, n = glow_ramp, glow_n end
     -- Round (not floor) so the TOP ramp stop is reachable below level==1.0.
     -- With floor, the brightest color only appeared at an exact 1.0, which the
     -- smoothed/heat level basically never hits — so the peak (e.g. white) was
     -- effectively unreachable. Rounding spreads stops evenly across [0,1].
-    local idx = math.floor(level * (#ramp - 1) + 0.5) + 1
-    if idx < 1 then idx = 1 end
-    if idx > #ramp then idx = #ramp end
+    local idx = floor(level * (n - 1) + 0.5) + 1
+    if idx < 1 then idx = 1 elseif idx > n then idx = n end
     return ramp[idx]
 end
 
@@ -586,88 +611,87 @@ function p:render(bands, frame, rows, cols)
         if max_d <= 0 then max_d = 1 end
     end
 
-    local left_pad = math.floor((cols - draw_w) / 2)
-    local top_pad  = math.floor((rows - draw_h) / 2)
+    local left_pad = floor((cols - draw_w) / 2)
+    local top_pad  = floor((rows - draw_h) / 2)
     local pad_str  = string.rep(" ", left_pad)
+
+    -- Per-frame scalars hoisted out of the loops (avoid recomputing per cell).
+    local inv_dw = art_w / draw_w     -- source-col scale
+    local inv_dh = art_h / draw_h     -- source-row scale
+    local nine_over_maxd = 9 / max_d  -- pos = d * this
+    local is_pass  = (cfg_color_mode == "passthrough")
+    local is_mono  = (cfg_color_mode == "mono")
+    local do_dens  = cfg_density
+    local do_blend = cfg_ring_blend
 
     local out = {}
     for _ = 1, top_pad do out[#out + 1] = "" end
 
     for oy = 1, draw_h do
         -- map output row -> source row (nearest neighbor)
-        local sy = math.floor((oy - 0.5) / draw_h * art_h) + 1
+        local sy = floor((oy - 0.5) * inv_dh) + 1
         if sy < 1 then sy = 1 elseif sy > art_h then sy = art_h end
         local srow  = art_cells[sy]
         local scode = art_code[sy]
 
+        -- vertical distance is constant across this row -> hoist out of x-loop
+        local dy = abs(oy - ocy)
+
         local parts = { pad_str }
+        local np = 1                 -- track append index (avoid #parts per cell)
         local last_color = nil
         for ox = 1, draw_w do
-            local sx = math.floor((ox - 0.5) / draw_w * art_w) + 1
+            local sx = floor((ox - 0.5) * inv_dw) + 1
             if sx < 1 then sx = 1 elseif sx > art_w then sx = art_w end
             local ch = srow[sx] or " "
 
-            if cfg_color_mode == "passthrough" then
-                parts[#parts + 1] = ch
+            if is_pass then
+                np = np + 1; parts[np] = ch
             else
-                -- ring/band for this output cell
-                local dx = math.abs(ox - ocx) * 0.5
-                local dy = math.abs(oy - ocy)
-                local d  = dist(dx, dy)
-
-                -- Continuous ring position in [0,9]. With blend ON we interpolate
-                -- the level between the two bands the cell sits between, so ring
-                -- boundaries dissolve into a smooth gradient. With blend OFF we
-                -- snap to the nearest band (hard concentric steps).
-                local pos = d / max_d * 9
+                -- ring position for this output cell
+                local dx = abs(ox - ocx) * 0.5
+                local pos = dist(dx, dy) * nine_over_maxd
                 if pos < 0 then pos = 0 elseif pos > 9 then pos = 9 end
+
                 local lvl, dlvl
-                if cfg_ring_blend then
-                    local lo = math.floor(pos)
-                    if lo > 8 then lo = 8 end          -- keep lo+1 (Lua lo+2) <= 10
+                if do_blend then
+                    local lo = floor(pos)
+                    if lo > 8 then lo = 8 end
                     local frac = pos - lo
-                    local a = effective[lo + 1]
-                    local b = effective[lo + 2]
+                    local a = effective[lo + 1]; local b = effective[lo + 2]
                     lvl = a + (b - a) * frac
-                    -- density level uses the SAME ring interpolation but its own
-                    -- envelope (dens[]) so dots fill/shed independently of color.
-                    local da = dens[lo + 1]
-                    local db = dens[lo + 2]
+                    local da = dens[lo + 1]; local db = dens[lo + 2]
                     dlvl = da + (db - da) * frac
                 else
-                    local band = 1 + math.floor(pos + 0.5)
+                    local band = 1 + floor(pos + 0.5)
                     if band < 1 then band = 1 elseif band > 10 then band = 10 end
                     lvl = effective[band]
                     dlvl = dens[band]
                 end
 
                 local color
-                if cfg_color_mode == "mono" then
+                if is_mono then
                     color = cfg_mono_color
                     if lvl < 0.12 and ch ~= " " then color = 236 end
                 else
                     color = glow_color(lvl, lvl >= cfg_overdrive)
                 end
 
-                -- Density mutation: thicken the braille glyph toward solid as the
-                -- cell heats. Braille cells only (scode[sx] is nil otherwise), so
-                -- non-braille art is never touched. Glyph gains matter on peaks
-                -- in lockstep with color, so a bass flare both brightens AND
-                -- thickens the core.
-                if cfg_density and scode then
+                -- density: thicken braille glyph (cached lookup). braille cells only.
+                if do_dens and scode then
                     local base_cp = scode[sx]
                     if base_cp then ch = thicken(base_cp, dlvl) end
                 end
 
                 if color ~= last_color then
-                    parts[#parts + 1] = fg256(color)
+                    np = np + 1; parts[np] = FG[color] or fg256(color)
                     last_color = color
                 end
-                parts[#parts + 1] = ch
+                np = np + 1; parts[np] = ch
             end
         end
-        if cfg_color_mode ~= "passthrough" then
-            parts[#parts + 1] = reset()
+        if not is_pass then
+            np = np + 1; parts[np] = reset()
         end
         out[#out + 1] = table.concat(parts)
     end
