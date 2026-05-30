@@ -364,7 +364,7 @@ function p:render(bands, frame, rows, cols)
     -- Resolve the metric ONCE per frame (in cycle mode it advances with the
     -- wall clock; resolving once keeps the whole frame on a single shape and
     -- keeps max_d consistent with the per-cell lookup).
-    local dist, shape_name = active_dist()
+    local dist = active_dist()
     local ocx = (draw_w + 1) / 2
     local ocy = (draw_h + 1) / 2
     local max_d = 0
@@ -427,16 +427,6 @@ function p:render(bands, frame, rows, cols)
     end
 
     for _ = #out + 1, rows do out[#out + 1] = "" end
-
-    -- In cycle mode only, label the active shape on the bottom row so you can
-    -- tell which metric you're looking at as it rotates. Fixed-shape mode stays
-    -- label-free (clean output). Dim gray, right-aligned, never overflows.
-    if cycle_mode and rows > 0 and cfg_color_mode ~= "passthrough" then
-        local label = "[" .. shape_name .. "]"
-        local pad = cols - #label
-        if pad < 0 then pad = 0 end
-        out[rows] = string.rep(" ", pad) .. fg256(240) .. label .. reset()
-    end
 
     return table.concat(out, "\n")
 end
