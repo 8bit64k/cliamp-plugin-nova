@@ -40,6 +40,17 @@ SEPARATE plugin. Don't re-add portrait-preservation hedging here.
    "immutable canvas" rule — that rule protected PORTRAITS, and dance is now
    braille-wall-only, so glyph mutation is correct here.
 
+   **Density fills TOWARD CENTER (2026-05-30).** Because the wall is mapped into
+   concentric rings around the pane center, the dots a heating cell adds accrete
+   TOWARD that center, not always bottom-up — this reinforces the radial structure
+   instead of fighting it. A cell left of center fills from its right edge inward;
+   above-center fills from its bottom up; corners fill from the dot nearest center.
+   Implemented as 9 direction-specific fill orders (`FILL_ORDERS[dirx][diry]`,
+   signs in {-1,0,1}) chosen per cell; `thicken()` is memoized per direction so
+   there's no per-frame cost. This is NOT a knob — it's the correct default for a
+   radial visualizer; do not revert to a single fixed fill order. (Verify any
+   change with `scratchpad/test_center_fill.lua` + the visual `show_final.lua`.)
+
 3. **User content stays in the user's clone.** `art_path` is an absolute path the
    plugin reads in place. Never copy art into cliamp's own dirs (`~/.config/cliamp/...`).
    App dirs hold app stuff, not the user's content.

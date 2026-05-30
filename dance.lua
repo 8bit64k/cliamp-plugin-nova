@@ -210,8 +210,35 @@ local function reset()  return ESC .. "[0m" end
 --
 -- Braille dot bit layout (cell is 2 cols x 4 rows):
 --   col0: r0=1 r1=2 r2=4 r3=64    col1: r0=8 r1=16 r2=32 r3=128
--- Bottom-up fill order: bottom row first (64,128), then up.
-local FILL_ORDER = { 64, 128, 4, 32, 2, 16, 1, 8 }
+--
+-- DENSITY FILLS TOWARD CENTER. dance maps the art into concentric rings around
+-- the pane center, so as the wall heats the matter should accrete TOWARD that
+-- center, reinforcing the radial structure -- not always bottom-up. A cell LEFT
+-- of center fills from its RIGHT edge inward; a cell ABOVE center fills from its
+-- BOTTOM up; corners fill from the dot nearest the center. We pick a fill order
+-- per cell by the SIGN of its offset from center (dirx, diry in {-1,0,1}).
+--
+-- The 9 orders below were derived by sorting the 8 dots so the ones on the
+-- center-facing side fill first, then VISUALLY verified (scratchpad/viz_fill.lua:
+-- every spatial position marches its dots toward center). Keyed
+-- FILL_ORDERS[dirx][diry] with dirx,diry in {-1,0,1}.
+local FILL_ORDERS = {
+    [-1] = {  -- cell LEFT of center (center is to the right)
+        [-1] = {128,32,64,16,4,8,2,1},   -- up-left:  toward down-right corner
+        [ 0] = {8,16,32,128,1,2,4,64},   -- left:     toward right column
+        [ 1] = {8,16,1,32,2,128,4,64},   -- dn-left:  toward up-right corner
+    },
+    [ 0] = {  -- cell on the vertical center line
+        [-1] = {64,128,4,32,2,16,1,8},   -- up:       toward bottom (center below)
+        [ 0] = {1,2,8,4,16,64,32,128},   -- on-center: balanced
+        [ 1] = {1,8,2,16,4,32,64,128},   -- down:     toward top (center above)
+    },
+    [ 1] = {  -- cell RIGHT of center (center is to the left)
+        [-1] = {64,4,128,2,32,1,16,8},   -- up-right: toward down-left corner
+        [ 0] = {1,2,4,64,8,16,32,128},   -- right:    toward left column
+        [ 1] = {1,2,8,4,16,64,32,128},   -- dn-right: toward up-left corner
+    },
+}
 
 -- Encode a codepoint in 0x2800..0x28FF as 3-byte UTF-8 (no bitops; div/mod).
 -- All braille codepoints are 3-byte: lead 0xE2, then two continuation bytes.
@@ -233,24 +260,27 @@ local function set_bit(mask, bit)
     return mask
 end
 
--- thicken(base_cp, level) -> thickened glyph string, MEMOIZED. The result
--- depends only on (base_cp, add) where add = round(level*8) in 0..8 — at most
--- 256 base glyphs x 9 buckets. After warmup this is two table lookups, no bit
--- loop and no allocation in the hot render path. thicken_cache[base_cp][add].
+-- thicken(base_cp, level, fill_order, dkey) -> thickened glyph string, MEMOIZED.
+-- The result depends on (dkey, base_cp, add) where add = round(level*8) in 0..8
+-- and dkey identifies the toward-center fill order (0..8) -- at most 9 dirs x 256
+-- base glyphs x 9 buckets. After warmup this is a couple table lookups, no bit
+-- loop and no allocation in the hot path. thicken_cache[dkey][base_cp][add].
 local thicken_cache = {}
-local function thicken(base_cp, level)
+local function thicken(base_cp, level, fill_order, dkey)
     local add = floor(level * 8 + 0.5)
     if add < 0 then add = 0 elseif add > 8 then add = 8 end
-    local row = thicken_cache[base_cp]
+    local dcache = thicken_cache[dkey]
+    if not dcache then dcache = {}; thicken_cache[dkey] = dcache end
+    local row = dcache[base_cp]
     if row then
         local hit = row[add]
         if hit then return hit end
     else
         row = {}
-        thicken_cache[base_cp] = row
+        dcache[base_cp] = row
     end
     local mask = base_cp - 0x2800
-    for k = 1, add do mask = set_bit(mask, FILL_ORDER[k]) end
+    for k = 1, add do mask = set_bit(mask, fill_order[k]) end
     local s = braille_char(0x2800 + mask)
     row[add] = s
     return s
@@ -715,6 +745,13 @@ function p:render(bands, frame, rows, cols)
 
         -- vertical distance is constant across this row -> hoist out of x-loop
         local dy = abs(oy - ocy)
+        -- vertical direction toward center (sign of offset): -1 above, +1 below,
+        -- 0 on the center line. Density fills toward center, so pick the row's
+        -- fill-order sub-table once here; the per-cell dirx selects within it.
+        local diry = (oy < ocy) and -1 or ((oy > ocy) and 1 or 0)
+        local fill_row = FILL_ORDERS[-1][diry]   -- left-of-center orders (default)
+        local fill_mid = FILL_ORDERS[0][diry]
+        local fill_rgt = FILL_ORDERS[1][diry]
 
         local parts = { pad_str }
         local np = 1                 -- track append index (avoid #parts per cell)
@@ -757,9 +794,18 @@ function p:render(bands, frame, rows, cols)
                 end
 
                 -- density: thicken braille glyph (cached lookup). braille cells only.
+                -- Dots fill TOWARD CENTER: pick the fill order by this cell's
+                -- direction from center (dirx selects within the row's diry table).
                 if do_dens and scode then
                     local base_cp = scode[sx]
-                    if base_cp then ch = thicken(base_cp, dlvl) end
+                    if base_cp then
+                        local fo, dirx
+                        if ox < ocx then fo, dirx = fill_row, -1
+                        elseif ox > ocx then fo, dirx = fill_rgt, 1
+                        else fo, dirx = fill_mid, 0 end
+                        -- dkey 0..8 = (dirx+1)*3 + (diry+1): unique per direction.
+                        ch = thicken(base_cp, dlvl, fo, (dirx + 1) * 3 + (diry + 1))
+                    end
                 end
 
                 if color ~= last_color then

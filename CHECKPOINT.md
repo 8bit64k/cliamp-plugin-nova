@@ -65,6 +65,28 @@ STILL TODO for these knobs: README config table + docs/DESIGN.md not yet updated
 with max_cols/max_rows/render_rate (batched at session end per 8bit64k). Then
 back to the tuning backlog (#4 dead_zone PRIORITY).
 
+## TOWARD-CENTER DENSITY FILL (2026-05-30) — aesthetic, but reinforces the design
+
+8bit64k noticed braille glyphs thickened but NOT toward the center (some did by
+coincidence). Since dance maps art into concentric rings around the pane center,
+density should accrete TOWARD center as the wall heats — reinforcing the radial
+structure instead of fighting it. DONE: replaced the single bottom-up FILL_ORDER
+with 9 direction-specific orders (FILL_ORDERS[dirx][diry], dirx/diry in {-1,0,1}),
+picked per-cell by the SIGN of the cell's offset from center. A cell left of
+center fills from its RIGHT edge inward; above-center fills from the BOTTOM up;
+corners from the dot nearest center. thicken() now takes (fill_order, dkey);
+cache is thicken_cache[dkey][base_cp][add] (9 dirs x 256 x 9, still tiny, no
+per-frame bit loop). Orders derived by sorting dots toward the center-facing
+edge then VISUALLY verified (scratchpad/viz_fill.lua + show_final.lua: a
+bass-heavy radial gradient shows all 4 quadrants leaning inward toward the solid
+core). Perf unchanged (a couple comparisons + 1 table index per cell; thicken
+still memoized). No new config knob — folded under existing `density` toggle.
+GOTCHA confirmed: passthrough color_mode SKIPS density entirely (the is_pass
+branch bypasses the else-block) — use glow/mono to see thickening.
+Verified: scratchpad/test_center_fill.lua asserts L/R/T/B dot mass leans toward
+center in all 4 regions; cap + frameskip suites still pass; no overflow.
+This is a DURABLE design decision -> promoted to AGENTS.md.
+
 **Last commit:** HEAD = "perf: max_cols/max_rows canvas cap + render_rate (both
 default off)". Local == remote, verified after push.
 **Branch:** master. **Repo:** github.com/8bit64k/cliamp-plugin-dance (PRIVATE).
