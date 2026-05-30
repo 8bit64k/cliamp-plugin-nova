@@ -15,7 +15,58 @@ aspect ratio knob (#5), ring count (#6), truecolor 24-bit ramp (removes 11-stop
 ceiling). Defaults (flare onset margin 0.18/baseline 0.05, density 0.6/0.15) are
 reasoned but NOT yet validated against lots of real music — tune by ear when ready.
 
-**Last commit:** 3c38abe (revert amber peak to magenta). Local == remote, verified.
+## PERF WORK (2026-05-30) — render cost profiling + canvas cap / frame-skip
+
+Plugin runs ~20% CPU heavier than native visualizers; heaviest at fit=fill on a
+big screen. Profiled the real render path (scratchpad/bench_render.lua — reusable;
+run with PLAIN `lua`, NOT luajit: host is gopher-lua 5.1, no JIT, so numbers are
+RELATIVE cost indicators, not host fps).
+
+cliamp ticks a Lua visualizer at TickFast = 50ms = **20 FPS** while playing
+(TickSlow 200ms/5fps when paused/overlay). Source: ui/tick.go + luaModeDriver in
+ui/visualizer.go (TickInterval -> defaultDriverTickInterval). No host "skip" API;
+returning a NON-string from render() triggers cliamp's silent frame-REUSE (repaint
+last) — that's the mechanism a plugin-side frame-skip uses.
+
+KEY FINDING — cost is almost PERFECTLY LINEAR in drawn cells (draw_w*draw_h):
+  70x5  (350)   0.14ms   0.458 ms/1000cells
+ 120x30 (3600)  1.38ms   0.418
+ 200x50 (10000) 3.63ms   0.412
+ 320x80 (25600) 10.30ms  0.410   <- 4K-ish worst case
+Flat ms/1000cells across 73x size range => no fixed overhead to chase; the cost
+IS the per-cell loop. Both your levers (cap cells / skip frames) attack this.
+
+Component breakdown @200x50 (~4.16ms baseline):
+ density mutation ~23% | color+ring math ~20% (passthrough floor=0.84ms=20%) |
+ blend ~7% | circle-sqrt ~7% over square. density + color are the real work
+ (don't gut). fit=contain already ~35% cheaper than fill (letterboxes -> fewer cells).
+
+TRADEOFF the data exposes: capping fit=fill on a huge screen necessarily makes
+the wall a CENTERED BLOCK instead of edge-to-edge (you can't fill 320 cols with
+fewer than 320 cols of glyphs). Frame-skip is the lever that KEEPS fill edge-to-
+edge while cutting AVERAGE cpu (trades refresh rate, not coverage). So: cap =
+per-frame ceiling (changes fill look on huge panes), skip = average-rate cut
+(preserves fill look). They compose.
+
+BUILD ORDER: (1) canvas cap [DONE], (2) render_rate (1-in-N w/ cached frame)
+[DONE], (3) transient-override so bass FLARES never drop while skipping [DONE —
+folded into render_rate]. Knobs default OFF (max 0/0, render_rate 1.0) =
+byte-for-byte old behavior. Verified results:
+ - cost linear in cells; cap 4K 320x80 -> 160x48 = -69%
+ - render_rate avg cut ~(1-rate): 0.5 -51%, 0.33 -68%, 0.25 -75%
+ - COMBINED cap160x48 + rate0.33 on 4K: 9.88 -> 1.07 ms avg (-89%)
+ - tests: scratchpad/test_cap.lua + test_frameskip.lua pass; render harness
+   unchanged across themes/fit/cycle; bench tools in scratchpad/bench_*.lua.
+RENDER_RATE SEMANTICS: it's the FRACTION of frames rendered (0..1), not a skip
+count — 8bit64k finds the 0->1 dial more natural than "skip N". 1.0=every frame,
+0.5=half, 0.25=quarter. Values <0.25 bump to 0.25 (a rate of 0='never' is
+meaningless). Internally maps to integer skip=round(1/rate)-1.
+STILL TODO for these knobs: README config table + docs/DESIGN.md not yet updated
+with max_cols/max_rows/render_rate (batched at session end per 8bit64k). Then
+back to the tuning backlog (#4 dead_zone PRIORITY).
+
+**Last commit:** HEAD = "perf: max_cols/max_rows canvas cap + render_rate (both
+default off)". Local == remote, verified after push.
 **Branch:** master. **Repo:** github.com/8bit64k/cliamp-plugin-dance (PRIVATE).
 **Durable design rules live in AGENTS.md** (not here — CHECKPOINT rolls over).
 

@@ -40,6 +40,42 @@ local cfg_cycle_secs = tonumber(clean(p:config("cycle_seconds"))) or 20
 if cfg_cycle_secs < 2 then cfg_cycle_secs = 2 end  -- guard against 0/typo thrash
 local cfg_fit        = clean(p:config("fit")) or "contain"
 
+-- Canvas cap: the render cost is LINEAR in drawn cells (draw_w*draw_h), so on a
+-- very large pane (fit=fill fullscreen on a 4K terminal) the per-frame work can
+-- get heavy. max_cols/max_rows clamp the DRAWN grid; the art is then centered in
+-- the (larger) pane with the existing letterbox padding. 0 = unlimited (default),
+-- so normal panes are completely unchanged. NOTE for fit=fill: a cap necessarily
+-- makes the wall a centered block instead of edge-to-edge (you can't fill more
+-- columns than you draw) -- that's the deliberate cost/coverage trade. Use
+-- frame_skip instead if you want true edge-to-edge fill on a huge screen.
+local cfg_max_cols = tonumber(clean(p:config("max_cols"))) or 0
+local cfg_max_rows = tonumber(clean(p:config("max_rows"))) or 0
+if cfg_max_cols < 0 then cfg_max_cols = 0 end
+if cfg_max_rows < 0 then cfg_max_rows = 0 end
+
+-- Render rate: cliamp ticks a visualizer at ~20 FPS while playing. For a smoothed
+-- glow wall, rendering every frame is often more than the eye needs. render_rate
+-- is the FRACTION of frames actually rendered, 0..1: 1.0 renders every frame (full
+-- ~20 FPS, default -- no change), 0.5 renders half (~10 FPS), 0.25 renders 1 in 4
+-- (~5 FPS). On the un-rendered frames the last output string is REUSED, cutting
+-- AVERAGE render cost by ~(1-rate) regardless of pane size -- and unlike the
+-- canvas cap it keeps fit=fill edge-to-edge (it trades refresh rate, not coverage).
+-- Audio state (smoothing/heat/density) still advances every frame so the envelope
+-- never freezes; only the expensive cell loop is skipped. A bass-transient ONSET
+-- force-renders even on a skipped frame so kick FLARES are never dropped.
+--
+-- A rate of 0 would mean "never render," which is meaningless, so anything below
+-- 0.25 is bumped to 0.25 (1-in-4, the slowest sane setting); above 1.0 clamps to
+-- full rate. The continuous rate maps to an integer skip count internally
+-- (skip = round(1/rate) - 1), so effective stops are ~{1.0, 0.5, 0.33, 0.25}.
+local cfg_render_rate = tonumber(clean(p:config("render_rate")))
+if cfg_render_rate == nil then cfg_render_rate = 1.0 end
+if cfg_render_rate > 1.0 then cfg_render_rate = 1.0 end
+if cfg_render_rate < 0.25 then cfg_render_rate = 0.25 end
+-- Integer frames to skip between renders: we draw 1 of every (cfg_frame_skip + 1).
+local cfg_frame_skip = math.floor(1 / cfg_render_rate + 0.5) - 1
+if cfg_frame_skip < 0 then cfg_frame_skip = 0 end
+
 -- Density mutation: as a braille cell climbs the level/color ramp, OR in dots so
 -- the glyph thickens toward solid (toward full). This makes the braille WALL not
 -- just brighten but gain matter on the peaks — a flare thickens the core. Only
@@ -444,10 +480,20 @@ local effective = {0,0,0,0,0,0,0,0,0,0}
 -- This is the level density mutation reads (NOT effective[] directly).
 local dens      = {0,0,0,0,0,0,0,0,0,0}
 
+-- Frame-skip state: cache the last rendered string and a frame counter so we can
+-- cheaply reuse output on skipped frames. onset_fired flags a bass transient this
+-- frame so a skip can be overridden (flares must never be dropped).
+local last_output = nil
+local skip_counter = 0
+local last_rows = 0
+local last_cols = 0
+
 function p:init(rows, cols)
     for i = 1, 10 do smoothed[i] = 0; effective[i] = 0; dens[i] = 0 end
     heat[1], heat[2] = 0, 0
     bass_base[1], bass_base[2] = 0, 0
+    last_output = nil
+    skip_counter = 0
     load_art()
 end
 
@@ -504,9 +550,11 @@ function p:render(bands, frame, rows, cols)
     -- tail never dims below the live level. cfg_od_decay=0 => no tail => snap.
     local BASE_RATE   = 0.05   -- baseline EMA: slow, so it tracks recent average
     local ONSET_MARGIN = 0.18  -- live must exceed baseline by this to be an onset
+    local onset_fired = false  -- a bass transient this frame -> override frame-skip
     for i = 1, 2 do
         local onset = (smoothed[i] >= cfg_overdrive)
                       and (smoothed[i] >= bass_base[i] + ONSET_MARGIN)
+        if onset then onset_fired = true end
         if onset and smoothed[i] > heat[i] then
             heat[i] = smoothed[i]                 -- latch hot on the punch
         else
@@ -566,22 +614,53 @@ function p:render(bands, frame, rows, cols)
     end
     if rows < 1 or cols < 1 then return "" end
 
-    -- Fit the art into the pane. Two modes:
+    -- Frame-skip gate. All audio state (smoothing/heat/baseline/density) has been
+    -- advanced above, so skipping here only elides the expensive per-cell render
+    -- -- the envelope keeps moving underneath. Reuse the cached frame UNLESS:
+    --   * frame_skip is 0 (feature off), or
+    --   * we have no cached frame yet, or
+    --   * the pane size changed (cache would be the wrong dimensions), or
+    --   * a bass transient fired this frame (force a render so flares never drop).
+    -- The counter renders 1 frame then reuses for the next `frame_skip` frames.
+    if cfg_frame_skip > 0
+        and last_output ~= nil
+        and last_rows == rows and last_cols == cols
+        and not onset_fired then
+        if skip_counter > 0 then
+            skip_counter = skip_counter - 1
+            return last_output
+        end
+    end
+    -- About to render fresh: arm the skip counter for the next N frames.
+    skip_counter = cfg_frame_skip
+
+    -- Canvas cap: clamp the grid we actually DRAW into. The art is sized against
+    -- the capped dimensions, then centered in the FULL pane below (existing
+    -- letterbox padding). Cost is linear in drawn cells, so this bounds the
+    -- per-frame work on huge panes. 0 = unlimited. We never draw larger than the
+    -- real pane either way.
+    local cap_rows = rows
+    local cap_cols = cols
+    if cfg_max_rows > 0 and cap_rows > cfg_max_rows then cap_rows = cfg_max_rows end
+    if cfg_max_cols > 0 and cap_cols > cfg_max_cols then cap_cols = cfg_max_cols end
+
+    -- Fit the art into the (capped) canvas. Two modes:
     --   contain (default): scale DOWN preserving aspect, centered, letterboxed.
     --     Right for pictures (Ruby, CRT) where the shape must be preserved.
-    --   fill: stretch each axis independently to the FULL pane (rows x cols),
-    --     edge to edge, no letterbox. Right for textures like the braille wall
-    --     where there's no "correct" shape to keep -- it fills the whole screen.
-    -- Never scales a source axis beyond the pane in either mode.
+    --   fill: stretch each axis independently to the FULL canvas, edge to edge,
+    --     no letterbox. Right for textures like the braille wall where there's
+    --     no "correct" shape to keep. (With a cap < pane, fill reaches the cap,
+    --     not the pane edge -- a centered block; that's the cost/coverage trade.)
+    -- Never scales a source axis beyond the canvas in either mode.
     local draw_h, draw_w
     if cfg_fit == "fill" then
-        draw_h = rows
-        draw_w = cols
+        draw_h = cap_rows
+        draw_w = cap_cols
     else
         draw_h = art_h
         draw_w = art_w
-        if draw_h > rows then draw_h = rows end
-        if draw_w > cols then draw_w = cols end
+        if draw_h > cap_rows then draw_h = cap_rows end
+        if draw_w > cap_cols then draw_w = cap_cols end
         -- preserve aspect-ish: if one axis must shrink, shrink the other in step
         -- so the face doesn't get grotesquely squished. Use the tighter ratio.
         local sh = draw_h / art_h
@@ -589,8 +668,8 @@ function p:render(bands, frame, rows, cols)
         local s  = (sh < sw) and sh or sw
         draw_h = math.max(1, math.floor(art_h * s + 0.5))
         draw_w = math.max(1, math.floor(art_w * s + 0.5))
-        if draw_h > rows then draw_h = rows end
-        if draw_w > cols then draw_w = cols end
+        if draw_h > cap_rows then draw_h = cap_rows end
+        if draw_w > cap_cols then draw_w = cap_cols end
     end
 
     -- Ring geometry computed on the OUTPUT grid (resolution-independent).
@@ -698,5 +777,11 @@ function p:render(bands, frame, rows, cols)
 
     for _ = #out + 1, rows do out[#out + 1] = "" end
 
-    return table.concat(out, "\n")
+    -- Cache the rendered frame so frame-skip can reuse it. Stash the pane size too
+    -- so a resize forces a fresh render (a stale cache would be the wrong shape).
+    local result = table.concat(out, "\n")
+    last_output = result
+    last_rows = rows
+    last_cols = cols
+    return result
 end
