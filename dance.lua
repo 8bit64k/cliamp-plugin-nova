@@ -58,6 +58,21 @@ local cfg_dead_zone = tonumber(clean(p:config("dead_zone"))) or 0.0
 if cfg_dead_zone < 0   then cfg_dead_zone = 0.0 end
 if cfg_dead_zone > 0.5 then cfg_dead_zone = 0.5 end
 
+-- Gamma: response curve shaping the level->brightness mapping. 1.0 = linear
+-- (default, no change). > 1.0 compresses the low end (darker, more contrast
+-- toward the top); < 1.0 lifts mid-levels (brighter, more even). Applied to
+-- effective[] after the dead zone gate, before density and color.
+local cfg_gamma = tonumber(clean(p:config("gamma"))) or 1.0
+if cfg_gamma < 0.1 then cfg_gamma = 0.1 end
+if cfg_gamma > 3.0 then cfg_gamma = 3.0 end
+
+-- Cell aspect ratio: terminal cells are ~2x tall, so x-distances are scaled
+-- down so circles read round instead of egg-shaped. 0.5 is the standard for
+-- most terminal fonts; dial up if your font is unusually wide, down if narrow.
+local cfg_cell_aspect = tonumber(clean(p:config("cell_aspect"))) or 0.5
+if cfg_cell_aspect < 0.2 then cfg_cell_aspect = 0.2 end
+if cfg_cell_aspect > 2.0 then cfg_cell_aspect = 2.0 end
+
 -- Canvas cap: the render cost is LINEAR in drawn cells (draw_w*draw_h), so on a
 -- very large pane (fit=fill fullscreen on a 4K terminal) the per-frame work can
 -- get heavy. max_cols/max_rows clamp the DRAWN grid; the art is then centered in
@@ -690,6 +705,16 @@ function p:render(bands, frame, rows, cols)
         end
     end
 
+    -- Gamma: shape the response curve. Applied after the dead zone gate so
+    -- bands that were clamped to 0 stay at 0 regardless of gamma.
+    if cfg_gamma ~= 1.0 then
+        for i = 1, 10 do
+            if effective[i] > 0 then
+                effective[i] = effective[i] ^ cfg_gamma
+            end
+        end
+    end
+
     -- Density envelope: chase effective[] with its OWN attack/release so dots
     -- fill fast and shed slow (CRT phosphor persistence) independent of color.
     -- Only advanced when density is on. dens[] is what the glyph mutation reads.
@@ -791,7 +816,7 @@ function p:render(bands, frame, rows, cols)
     local ocy = (draw_h + 1) / 2
     local max_d = 0
     do
-        local dx = (draw_w - ocx) * 0.5
+        local dx = (draw_w - ocx) * cfg_cell_aspect
         local dy = (draw_h - ocy)
         max_d = dist(dx, dy)
         if max_d <= 0 then max_d = 1 end
@@ -842,7 +867,7 @@ function p:render(bands, frame, rows, cols)
                 np = np + 1; parts[np] = ch
             else
                 -- ring position for this output cell
-                local dx = abs(ox - ocx) * 0.5
+                local dx = abs(ox - ocx) * cfg_cell_aspect
                 local pos = dist(dx, dy) * nine_over_maxd
                 if pos < 0 then pos = 0 elseif pos > 9 then pos = 9 end
 
