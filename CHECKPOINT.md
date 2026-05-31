@@ -138,20 +138,20 @@ optional, documents `start` + the perf knobs. Accurate to current plugin.
 
 ## Tuning backlog (unbuilt)
 
-- **#4 DEAD ZONE — PRIORITY.** The round-mapping fix bumped low-level signal up one
-  ramp stop, surfacing faint treble/outer-ring activity that used to floor to
-  black. 8bit64k noticed the higher bands got more active. Fix: a `dead_zone`
-  config (clamp band levels below ~0.10-0.12 to true off) — keeps the correct round
-  mapping AND restores a clean noise floor. New config knob.
-- **#3 Gamma / response curve.** Shape the level->brightness mapping.
+- **#4 DEAD ZONE — SHIPPED (1dd55a4).** `dead_zone` knob clamps bands below threshold
+  to 0. Default 0 (off). Try 0.08-0.12.
+- **#3 Gamma / response curve.** Shape the level→brightness mapping.
 - **#5 Aspect ratio knob.** Currently x scaled 0.5 for ~2:1 cell aspect.
-- **#6 Ring count.** Currently fixed at 10 (the band count).
-- **Truecolor 24-bit ramp.** Removes the 11-stop brightness ceiling that
-  `ring_blend` smooths spatially but can't exceed. Detect `COLORTERM=truecolor`
-  via `os.getenv` (available in sandbox). Bigger item.
 - Defaults (flare onset margin 0.18 / baseline EMA 0.05, density attack 0.6 /
   release 0.15) are reasoned but NOT yet validated against lots of real music —
   tune by ear when ready.
+
+### Deferred (bottom of list)
+
+- **Truecolor 24-bit ramp.** Removes the 11-stop brightness ceiling. Detect
+  `COLORTERM=truecolor` via `os.getenv`.
+- **Ring count.** Staying fixed at 10 — 1:1 mapping with cliamp's 10-band EQ
+  is the correct call. Defer until there's a compelling reason to break it.
 
 ---
 

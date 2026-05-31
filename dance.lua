@@ -402,6 +402,14 @@ local PRESETS = {
         -- Overdrive: red-orange → crimson → magenta-red → cream white
         overdrive = { 196, 160, 125, 230 },
     },
+    flan = {
+        name = "Flan (cream → gold → rose gold)",
+        -- 11-stop ramp: cool cream → warm gold → hot rose gold.
+        -- Like caramel custard browning under heat. ANSI 256 indices.
+        glow      = { 232, 230, 229, 228, 226, 220, 214, 208, 209, 174, 167 },
+        -- Overdrive: coral → dusty rose → deep rose → salmon pink
+        overdrive = { 209, 174, 167, 210 },
+    },
 }
 
 -- ---------- Preset profiles (dynamics + behaviour bundled for one-knob feel) ----
@@ -461,6 +469,14 @@ local PRESET_PROFILES = {
         dead_zone = 0.1,  gamma = 1.6,  tilt = 0.0,
         ring_blend = true,
     },
+    tacutacu = {
+        theme = "flan",  ring_shape = "diamond",
+        attack = 0.3,  release = 0.3,
+        overdrive = 0.90,  overdrive_decay = 0.65,  overdrive_bleed = true,
+        density_attack = 0.85,  density_release = 0.06,
+        dead_zone = 0.0,  gamma = 1.0,  tilt = 0.1,
+        ring_blend = true,
+    },
 }
 
 -- Resolve active behaviour preset. preset = "default" | profile name.
@@ -480,7 +496,7 @@ do
     end
 end
 
-local CYCLE_PRESET_NAMES = { "default", "punchy", "ethereal", "retro", "plasma", "ghost" }
+local CYCLE_PRESET_NAMES = { "default", "punchy", "ethereal", "retro", "plasma", "ghost", "tacutacu" }
 
 -- Resolve the active profile for THIS frame. In fixed mode this is constant;
 -- in cycle mode it advances with wall-clock time (same cycle_t0 as ring_shape).
