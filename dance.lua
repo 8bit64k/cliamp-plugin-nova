@@ -253,6 +253,7 @@ local ESC = string.char(27)
 local FG = {}
 for n = 0, 255 do FG[n] = ESC .. "[38;5;" .. n .. "m" end
 local function fg256(n) return FG[n] or (ESC .. "[38;5;" .. n .. "m") end
+local function bg256(n) return ESC .. "[48;5;" .. n .. "m" end
 local function reset()  return ESC .. "[0m" end
 
 -- ---------- Braille density mutation ----------------------------------------
@@ -1101,6 +1102,16 @@ function p:render(bands, frame, rows, cols)
     end
 
     for _ = #out + 1, rows do out[#out + 1] = "" end
+
+    -- Debug footer: show preset + theme on the last row when cycling.
+    -- Safe here (no API calls) — just paints into the output string.
+    if cfg_debug and rows > 0 and last_shown_preset then
+        local label = " [" .. last_shown_preset .. " + " .. cfg_theme_name .. "] "
+        local lc = visible_cols(label)
+        local pad = math.floor((cols - lc) / 2)
+        if pad < 0 then pad = 0 end
+        out[rows] = fg256(244) .. bg256(232) .. string.rep(" ", pad) .. label .. reset()
+    end
 
     -- Cache the rendered frame so frame-skip can reuse it. Stash the pane size too
     -- so a resize forces a fresh render (a stale cache would be the wrong shape).
