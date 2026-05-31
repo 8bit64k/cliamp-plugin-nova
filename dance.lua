@@ -194,6 +194,8 @@ local user_set_density_release = (p:config("density_release") ~= nil)
 local user_set_overdrive_decay = (p:config("overdrive_decay") ~= nil)
 local user_set_overdrive_bleed = (p:config("overdrive_bleed") ~= nil)
 local user_set_ring_blend      = (p:config("ring_blend") ~= nil)
+local user_set_theme         = (p:config("theme") ~= nil)
+local user_set_ring_shape    = (p:config("ring_shape") ~= nil)
 
 -- ---------- Ring distance metric --------------------------------------------
 -- Rings are level sets of a distance-from-center metric on the OUTPUT grid.
@@ -409,7 +411,10 @@ local PRESETS = {
 -- preset = "default" | "punchy" | "ethereal" | "retro" | "plasma"
 -- cycle_presets = true to auto-rotate through all five on the cycle_seconds timer.
 local PRESET_PROFILES = {
+    -- Presets bundle dynamics + theme + ring_shape into a single feel.
+    -- Keys not listed fall back to the "default" profile values.
     ["default"] = {
+        theme = "amber",  ring_shape = "circle",
         attack = 0.55,  release = 0.18,
         overdrive = 0.78,  overdrive_decay = 0.82,  overdrive_bleed = true,
         density_attack = 0.6,  density_release = 0.15,
@@ -417,6 +422,7 @@ local PRESET_PROFILES = {
         ring_blend = true,
     },
     punchy = {
+        theme = "crt",  ring_shape = "diamond",
         attack = 0.75,  release = 0.25,
         overdrive = 0.70,  overdrive_decay = 0.75,  overdrive_bleed = true,
         density_attack = 0.8,  density_release = 0.3,
@@ -424,6 +430,7 @@ local PRESET_PROFILES = {
         ring_blend = true,
     },
     ethereal = {
+        theme = "aurora",  ring_shape = "diamond",
         attack = 0.3,  release = 0.08,
         overdrive = 0.85,  overdrive_decay = 0.9,  overdrive_bleed = true,
         density_attack = 0.4,  density_release = 0.05,
@@ -431,6 +438,7 @@ local PRESET_PROFILES = {
         ring_blend = true,
     },
     retro = {
+        theme = "ember",  ring_shape = "square",
         attack = 0.6,  release = 0.15,
         overdrive = 0.82,  overdrive_decay = 0.78,  overdrive_bleed = false,
         density_attack = 0.7,  density_release = 0.2,
@@ -438,10 +446,19 @@ local PRESET_PROFILES = {
         ring_blend = false,
     },
     plasma = {
+        theme = "predator",  ring_shape = "circle",
         attack = 0.65,  release = 0.1,
         overdrive = 0.65,  overdrive_decay = 0.88,  overdrive_bleed = true,
         density_attack = 0.85,  density_release = 0.06,
         dead_zone = 0.03,  gamma = 0.9,  tilt = 0.2,
+        ring_blend = true,
+    },
+    ghost = {
+        theme = "vantablack",  ring_shape = "square",
+        attack = 0.7,  release = 0.3,
+        overdrive = 0.88,  overdrive_decay = 0.65,  overdrive_bleed = false,
+        density_attack = 0.9,  density_release = 0.5,
+        dead_zone = 0.1,  gamma = 1.6,  tilt = 0.0,
         ring_blend = true,
     },
 }
@@ -463,7 +480,7 @@ do
     end
 end
 
-local CYCLE_PRESET_NAMES = { "default", "punchy", "ethereal", "retro", "plasma" }
+local CYCLE_PRESET_NAMES = { "default", "punchy", "ethereal", "retro", "plasma", "ghost" }
 
 -- Resolve the active profile for THIS frame. In fixed mode this is constant;
 -- in cycle mode it advances with wall-clock time (same cycle_t0 as ring_shape).
@@ -797,6 +814,31 @@ function p:render(bands, frame, rows, cols)
         apply_num("overdrive_decay", cfg_od_decay, user_set_overdrive_decay)
         apply_bool("overdrive_bleed", user_set_overdrive_bleed)
         apply_bool("ring_blend", user_set_ring_blend)
+
+        -- Theme swap: if profile specifies a theme the user didn't set,
+        -- resolve the colour ramp and swap glow_ramp / overdrive_ramp.
+        if not user_set_theme then
+            local t = prof["theme"]
+            if t then
+                local theme_preset = PRESETS[t]
+                if theme_preset then
+                    cfg_theme_name = t
+                    glow_ramp      = theme_preset.glow
+                    overdrive_ramp = theme_preset.overdrive
+                    glow_n         = #glow_ramp
+                    overdrive_n    = #overdrive_ramp
+                end
+            end
+        end
+        -- Ring shape swap: if profile specifies a shape the user didn't set,
+        -- update cfg_ring_shape so active_dist() picks it up next frame.
+        -- Round trip through the DIST table to validate.
+        if not user_set_ring_shape then
+            local s = prof["ring_shape"]
+            if s and DIST[s] then
+                cfg_ring_shape = s
+            end
+        end
     end
 
     -- Debug: track preset changes so we can show the name on first render.

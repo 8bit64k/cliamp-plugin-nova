@@ -74,8 +74,8 @@ density = true                                  # true = braille glyphs thicken 
 density_attack = 0.6                            # how fast dots FILL toward the level (high = snappy; 1.0 = instant)
 density_release = 0.15                          # how fast dots SHED when level drops (low = lingering CRT-phosphor trail; 1.0 = instant)
 theme = "amber"                                # "amber" | "crt" | "vantablack" | "aurora" | "ember" | "predator"
-preset = "default"                             # behaviour preset: "default" | "punchy" | "ethereal" | "retro" | "plasma" — bundles dynamics knobs (attack/release/gamma/etc) into a single feel; individual overrides still work
-cycle_presets = false                           # auto-rotate through all 5 presets on cycle_seconds (like ring_shape=cycle) — hands-free preview
+preset = "default"                             # behaviour preset: "default" | "punchy" | "ethereal" | "retro" | "plasma" | "ghost" — bundles dynamics + theme + ring_shape into a single feel; individual overrides still work
+cycle_presets = false                           # auto-rotate through all 6 presets on cycle_seconds (like ring_shape=cycle) — hands-free preview
 mono_color = 11                                # ANSI 256 index, used when color_mode = "mono"
 attack = 0.55                                  # smoothing attack (shared defaults with tubeamp)
 release = 0.18                                 # smoothing release
