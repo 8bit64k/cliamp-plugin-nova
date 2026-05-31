@@ -331,10 +331,12 @@ local PRESETS = {
     },
     ember = {
         name = "Ember (green → yellow → red heat map)",
-        -- 11-stop heat-map ramp: dark green → yellow → red. ANSI 256 indices
-        -- chosen for visible steps that read as a temperature gradient.
-        glow      = { 232, 22, 28, 40, 64, 100, 142, 178, 208, 196, 197 },
-        overdrive = { 208, 196, 197, 203 },
+        -- 11-stop heat-map ramp with real yellows in the mid and true red
+        -- at the peak: dark green → yellow-green → pure yellow → orange
+        -- → true red → hot red. ANSI 256 indices.
+        glow      = { 232, 22, 28, 64, 106, 154, 226, 214, 202, 196, 197 },
+        -- Overdrive: red → magenta → white
+        overdrive = { 196, 197, 201, 231 },
     },
 }
 
