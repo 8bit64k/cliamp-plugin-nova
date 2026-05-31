@@ -471,10 +471,10 @@ local PRESET_PROFILES = {
     },
     tacutacu = {
         theme = "flan",  ring_shape = "diamond",
-        attack = 0.3,  release = 0.3,
-        overdrive = 0.90,  overdrive_decay = 0.65,  overdrive_bleed = true,
-        density_attack = 0.85,  density_release = 0.06,
-        dead_zone = 0.0,  gamma = 1.0,  tilt = 0.1,
+        attack = 0.75,  release = 0.25,
+        overdrive = 0.70,  overdrive_decay = 0.75,  overdrive_bleed = true,
+        density_attack = 0.8,  density_release = 0.3,
+        dead_zone = 0.05,  gamma = 1.1,  tilt = 0.0,
         ring_blend = true,
     },
 }
