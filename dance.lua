@@ -336,7 +336,7 @@ local PRESETS = {
         -- → true red → hot red. ANSI 256 indices.
         glow      = { 232, 22, 28, 64, 106, 154, 226, 214, 202, 196, 197 },
         -- Overdrive: red → magenta → white
-        overdrive = { 196, 197, 201, 231 },
+        overdrive = { 196, 197, 201, 230 },
     },
     predator = {
         name = "Predator (thermal vision heatmap)",
@@ -344,10 +344,10 @@ local PRESETS = {
         -- Cold: deep indigo → royal blue → cyan (background/cool surfaces).
         -- Warm: green → lime → olive → yellow-green → yellow (body heat onset).
         -- Hot: dark orange → red-orange (core body temperature).
-        -- Peak: pure white (thermal overload). ANSI 256 indices.
-        glow      = { 17, 21, 39, 46, 112, 142, 184, 220, 208, 196, 231 },
-        -- Overdrive: red-orange → crimson → magenta-red → white
-        overdrive = { 196, 160, 125, 231 },
+        -- Peak: cream yellow-white (thermal overload). ANSI 256 indices.
+        glow      = { 17, 21, 39, 46, 112, 142, 184, 220, 208, 196, 230 },
+        -- Overdrive: red-orange → crimson → magenta-red → cream white
+        overdrive = { 196, 160, 125, 230 },
     },
 }
 
