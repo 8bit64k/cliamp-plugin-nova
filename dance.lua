@@ -49,6 +49,18 @@ local cfg_cycle_secs = tonumber(clean(p:config("cycle_seconds"))) or 20
 if cfg_cycle_secs < 2 then cfg_cycle_secs = 2 end  -- guard against 0/typo thrash
 local cfg_fit        = clean(p:config("fit")) or "contain"
 
+-- Debug: when true, show the active preset name via cliamp.message() on change.
+local cfg_debug = false
+do
+    local raw = p:config("debug")
+    if type(raw) == "boolean" then
+        cfg_debug = raw
+    elseif raw ~= nil then
+        local v = clean(tostring(raw)):lower():gsub("%s+", "")
+        if v == "true" or v == "on" or v == "1" or v == "yes" then cfg_debug = true end
+    end
+end
+
 -- Dead zone: noise gate — clamp band levels below this threshold to exactly 0
 -- before the color and density paths read them. The round-mapping ramp-index fix
 -- bumped low-level signal up one visible stop, making the outer rings glow faintly
@@ -688,6 +700,7 @@ local last_output = nil
 local skip_counter = 0
 local last_rows = 0
 local last_cols = 0
+local last_shown_preset = nil
 
 function p:init(rows, cols)
     for i = 1, 10 do smoothed[i] = 0; effective[i] = 0; dens[i] = 0 end
@@ -776,6 +789,16 @@ function p:render(bands, frame, rows, cols)
         apply_num("overdrive_decay", cfg_od_decay, user_set_overdrive_decay)
         apply_bool("overdrive_bleed", user_set_overdrive_bleed)
         apply_bool("ring_blend", user_set_ring_blend)
+    end
+
+    -- Debug: show active preset name via cliamp.message() when it changes.
+    -- Only fires on transition (static = once at start; cycle = per rotation).
+    if cfg_debug and cliamp and cliamp.message then
+        local _, pname = active_profile()
+        if last_shown_preset ~= pname then
+            cliamp.message("preset: " .. pname, 2)
+            last_shown_preset = pname
+        end
     end
 
     -- Always advance smoothing state, even on error/hidden paths, so a resume
