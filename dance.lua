@@ -329,6 +329,13 @@ local PRESETS = {
         glow      = { 232, 23, 30, 36, 42, 48, 83, 119, 155, 191, 195 },
         overdrive = { 48, 87, 123, 195 },
     },
+    ember = {
+        name = "Ember (green → yellow → red heat map)",
+        -- 11-stop heat-map ramp: dark green → yellow → red. ANSI 256 indices
+        -- chosen for visible steps that read as a temperature gradient.
+        glow      = { 232, 22, 28, 40, 64, 100, 142, 178, 208, 196, 197 },
+        overdrive = { 208, 196, 197, 203 },
+    },
 }
 
 -- Resolve active preset (fall back to amber on unknown name).
