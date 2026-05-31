@@ -169,6 +169,20 @@ do
     end
 end
 
+-- Track whether the user EXPLICITLY set each preset-controlled key.
+-- true = user set it (cfg_* holds their value); false/nil = use preset profile.
+local user_set_attack         = (p:config("attack") ~= nil)
+local user_set_release        = (p:config("release") ~= nil)
+local user_set_overdrive      = (p:config("overdrive") ~= nil)
+local user_set_tilt           = (p:config("tilt") ~= nil)
+local user_set_dead_zone      = (p:config("dead_zone") ~= nil)
+local user_set_gamma          = (p:config("gamma") ~= nil)
+local user_set_density_attack  = (p:config("density_attack") ~= nil)
+local user_set_density_release = (p:config("density_release") ~= nil)
+local user_set_overdrive_decay = (p:config("overdrive_decay") ~= nil)
+local user_set_overdrive_bleed = (p:config("overdrive_bleed") ~= nil)
+local user_set_ring_blend      = (p:config("ring_blend") ~= nil)
+
 -- ---------- Ring distance metric --------------------------------------------
 -- Rings are level sets of a distance-from-center metric on the OUTPUT grid.
 -- The shape of a ring is determined entirely by which metric we use; band
@@ -374,6 +388,83 @@ local PRESETS = {
         overdrive = { 196, 160, 125, 230 },
     },
 }
+
+-- ---------- Preset profiles (dynamics + behaviour bundled for one-knob feel) ----
+-- Each profile sets defaults for the dynamics/config keys that shape how the
+-- wall MOVES and FEELS. The user's explicit TOML keys ALWAYS override. Keys not
+-- listed in a profile fall back to their standard defaults (the "default" profile).
+-- preset = "default" | "punchy" | "ethereal" | "retro" | "plasma"
+-- cycle_presets = true to auto-rotate through all five on the cycle_seconds timer.
+local PRESET_PROFILES = {
+    ["default"] = {
+        attack = 0.55,  release = 0.18,
+        overdrive = 0.78,  overdrive_decay = 0.82,  overdrive_bleed = true,
+        density_attack = 0.6,  density_release = 0.15,
+        dead_zone = 0.0,  gamma = 1.0,  tilt = 0.0,
+        ring_blend = true,
+    },
+    punchy = {
+        attack = 0.75,  release = 0.25,
+        overdrive = 0.70,  overdrive_decay = 0.75,  overdrive_bleed = true,
+        density_attack = 0.8,  density_release = 0.3,
+        dead_zone = 0.05,  gamma = 1.1,  tilt = 0.0,
+        ring_blend = true,
+    },
+    ethereal = {
+        attack = 0.3,  release = 0.08,
+        overdrive = 0.85,  overdrive_decay = 0.9,  overdrive_bleed = true,
+        density_attack = 0.4,  density_release = 0.05,
+        dead_zone = 0.0,  gamma = 0.6,  tilt = 0.4,
+        ring_blend = true,
+    },
+    retro = {
+        attack = 0.6,  release = 0.15,
+        overdrive = 0.82,  overdrive_decay = 0.78,  overdrive_bleed = false,
+        density_attack = 0.7,  density_release = 0.2,
+        dead_zone = 0.12,  gamma = 1.4,  tilt = 0.0,
+        ring_blend = false,
+    },
+    plasma = {
+        attack = 0.65,  release = 0.1,
+        overdrive = 0.65,  overdrive_decay = 0.88,  overdrive_bleed = true,
+        density_attack = 0.85,  density_release = 0.06,
+        dead_zone = 0.03,  gamma = 0.9,  tilt = 0.2,
+        ring_blend = true,
+    },
+}
+
+-- Resolve active behaviour preset. preset = "default" | profile name.
+-- cycle_presets = true rotates through all profiles on cycle_seconds (same timer
+-- as ring_shape cycle) so you can preview without config edits.
+local cfg_preset_name = clean(p:config("preset")) or "default"
+
+-- cycle_presets: auto-rotate presets. Read as bool (same defensive pattern).
+local cycle_presets = false
+do
+    local raw = p:config("cycle_presets")
+    if type(raw) == "boolean" then
+        cycle_presets = raw
+    elseif raw ~= nil then
+        local v = clean(tostring(raw)):lower():gsub("%s+", "")
+        if v == "true" or v == "on" or v == "1" or v == "yes" then cycle_presets = true end
+    end
+end
+
+local CYCLE_PRESET_NAMES = { "default", "punchy", "ethereal", "retro", "plasma" }
+
+-- Resolve the active profile for THIS frame. In fixed mode this is constant;
+-- in cycle mode it advances with wall-clock time (same cycle_t0 as ring_shape).
+local function active_profile()
+    if cycle_presets then
+        local elapsed = os.time() - cycle_t0
+        if elapsed < 0 then elapsed = 0 end
+        local idx = (math.floor(elapsed / cfg_cycle_secs) % #CYCLE_PRESET_NAMES) + 1
+        local name = CYCLE_PRESET_NAMES[idx]
+        return PRESET_PROFILES[name] or PRESET_PROFILES["default"], name
+    end
+    return PRESET_PROFILES[cfg_preset_name] or PRESET_PROFILES["default"],
+           (PRESET_PROFILES[cfg_preset_name] and cfg_preset_name or "default")
+end
 
 -- Resolve active preset (fall back to amber on unknown name).
 local active_preset = PRESETS[cfg_theme_name] or PRESETS["amber"]
@@ -629,6 +720,64 @@ end
 -- ---------- The render loop --------------------------------------------------
 
 function p:render(bands, frame, rows, cols)
+    -- Profile overlay: if a named preset (or cycle_presets) is active, apply
+    -- the profile's values to any config key the user didn't explicitly set.
+    -- This runs first so the smoothing math and hot loop use the right values.
+    -- Called every frame (not just on preset change) — cost is negligible.
+    do
+        local prof, _ = active_profile()
+        local function apply_num(key, var, user_set)
+            if not user_set then
+                local v = prof[key]
+                if v ~= nil then
+                    -- Re-apply clamping (same ranges as the config reads)
+                    if key == "dead_zone" then
+                        if v < 0 then v = 0 elseif v > 0.5 then v = 0.5 end
+                    elseif key == "gamma" then
+                        if v < 0.1 then v = 0.1 elseif v > 3.0 then v = 3.0 end
+                    elseif key == "density_attack" or key == "density_release" then
+                        if v < 0 then v = 0 elseif v > 1 then v = 1 end
+                    elseif key == "overdrive_decay" then
+                        if v < 0 then v = 0 elseif v > 0.97 then v = 0.97 end
+                    end
+                    -- Assign to the upvalue (non-local assignment in Lua
+                    -- rebinds the module-level variable for this frame)
+                    if key == "attack" then cfg_attack = v
+                    elseif key == "release" then cfg_release = v
+                    elseif key == "overdrive" then cfg_overdrive = v
+                    elseif key == "tilt" then cfg_tilt = v
+                    elseif key == "dead_zone" then cfg_dead_zone = v
+                    elseif key == "gamma" then cfg_gamma = v
+                    elseif key == "density_attack" then cfg_dens_attack = v
+                    elseif key == "density_release" then cfg_dens_release = v
+                    elseif key == "overdrive_decay" then cfg_od_decay = v
+                    end
+                end
+            end
+        end
+        local function apply_bool(key, user_set)
+            if not user_set then
+                local v = prof[key]
+                if v ~= nil then
+                    if key == "overdrive_bleed" then cfg_od_bleed = v
+                    elseif key == "ring_blend" then cfg_ring_blend = v
+                    end
+                end
+            end
+        end
+        apply_num("attack", cfg_attack, user_set_attack)
+        apply_num("release", cfg_release, user_set_release)
+        apply_num("overdrive", cfg_overdrive, user_set_overdrive)
+        apply_num("tilt", cfg_tilt, user_set_tilt)
+        apply_num("dead_zone", cfg_dead_zone, user_set_dead_zone)
+        apply_num("gamma", cfg_gamma, user_set_gamma)
+        apply_num("density_attack", cfg_dens_attack, user_set_density_attack)
+        apply_num("density_release", cfg_dens_release, user_set_density_release)
+        apply_num("overdrive_decay", cfg_od_decay, user_set_overdrive_decay)
+        apply_bool("overdrive_bleed", user_set_overdrive_bleed)
+        apply_bool("ring_blend", user_set_ring_blend)
+    end
+
     -- Always advance smoothing state, even on error/hidden paths, so a resume
     -- never shows cold state.
     for i = 1, 10 do
