@@ -338,6 +338,17 @@ local PRESETS = {
         -- Overdrive: red → magenta → white
         overdrive = { 196, 197, 201, 231 },
     },
+    predator = {
+        name = "Predator (thermal vision heatmap)",
+        -- 11-stop ramp matching the iconic Predator thermal-vision palette.
+        -- Cold: deep indigo → royal blue → cyan (background/cool surfaces).
+        -- Warm: green → lime → olive → yellow-green → yellow (body heat onset).
+        -- Hot: dark orange → red-orange (core body temperature).
+        -- Peak: pure white (thermal overload). ANSI 256 indices.
+        glow      = { 17, 21, 39, 46, 112, 142, 184, 220, 208, 196, 231 },
+        -- Overdrive: red-orange → crimson → magenta-red → white
+        overdrive = { 196, 160, 125, 231 },
+    },
 }
 
 -- Resolve active preset (fall back to amber on unknown name).

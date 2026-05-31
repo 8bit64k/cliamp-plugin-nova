@@ -73,7 +73,7 @@ ring_blend = true                              # true = smooth gradient across r
 density = true                                  # true = braille glyphs thicken toward center as they heat (default) | false = glyphs fixed, color only
 density_attack = 0.6                            # how fast dots FILL toward the level (high = snappy; 1.0 = instant)
 density_release = 0.15                          # how fast dots SHED when level drops (low = lingering CRT-phosphor trail; 1.0 = instant)
-theme = "amber"                                # "amber" | "crt" | "vantablack" | "aurora"
+theme = "amber"                                # "amber" | "crt" | "vantablack" | "aurora" | "ember" | "predator"
 mono_color = 11                                # ANSI 256 index, used when color_mode = "mono"
 attack = 0.55                                  # smoothing attack (shared defaults with tubeamp)
 release = 0.18                                 # smoothing release

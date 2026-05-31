@@ -4,10 +4,29 @@
 > first — it never rolls over). Prior history archived in
 > `CHECKPOINT.2026-05-30-01.md` (and earlier rollovers).
 
-**Last commit:** `91f86c5` — "wall: default start = black". Local == remote, verified.
+**Last commit:** 91f86c5 plus uncommitted predator theme.
 **Branch:** master. **Repo:** github.com/8bit64k/cliamp-plugin-dance (PRIVATE).
-**Local dir:** `/home/nick/builds/cliamp-plugin-ascii-eq/` (dir NOT renamed; repo IS `cliamp-plugin-dance`).
-**Entry file:** `dance.lua` (repo root). Single Lua file, no `require`/helpers.
+**Local dir:** /home/nick/builds/cliamp-plugin-ascii-eq/
+**Entry file:** dance.lua (repo root). Single Lua file, no require/helpers.
+
+---
+
+## Session 2026-05-31 — predator theme (uncommitted)
+
+Added predator theme to PRESETS table — iconic Predator thermal-vision heatmap.
+11-stop ANSI 256 glow ramp + 4-stop overdrive:
+
+- glow: 17, 21, 39, 46, 112, 142, 184, 220, 208, 196, 231
+  (deep indigo -> royal blue -> cyan -> green -> lime -> olive ->
+   yellow-green -> yellow -> dark orange -> red-orange -> pure white)
+- overdrive: 196, 160, 125, 231
+  (red-orange -> crimson -> magenta-red -> white)
+
+Changes:
+- dance.lua: predator preset inserted after ember
+- README.md: theme list updated to include ember + predator
+- Verified via render harness: all 6 scenes, no overflow, ANSI present
+- Not yet committed — deferring to Nick
 
 ---
 
