@@ -708,7 +708,14 @@ function p:init(rows, cols)
     bass_base[1], bass_base[2] = 0, 0
     last_output = nil
     skip_counter = 0
+    last_shown_preset = nil
     load_art()
+    -- Debug: show active preset once on visualizer selection. Safe here
+    -- (outside the render loop); cliamp.message blocks if called in render().
+    if cfg_debug and cliamp and cliamp.message then
+        local _, pname = active_profile()
+        cliamp.message("preset: " .. pname, 2)
+    end
 end
 
 function p:destroy() end
@@ -791,14 +798,12 @@ function p:render(bands, frame, rows, cols)
         apply_bool("ring_blend", user_set_ring_blend)
     end
 
-    -- Debug: show active preset name via cliamp.message() when it changes.
-    -- Only fires on transition (static = once at start; cycle = per rotation).
-    if cfg_debug and cliamp and cliamp.message then
+    -- Debug: track preset changes so we can show the name on first render.
+    -- cliamp.message() is NOT safe inside render() (blocks the UI loop),
+    -- so we defer the actual message to init() and show the name inline.
+    if cfg_debug then
         local _, pname = active_profile()
-        if last_shown_preset ~= pname then
-            cliamp.message("preset: " .. pname, 2)
-            last_shown_preset = pname
-        end
+        last_shown_preset = pname
     end
 
     -- Always advance smoothing state, even on error/hidden paths, so a resume
