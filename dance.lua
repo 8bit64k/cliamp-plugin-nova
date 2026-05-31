@@ -49,6 +49,15 @@ local cfg_cycle_secs = tonumber(clean(p:config("cycle_seconds"))) or 20
 if cfg_cycle_secs < 2 then cfg_cycle_secs = 2 end  -- guard against 0/typo thrash
 local cfg_fit        = clean(p:config("fit")) or "contain"
 
+-- Dead zone: noise gate — clamp band levels below this threshold to exactly 0
+-- before the color and density paths read them. The round-mapping ramp-index fix
+-- bumped low-level signal up one visible stop, making the outer rings glow faintly
+-- on quiet passages. A small dead zone (~0.08-0.12) restores a clean noise floor
+-- without affecting real musical content. 0 = off (default).
+local cfg_dead_zone = tonumber(clean(p:config("dead_zone"))) or 0.0
+if cfg_dead_zone < 0   then cfg_dead_zone = 0.0 end
+if cfg_dead_zone > 0.5 then cfg_dead_zone = 0.5 end
+
 -- Canvas cap: the render cost is LINEAR in drawn cells (draw_w*draw_h), so on a
 -- very large pane (fit=fill fullscreen on a 4K terminal) the per-frame work can
 -- get heavy. max_cols/max_rows clamp the DRAWN grid; the art is then centered in
@@ -668,6 +677,16 @@ function p:render(bands, frame, rows, cols)
                 if v > 1 then v = 1 end
                 if v > effective[tgt] then effective[tgt] = v end
             end
+        end
+    end
+
+    -- Dead zone gate: clamp any band level below cfg_dead_zone to 0.
+    -- This runs after the full effective[] layer is built (smoothed + heat + bleed)
+    -- but before the per-cell color loop and the density envelope — one gate,
+    -- kills both color and density at once. 0 = off (default).
+    if cfg_dead_zone > 0 then
+        for i = 1, 10 do
+            if effective[i] < cfg_dead_zone then effective[i] = 0 end
         end
     end
 

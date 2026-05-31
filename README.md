@@ -81,6 +81,7 @@ overdrive = 0.78                               # band level above which a bass r
 overdrive_decay = 0.82                          # bass flare tail: fraction of heat retained per frame (0 = instant snap, ~0.85 = long glowing fade)
 overdrive_bleed = true                          # when a bass ring punches hot, bleed warmth into the ring just outside it (true | false)
 tilt = 0.0                                     # per-band boost toward treble (0=off; try 0.5 if outer rings feel dead)
+dead_zone = 0.0                                # noise gate: clamp band level below this to 0 (0=off; try 0.08-0.12 to silence faint outer-ring glow on quiet passages)
 
 # --- performance (all default OFF / full rate; only needed on very large panes) ---
 max_cols = 0                                   # cap the DRAWN width (0 = unlimited). On a huge fit=fill pane this bounds per-frame cost; the wall becomes a centered block.
