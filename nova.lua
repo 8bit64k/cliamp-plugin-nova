@@ -375,6 +375,20 @@ local PRESETS = {
         glow      = { 232, 234, 238, 242, 246, 249, 251, 253, 254, 255, 231 },
         overdrive = { 249, 253, 255, 231 },
     },
+    whitehot = {
+        name = "White Hot (high contrast)",
+        -- 11 stops across the full grayscale range with 3-5 index gaps.
+        -- 232 = baseline; 234-254 = visible grayscale; 255 = pure white.
+        glow      = { 0, 232, 235, 238, 241, 244, 247, 251, 254, 255, 231 },
+        overdrive = { 251, 254, 255, 231 },
+    },
+    blackhot = {
+        name = "Black Hot (high contrast)",
+        -- 11 stops across the full grayscale range with 3-5 index gaps.
+        -- 232 = baseline; 234-254 = visible grayscale; 255 = pure white.
+        glow      = { 231, 249, 247, 245, 243, 241, 239, 237, 235, 233, 16 },
+        overdrive = { 238, 235, 233, 16},
+    },
     aurora = {
         name = "Aurora (teal-cyan-green)",
         -- 11-stop cool palette: deep teal through cyan to bright green-yellow.
@@ -398,9 +412,10 @@ local PRESETS = {
         -- Warm: green → lime → olive → yellow-green → yellow (body heat onset).
         -- Hot: dark orange → red-orange (core body temperature).
         -- Peak: cream yellow-white (thermal overload). ANSI 256 indices.
-        glow      = { 17, 21, 39, 46, 112, 142, 184, 220, 208, 196, 230 },
+        -- 230
+        glow      = { 17, 21, 39, 46, 112, 142, 184, 220, 208, 196, 224 },
         -- Overdrive: red-orange → crimson → magenta-red → cream white
-        overdrive = { 196, 160, 125, 230 },
+        overdrive = { 196, 160, 125, 224 },
     },
     flan = {
         name = "Flan (cream → gold → rose gold)",
@@ -429,12 +444,12 @@ local PRESET_PROFILES = {
         dead_zone = 0.0,  gamma = 1.0,  tilt = 0.0,
         ring_blend = true,
     },
-    punchy = {
+    punch = {
         theme = "crt",  ring_shape = "diamond",
-        attack = 0.75,  release = 0.25,
-        overdrive = 0.70,  overdrive_decay = 0.75,  overdrive_bleed = true,
-        density_attack = 0.8,  density_release = 0.3,
-        dead_zone = 0.05,  gamma = 1.1,  tilt = 0.0,
+        attack = 1,  release = .25,
+        overdrive = 1,  overdrive_decay = 0.9,  overdrive_bleed = false,
+        density_attack = 1,  density_release = .85,
+        dead_zone = 0.2,  gamma = .99,  tilt = 0.0,
         ring_blend = true,
     },
     ethereal = {
@@ -463,10 +478,10 @@ local PRESET_PROFILES = {
     },
     ghost = {
         theme = "vantablack",  ring_shape = "square",
-        attack = 0.7,  release = 0.3,
-        overdrive = 0.88,  overdrive_decay = 0.65,  overdrive_bleed = false,
-        density_attack = 0.9,  density_release = 0.5,
-        dead_zone = 0.1,  gamma = 1.6,  tilt = 0.0,
+        attack = 0.3,  release = 0.05,
+        overdrive = 0.88,  overdrive_decay = 0.9,  overdrive_bleed = false,
+        density_attack = 0.05,  density_release = 0.9,
+        dead_zone = 0.00,  gamma = 2.6,  tilt = 0.5,
         ring_blend = true,
     },
     tacutacu = {
@@ -477,6 +492,15 @@ local PRESET_PROFILES = {
         dead_zone = 0.05,  gamma = 1.1,  tilt = 0.0,
         ring_blend = true,
     },
+     bloom = {
+        theme = "whitehot",  ring_shape = "diamond",
+        attack = 1,  release = 0.01,
+        overdrive = 0.85,  overdrive_decay = 0.05,  overdrive_bleed = true,
+        density_attack = 1,  density_release = 0.01,
+        dead_zone = 0.0,  gamma = 0.95,  tilt = 0.5,
+        ring_blend = true,
+    },
+
 }
 
 -- Resolve active behaviour preset. preset = "default" | profile name.
@@ -496,7 +520,7 @@ do
     end
 end
 
-local CYCLE_PRESET_NAMES = { "default", "punchy", "ethereal", "retro", "plasma", "ghost", "tacutacu" }
+local CYCLE_PRESET_NAMES = { "default", "punch", "ethereal", "retro", "plasma", "ghost", "bloom", "tacutacu" }
 
 -- Resolve the active profile for THIS frame. In fixed mode this is constant;
 -- in cycle mode it advances with wall-clock time (same cycle_t0 as ring_shape).
