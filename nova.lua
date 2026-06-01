@@ -1,4 +1,4 @@
--- dance.lua — cliamp visualizer: animate a user-supplied ASCII art file from the EQ feed.
+-- nova.lua — cliamp visualizer: braille wall that glows to the EQ feed.
 --
 -- v0.1 "square rings": the art is mapped into 10 concentric SQUARE rings
 -- (Chebyshev distance from center). The innermost ring is driven by the lowest
@@ -10,10 +10,10 @@
 -- No motion/jitter in v0.1 (deferred). See BRAINSTORM.md + README.md.
 
 local p = plugin.register({
-    name        = "dance",
+    name        = "nova",
     type        = "visualizer",
     version     = "0.1.0",
-    description = "ASCII art that glows to the EQ in concentric square rings",
+    description = "Braille wall visualizer — EQ-driven glow with presets, themes, and density mutation",
 })
 
 -- ---------- Configuration (read once at load) --------------------------------
@@ -125,7 +125,7 @@ if cfg_frame_skip < 0 then cfg_frame_skip = 0 end
 -- the glyph thickens toward solid (toward full). This makes the braille WALL not
 -- just brighten but gain matter on the peaks — a flare thickens the core. Only
 -- braille glyphs (U+2800..U+28FF) mutate; anything else is left as-is. Default ON
--- (dance is a braille-wall plugin). Toggle off to keep the art's glyphs fixed.
+-- (nova is a braille-wall plugin). Toggle off to keep the art's glyphs fixed.
 local cfg_density = true
 do
     local raw = p:config("density")
@@ -273,7 +273,7 @@ local function reset()  return ESC .. "[0m" end
 -- Braille dot bit layout (cell is 2 cols x 4 rows):
 --   col0: r0=1 r1=2 r2=4 r3=64    col1: r0=8 r1=16 r2=32 r3=128
 --
--- DENSITY FILLS TOWARD CENTER. dance maps the art into concentric rings around
+-- DENSITY FILLS TOWARD CENTER. nova maps the art into concentric rings around
 -- the pane center, so as the wall heats the matter should accrete TOWARD that
 -- center, reinforcing the radial structure -- not always bottom-up. A cell LEFT
 -- of center fills from its RIGHT edge inward; a cell ABOVE center fills from its
@@ -629,13 +629,13 @@ local function load_art()
     end
     local path = expand_path(cfg_art_path)
     if not (cliamp and cliamp.fs and cliamp.fs.exists(path)) then
-        load_error = "dance: art file not found: " .. tostring(path)
+        load_error = "nova: art file not found: " .. tostring(path)
         return
     end
 
     local data = cliamp.fs.read(path)
     if not data or data == "" then
-        load_error = "dance: art file empty or unreadable"
+        load_error = "nova: art file empty or unreadable"
         return
     end
 
@@ -648,7 +648,7 @@ local function load_art()
     -- Drop a single trailing empty line from the terminal newline.
     if #lines > 0 and lines[#lines] == "" then lines[#lines] = nil end
     if #lines == 0 then
-        load_error = "dance: art file has no rows"
+        load_error = "nova: art file has no rows"
         return
     end
 
@@ -659,7 +659,7 @@ local function load_art()
         if w > art_w then art_w = w end
     end
     if art_w == 0 then
-        load_error = "dance: art file has zero width"
+        load_error = "nova: art file has zero width"
         art_lines = nil
         return
     end
@@ -978,7 +978,7 @@ function p:render(bands, frame, rows, cols)
         return placeholder(rows, cols, load_error)
     end
     if not art_cells then
-        return placeholder(rows, cols, "dance: no art loaded")
+        return placeholder(rows, cols, "nova: no art loaded")
     end
     if rows < 1 or cols < 1 then return "" end
 

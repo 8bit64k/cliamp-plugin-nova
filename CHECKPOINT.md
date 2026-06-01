@@ -1,13 +1,13 @@
-# CHECKPOINT — cliamp-plugin-dance
+# CHECKPOINT — cliamp-plugin-nova
 
 > Transient rolling work-log. DURABLE design rules live in `AGENTS.md` (read it
 > first — it never rolls over). Prior history archived in
 > `CHECKPOINT.2026-05-30-01.md` (and earlier rollovers).
 
 **Last commit:** 91f86c5 plus uncommitted predator theme.
-**Branch:** master. **Repo:** github.com/8bit64k/cliamp-plugin-dance (PRIVATE).
+**Branch:** master. **Repo:** github.com/8bit64k/cliamp-plugin-nova (PRIVATE).
 **Local dir:** /home/nick/builds/cliamp-plugin-ascii-eq/
-**Entry file:** dance.lua (repo root). Single Lua file, no require/helpers.
+**Entry file:** nova.lua (repo root). Single Lua file, no require/helpers.
 
 ---
 
@@ -23,7 +23,7 @@ Added predator theme to PRESETS table — iconic Predator thermal-vision heatmap
   (red-orange -> crimson -> magenta-red -> white)
 
 Changes:
-- dance.lua: predator preset inserted after ember
+- nova.lua: predator preset inserted after ember
 - README.md: theme list updated to include ember + predator
 - Verified via render harness: all 6 scenes, no overflow, ANSI present
 - Not yet committed — deferring to Nick
@@ -46,7 +46,7 @@ the wall is **generated procedurally** — no art file needed.
 - cliamp = **gopher-lua (Lua 5.1)**: NO bitwise ops (`>> << | &`), no bit32. All
   bit math is arithmetic on powers of two. Local `lua` is 5.5 and WILL parse
   bitops fine while the host silently fails to load them — always write 5.1-safe.
-- Errors go to `~/.config/cliamp/plugins.log` as `[dance] error: ...`, NEVER the UI.
+- Errors go to `~/.config/cliamp/plugins.log` as `[nova] error: ...`, NEVER the UI.
 - Sibling: `~/builds/cliamp-plugin-tubeamp/` (shipped v1.2.0; its docs/DESIGN.md is
   the gold-standard plugin doc). Shares the amber glow ramp = one plugin family.
 
@@ -105,7 +105,7 @@ default experience needs ZERO files. Sentinel for "wall ready?" is `art_cells`
 only). The 5 generated wall files (dots_braille, dots_dense_braille, noise_braille,
 weave_braille, art_max) MOVED to `scratchpad/` (gitignored) + removed from repo.
 Portrait files (`crt.txt`, `ruby.txt`, `ruby_ascii.txt`) LEFT at root — different
-lineage, headed for a future SEPARATE portrait plugin (dance is braille-wall ONLY).
+lineage, headed for a future SEPARATE portrait plugin (nova is braille-wall ONLY).
 Test: `scratchpad/test_generator.lua` (renders both starts with fs stubbed to
 fail), `scratchpad/verify_default.lua` (empty config => black).
 
@@ -118,7 +118,7 @@ optional, documents `start` + the perf knobs. Accurate to current plugin.
 
 1. **8bit64k is testing the whole batch live** (cap, render_rate, toward-center
    density, black/stipple wall). On the laptop: `git fetch origin && git reset
-   --hard origin/master` then `cp dance.lua ~/.config/cliamp/plugins/dance.lua`,
+   --hard origin/master` then `cp nova.lua ~/.config/cliamp/plugins/nova.lua`,
    restart cliamp. No config needed — renders the black bloom wall out of the box.
    Use `color_mode = glow` (NOT passthrough — passthrough skips color AND density).
 2. **DOCS LOOP STILL OPEN** (was being batched at session end, budget ran out):
@@ -129,7 +129,7 @@ optional, documents `start` + the perf knobs. Accurate to current plugin.
      sections to reflect toward-center fill and the procedural generator.
    - Optional: fold a git push-verification lesson into the skill — TWICE this
      session a commit went out with an incomplete staged set (only file deletions,
-     not dance.lua) because `git add` was assumed instead of verified. Always
+     not nova.lua) because `git add` was assumed instead of verified. Always
      check `git diff --cached --stat` matches the commit message BEFORE committing,
      and `git show --stat` after, before pushing.
 3. **Then back to the tuning backlog** (see below). #4 dead_zone is flagged PRIORITY.
@@ -158,7 +158,7 @@ optional, documents `start` + the perf knobs. Accurate to current plugin.
 ## Full current config surface (as of 91f86c5)
 
 ```toml
-[plugins.dance]                 # entire block OPTIONAL — defaults render the black wall
+[plugins.nova]                 # entire block OPTIONAL — defaults render the black wall
 start = "black"                 # "black" (empty, blooms — default) | "stipple" (faint texture)
 # art_path = "/abs/path.txt"    # OPTIONAL override — load a custom ASCII/braille file
 color_mode = "glow"             # "glow" | "mono" | "passthrough" (passthrough = raw glyphs, no color/density)
@@ -184,7 +184,7 @@ render_rate = 1.0               # fraction of frames rendered, 0.25..1.0 (1.0=ev
 
 ---
 
-## Architecture quick map (dance.lua, ~870 lines)
+## Architecture quick map (nova.lua, ~870 lines)
 
 - **Config reads** (top): all via `clean()` (strips leaked TOML `#` comments);
   numerics via `tonumber(clean(...))`; bools parsed defensively (string or real).
@@ -213,7 +213,7 @@ render_rate = 1.0               # fraction of frames rendered, 0.25..1.0 (1.0=ev
   `git -c user.name=8bit64k -c user.email=8bit64k@users.noreply.github.com ...`
 - `scratchpad/` is gitignored — harnesses, probes, the moved wall .txt files,
   source images stay local; never part of a release.
-- cliamp does NOT hot-reload — re-`cp dance.lua` + restart after every change.
+- cliamp does NOT hot-reload — re-`cp nova.lua` + restart after every change.
 - Verify end-to-end, not just syntax. Run with PLAIN `lua` for tests, NOT luajit
   (host has no JIT — luajit perf numbers mislead; relative cost only).
 - 8bit64k reviews visual/terminal software LIVE himself — give pull/install steps,

@@ -1,7 +1,7 @@
-# cliamp-plugin-dance
+# cliamp-plugin-nova
 
 > ⚠️ **IN DEVELOPMENT — expect breakage.** This is a work-in-progress cliamp
-> visualizer plugin. The name `dance` is provisional, the render is unstable,
+> visualizer plugin. The name `nova` is provisional, the render is unstable,
 > and the config schema may change without notice. Not released. No tags, no
 > versioning, no support. Here so 8bit64k can test against live cliamp from a
 > remote machine.
@@ -27,12 +27,12 @@ single Lua file into cliamp's plugins directory.
 
 ```bash
 # 1. Clone (uses your 8bit64k GitHub credentials)
-git clone https://github.com/8bit64k/cliamp-plugin-dance.git
-cd cliamp-plugin-dance
+git clone https://github.com/8bit64k/cliamp-plugin-nova.git
+cd cliamp-plugin-nova
 
 # 2. Copy the plugin into cliamp's plugins dir
 mkdir -p ~/.config/cliamp/plugins
-cp dance.lua ~/.config/cliamp/plugins/dance.lua
+cp nova.lua ~/.config/cliamp/plugins/nova.lua
 ```
 
 That's it — the wall is generated procedurally, so there is **no art file to
@@ -43,12 +43,12 @@ and the plugin reads it in place — nothing gets copied into cliamp's dirs.)
 To **update** after I push changes:
 
 ```bash
-cd cliamp-plugin-dance
+cd cliamp-plugin-nova
 git pull
-cp dance.lua ~/.config/cliamp/plugins/dance.lua   # re-copy; cliamp doesn't hot-reload
+cp nova.lua ~/.config/cliamp/plugins/nova.lua   # re-copy; cliamp doesn't hot-reload
 ```
 
-Then restart cliamp and press `v` to cycle visualizers until you reach **dance**.
+Then restart cliamp and press `v` to cycle visualizers until you reach **nova**.
 
 > cliamp does **not** hot-reload plugins or config — re-copy the file and restart
 > cliamp after every change.
@@ -57,12 +57,12 @@ Then restart cliamp and press `v` to cycle visualizers until you reach **dance**
 
 ## Configure
 
-A `[plugins.dance]` block is **optional** — with no config the plugin renders the
+A `[plugins.nova]` block is **optional** — with no config the plugin renders the
 default procedural wall (`start = "black"`, `fit = "contain"`). Add a block to
 tune it:
 
 ```toml
-[plugins.dance]
+[plugins.nova]
 start = "black"                                # procedural wall when no art_path: "black" = empty canvas, dots bloom in from nothing (default) | "stipple" = faint resting texture that thickens
 # art_path = "/abs/path/to/your_art.txt"       # OPTIONAL — drive a custom ASCII/braille file instead of the generated wall (lives in your clone, read in place)
 color_mode = "glow"                            # "glow" | "mono" | "passthrough"  (NOTE: passthrough shows raw glyphs — no color OR density thickening)
@@ -132,13 +132,13 @@ within a single session. Use it to pick the shape you like, then set
 ## Troubleshooting
 
 cliamp swallows plugin render errors silently — they do **not** appear in the UI.
-If `dance` shows a blank pane or stale frame, check the log:
+If `nova` shows a blank pane or stale frame, check the log:
 
 ```bash
 tail -n 40 ~/.config/cliamp/plugins.log
 ```
 
-Look for `[dance] error: ...` lines.
+Look for `[nova] error: ...` lines.
 
 ---
 
@@ -147,8 +147,8 @@ Look for `[dance] error: ...` lines.
 | | |
 |---|---|
 | State | In development — not released |
-| Repo | `8bit64k/cliamp-plugin-dance` (private) |
-| Entry file | `dance.lua` (repo root) |
+| Repo | `8bit64k/cliamp-plugin-nova` (private) |
+| Entry file | `nova.lua` (repo root) |
 | Wall | procedural (no art file needed); `start = "black"` (default) \| `"stipple"` |
 | Sibling plugin | [`cliamp-plugin-tubeamp`](https://github.com/8bit64k/cliamp-plugin-tubeamp) (shipped, v1.2.0) |
 

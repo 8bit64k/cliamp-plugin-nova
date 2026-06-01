@@ -1,22 +1,22 @@
-# cliamp-plugin-dance — Agent Context
+# cliamp-plugin-nova — Agent Context
 
 ## Status
 
-**Working v0.1.** dance is a **braille-wall visualizer**: a dense braille texture
+**Working v0.1.** nova is a **braille-wall visualizer**: a dense braille texture
 (e.g. `dots_braille.txt`) under `fit="fill"` that the 10-band EQ lights AND
-thickens. SCOPE DECISION (2026-05-29): dance is braille-wall ONLY. ASCII portrait
+thickens. SCOPE DECISION (2026-05-29): nova is braille-wall ONLY. ASCII portrait
 art (Ruby, the CRT) has real problems at cliamp's tiny default pane and will be a
 SEPARATE plugin. Don't re-add portrait-preservation hedging here.
 
-- Local dir: `/home/nick/builds/cliamp-plugin-ascii-eq/` (NOT renamed; repo IS `cliamp-plugin-dance`)
-- Repo: `github.com/8bit64k/cliamp-plugin-dance` (PRIVATE, manual install — clone + cp)
-- Entry file: `dance.lua` (repo root — required by cliamp plugin manager)
+- Local dir: `/home/nick/builds/cliamp-plugin-ascii-eq/` (NOT renamed; repo IS `cliamp-plugin-nova`)
+- Repo: `github.com/8bit64k/cliamp-plugin-nova` (PRIVATE, manual install — clone + cp)
+- Entry file: `nova.lua` (repo root — required by cliamp plugin manager)
 - Read `CHECKPOINT.md` for current session state and the tuning backlog.
 
 ## Load these skills first
 
 - `cliamp-plugin-development` — the plugin API contract, sandbox quirks, color
-  ramps, render harness, and family conventions. MANDATORY before touching `dance.lua`.
+  ramps, render harness, and family conventions. MANDATORY before touching `nova.lua`.
 
 ## Design principles (DURABLE — do not let these die in CHECKPOINT)
 
@@ -37,7 +37,7 @@ SEPARATE plugin. Don't re-add portrait-preservation hedging here.
    gains matter on peaks, not just brightness. Only braille glyphs mutate; the art
    is never translated/shaken (positional jitter #8 is shelved — density displaced
    it as the texture reaction). NOTE: this is the deliberate exception to the old
-   "immutable canvas" rule — that rule protected PORTRAITS, and dance is now
+   "immutable canvas" rule — that rule protected PORTRAITS, and nova is now
    braille-wall-only, so glyph mutation is correct here.
 
    **Density fills TOWARD CENTER (2026-05-30).** Because the wall is mapped into
