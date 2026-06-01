@@ -8,7 +8,7 @@ thickens. SCOPE DECISION (2026-05-29): nova is braille-wall ONLY. ASCII portrait
 art (Ruby, the CRT) has real problems at cliamp's tiny default pane and will be a
 SEPARATE plugin. Don't re-add portrait-preservation hedging here.
 
-- Local dir: `/home/nick/builds/cliamp-plugin-ascii-eq/` (NOT renamed; repo IS `cliamp-plugin-nova`)
+- Local dir: `/home/nick/builds/cliamp-plugin-nova/` (NOT renamed; repo IS `cliamp-plugin-nova`)
 - Repo: `github.com/8bit64k/cliamp-plugin-nova` (PRIVATE, manual install — clone + cp)
 - Entry file: `nova.lua` (repo root — required by cliamp plugin manager)
 - Read `CHECKPOINT.md` for current session state and the tuning backlog.

@@ -6,7 +6,7 @@
 
 **Last commit:** 91f86c5 plus uncommitted predator theme.
 **Branch:** master. **Repo:** github.com/8bit64k/cliamp-plugin-nova (PRIVATE).
-**Local dir:** /home/nick/builds/cliamp-plugin-ascii-eq/
+**Local dir:** /home/nick/builds/cliamp-plugin-nova/
 **Entry file:** nova.lua (repo root). Single Lua file, no require/helpers.
 
 ---
