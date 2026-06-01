@@ -66,7 +66,7 @@ tune it:
 start = "black"                                # procedural wall when no art_path: "black" = empty canvas, dots bloom in from nothing (default) | "stipple" = faint resting texture that thickens
 # art_path = "/abs/path/to/your_art.txt"       # OPTIONAL — drive a custom ASCII/braille file instead of the generated wall (lives in your clone, read in place)
 color_mode = "glow"                            # "glow" | "mono" | "passthrough"  (NOTE: passthrough shows raw glyphs — no color OR density thickening)
-ring_shape = "square"                          # "square" | "diamond" | "circle" | "cycle" — geometry of the concentric bands
+ring_shape = "square"                          # "square" | "diamond" | "circle" | "squircle" | "wings" | "cycle" — geometry of the concentric bands
 cycle_seconds = 20                             # when ring_shape="cycle", seconds per shape before rotating (min 2)
 fit = "contain"                                # "contain" = preserve aspect, letterboxed (pictures) | "fill" = stretch to fill the whole pane (textures / the wall)
 ring_blend = true                              # true = smooth gradient across rings (default) | false = hard stepped band boundaries
@@ -114,7 +114,7 @@ full-screen reactive wall.
 
 ### Reviewing shapes: `ring_shape = "cycle"`
 
-Set `ring_shape = "cycle"` to auto-rotate through square → diamond → circle every
+Set `ring_shape = "cycle"` to auto-rotate through square → diamond → circle → squircle → wings every
 `cycle_seconds` (default 20). The active shape is labelled `[square]` / `[diamond]`
 / `[circle]` in the bottom-right corner so you can tell them apart as it rotates.
 This needs **no restart between shapes** — cliamp doesn't hot-reload config, but
