@@ -215,6 +215,7 @@ local DIST = {
     squircle = function(adx, ady) return (adx^4 + ady^4) ^ 0.25 end,
     wings    = function(adx, _)   return adx end,
     layers   = function(_, ady)   return ady end,
+    compass  = function(adx, ady) return math.min(adx, ady) + 0.4 * math.abs(adx - ady) end,
 }
 
 -- ring_shape = "cycle" rotates square -> diamond -> circle every
@@ -224,7 +225,7 @@ local DIST = {
 -- one of the four os functions the cliamp sandbox keeps (time/date/clock/
 -- getenv). The cycle is anchored to a load-time baseline so it always starts
 -- on "square" when the visualizer is (re)selected.
-local CYCLE_ORDER = { "square", "diamond", "circle", "squircle", "wings", "layers" }
+local CYCLE_ORDER = { "square", "diamond", "circle", "squircle", "wings", "layers", "compass" }
 local cycle_mode  = (cfg_ring_shape == "cycle")
 local cycle_t0    = os.time()
 
