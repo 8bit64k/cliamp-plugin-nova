@@ -3,10 +3,10 @@
 > Transient rolling work-log. DURABLE design rules live in `AGENTS.md`.
 > Prior history archived in `CHECKPOINT.2026-05-31.md` and earlier.
 
-**Last commit:** `96c6594` — updated color ways (new redhot + orangehot themes)
+**Last commit:** `628a94c` — density bleed: overdrive thickens +1/+2 rings, BLD debug footer
 **Branch:** master. **Repo:** github.com/8bit64k/cliamp-plugin-nova (PRIVATE)
 **Local dir:** /home/nick/builds/cliamp-plugin-nova/
-**Entry file:** nova.lua (repo root, ~1200 lines). Single Lua file, no require/helpers.
+**Entry file:** nova.lua (repo root, ~1267 lines). Single Lua file, no require/helpers.
 
 ## June 2 — color way changes (from laptop)
 
@@ -14,6 +14,15 @@ Two new themes: **redhot** (ANSI red ramp: 185→9) and **orangehot** (ANSI oran
 ramp: 223→9). Extends the "hot" family alongside whitehot and blackhot.
 Ghost preset gamma tweaked from 0.99 → 1 (clean integer). No preset profiles
 reference the new themes yet — they're available for manual config only.
+
+## June 2 — density bleed
+
+Overdrive now thickens glyphs in adjacent rings +1 and +2 (color bleed only
+reaches +1 — density travels further, reinforcing the radial bulge metaphor).
+Latch-and-decay at `overdrive_decay` rate (same clock as color bleed) so the
+two channels read as one percussive event. No new config knob — piggybacks on
+`overdrive_bleed`. Debug footer shows "BLD" when any ring has active density
+bleed. Native indicator (overdrive source breathing) planned but not yet built.
 
 ---
 
