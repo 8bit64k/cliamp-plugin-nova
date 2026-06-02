@@ -1,221 +1,155 @@
 # CHECKPOINT — cliamp-plugin-nova
 
-> Transient rolling work-log. DURABLE design rules live in `AGENTS.md` (read it
-> first — it never rolls over). Prior history archived in
-> `CHECKPOINT.2026-05-30-01.md` (and earlier rollovers).
+> Transient rolling work-log. DURABLE design rules live in `AGENTS.md`.
+> Prior history archived in `CHECKPOINT.2026-05-31.md` and earlier.
 
-**Last commit:** 91f86c5 plus uncommitted predator theme.
-**Branch:** master. **Repo:** github.com/8bit64k/cliamp-plugin-nova (PRIVATE).
+**Last commit:** `5e26fd6` — compass ring shape
+**Branch:** master. **Repo:** github.com/8bit64k/cliamp-plugin-nova (PRIVATE)
 **Local dir:** /home/nick/builds/cliamp-plugin-nova/
-**Entry file:** nova.lua (repo root). Single Lua file, no require/helpers.
+**Entry file:** nova.lua (repo root, ~1200 lines). Single Lua file, no require/helpers.
 
 ---
 
-## Session 2026-05-31 — predator theme (uncommitted)
+## What this is (current, accurate — May 31)
 
-Added predator theme to PRESETS table — iconic Predator thermal-vision heatmap.
-11-stop ANSI 256 glow ramp + 4-stop overdrive:
+A cliamp Lua visualizer that renders a **braille wall** reacting to the 10-band
+EQ. Procedurally generated wall (no art file needed). The wall is mapped into
+concentric rings, recolors by band level on a themed ANSI 256 ramp, and braille
+glyphs thicken (gain dots toward center) as they heat.
 
-- glow: 17, 21, 39, 46, 112, 142, 184, 220, 208, 196, 231
-  (deep indigo -> royal blue -> cyan -> green -> lime -> olive ->
-   yellow-green -> yellow -> dark orange -> red-orange -> pure white)
-- overdrive: 196, 160, 125, 231
-  (red-orange -> crimson -> magenta-red -> white)
+Core features built and shipped this session:
 
-Changes:
-- nova.lua: predator preset inserted after ember
-- README.md: theme list updated to include ember + predator
-- Verified via render harness: all 6 scenes, no overflow, ANSI present
-- Not yet committed — deferring to Nick
+### Presets system — one-knob feel selection
+`preset` knob bundles dynamics + theme + ring_shape. 8 presets shipped:
+default, punch, ethereal, retro, plasma, ghost, bloom, tacutacu.
+`cycle_presets = true` auto-rotates through all 8 on cycle_seconds timer.
+Individual TOML keys override preset values. Debug flag shows preset name
+as a footer bar + fires `cliamp.message()` in init().
 
----
+### 8 colour themes
+amber, crt, vantablack, whitehot, blackhot, aurora, ember, predator, flan.
+All 11-stop ANSI 256 glow + 4-stop overdrive.
 
-## What this is (current, accurate)
+### 7 ring shapes
+square (Chebyshev), diamond (Manhattan), circle (Euclidean), squircle (p=4
+Minkowski), wings (vertical stripes, X-only), layers (horizontal strata,
+Y-only), compass (four-pointed star). `ring_shape = "cycle"` rotates all 7.
 
-A cliamp Lua **visualizer** that renders a **braille wall** reacting to the
-10-band EQ. The wall is mapped into 10 concentric rings (band 1 = 32 Hz bass at
-center, band 10 = 16 kHz treble at edge). Each ring RECOLORS by its level on a
-themed ramp AND braille glyphs THICKEN (gain dots) as they heat. As of 2026-05-30
-the wall is **generated procedurally** — no art file needed.
-
-- Render call: `p:render(bands, frame, rows, cols)` — `bands` 1-indexed table,
-  MUST return a string (returning non-string = cliamp silently reuses last frame).
-- cliamp ticks a visualizer at **20 FPS** while playing (TickFast 50ms; TickSlow
-  200ms/5fps when paused/overlay). Source: `~/builds/cliamp/ui/tick.go` +
-  `luaModeDriver` in `ui/visualizer.go`.
-- cliamp = **gopher-lua (Lua 5.1)**: NO bitwise ops (`>> << | &`), no bit32. All
-  bit math is arithmetic on powers of two. Local `lua` is 5.5 and WILL parse
-  bitops fine while the host silently fails to load them — always write 5.1-safe.
-- Errors go to `~/.config/cliamp/plugins.log` as `[nova] error: ...`, NEVER the UI.
-- Sibling: `~/builds/cliamp-plugin-tubeamp/` (shipped v1.2.0; its docs/DESIGN.md is
-  the gold-standard plugin doc). Shares the amber glow ramp = one plugin family.
-
----
-
-## Session 2026-05-30 — what shipped (all on master, all verified)
-
-Four features built this session, in order. All knobs default to no-change
-behavior. Reusable test/bench tooling lives in `scratchpad/` (gitignored).
-
-### 1. Canvas cap — `max_cols` / `max_rows` (default 0 = unlimited)
-Render cost is almost PERFECTLY LINEAR in drawn cells (`draw_w*draw_h`), ~0.41
-ms/1000 cells flat across a 73x pane-size range — so the ~20% CPU overage vs
-native visualizers is the per-cell loop at large `fit=fill` panes, not fixed
-overhead. The cap clamps the DRAWN grid; art is then centered in the full pane via
-existing letterbox padding. 4K 320x80 capped to 160x48 = -69% cost. TRADE: on a
-huge `fit=fill` pane the wall becomes a CENTERED BLOCK, not edge-to-edge (can't
-fill more columns than you draw). Test: `scratchpad/test_cap.lua`.
-
-### 2. Render rate — `render_rate` (0.25..1.0, default 1.0 = every frame)
-FRACTION of frames actually rendered (NOT a skip count — 8bit64k finds the 0->1
-dial more natural). 1.0 = every frame (~20 FPS); 0.5 = ~10 FPS; 0.25 = ~5 FPS.
-Un-rendered frames REUSE the cached output string. Cuts AVERAGE cost ~(1-rate) at
-ANY pane size AND keeps `fit=fill` edge-to-edge (trades refresh rate, not
-coverage). Values <0.25 clamp to 0.25 (rate 0 = "never render" is meaningless).
-Maps internally to integer skip = `round(1/rate)-1`. Audio state still advances
-every frame (envelope never freezes); a bass-transient ONSET force-renders even on
-a skip frame so kick FLARES are never dropped; cache invalidated on resize.
-Measured: 0.5 -51%, 0.33 -68%, 0.25 -75%. COMBINED cap160x48 + rate0.33 on 4K:
-9.88 -> 1.07 ms avg (-89%). Test: `scratchpad/test_frameskip.lua` (still uses the
-old internal name "frameskip"; the config key is `render_rate`).
-
-### 3. Toward-center density fill
-Braille glyphs now accrete dots TOWARD the pane center as they heat (was bottom-up
-regardless of position). Reinforces the radial ring structure. Cell left of center
-fills from its right edge inward; above-center fills bottom-up; corners from the
-dot nearest center. Implemented as 9 direction-specific orders
-`FILL_ORDERS[dirx][diry]` (signs in {-1,0,1}), chosen per cell by SIGN of offset
-from center; `thicken()` takes `(fill_order, dkey)` and caches per direction
-(`thicken_cache[dkey][base_cp][add]`, no per-frame bit loop). NOT a knob — it's
-the correct default; folded under existing `density` toggle. Promoted to AGENTS.md
-(durable). Test: `scratchpad/test_center_fill.lua`; visual `scratchpad/show_final.lua`.
-
-### 4. Procedural wall — no art file needed
-`generate_wall()` fills `art_cells`/`art_code` with a single base glyph at a fixed
-35x188 source grid (matches old dots_braille dims so fit behaves identically); the
-existing fit/downscale/ring/density path renders it like a file. Config
-`start = "black" | "stipple"`, **default "black"** (8bit64k's pick, "it's
-beautiful"):
-- `black` = base ⠀ (U+2800, empty) — dots bloom in from nothing toward the lit core.
-- `stipple` = base ⠡ (U+2821) — faint resting texture that thickens.
-- Unknown values fall back to stipple.
-`art_path` KEPT as an optional override (set => load file; unset => generate). The
-default experience needs ZERO files. Sentinel for "wall ready?" is `art_cells`
-(the generator sets art_cells/art_code but NOT art_lines — art_lines is file-path
-only). The 5 generated wall files (dots_braille, dots_dense_braille, noise_braille,
-weave_braille, art_max) MOVED to `scratchpad/` (gitignored) + removed from repo.
-Portrait files (`crt.txt`, `ruby.txt`, `ruby_ascii.txt`) LEFT at root — different
-lineage, headed for a future SEPARATE portrait plugin (nova is braille-wall ONLY).
-Test: `scratchpad/test_generator.lua` (renders both starts with fs stubbed to
-fail), `scratchpad/verify_default.lua` (empty config => black).
-
-README rewritten this session: leads with procedural wall (no file), `art_path`
-optional, documents `start` + the perf knobs. Accurate to current plugin.
+### Dynamics knobs (all built and shipped)
+- dead_zone (noise gate, 0-0.5)
+- gamma (response curve, 0.1-3.0)
+- cell_aspect (terminal cell ratio, 0.2-2.0)
+- density_attack / density_release (dot fill/shed speed)
+- overdrive / overdrive_decay / overdrive_bleed (bass flare)
+- tilt (treble boost)
+- attack / release (color smoothing)
+- ring_blend (smooth/hard band boundaries)
+- max_cols / max_rows (canvas cap)
+- render_rate (frame-skip fraction)
+- debug (footer + init message)
 
 ---
 
-## RESUME HERE — next session
+## Tomorrow (June 1) — review session
 
-1. **8bit64k is testing the whole batch live** (cap, render_rate, toward-center
-   density, black/stipple wall). On the laptop: `git fetch origin && git reset
-   --hard origin/master` then `cp nova.lua ~/.config/cliamp/plugins/nova.lua`,
-   restart cliamp. No config needed — renders the black bloom wall out of the box.
-   Use `color_mode = glow` (NOT passthrough — passthrough skips color AND density).
-2. **DOCS LOOP STILL OPEN** (was being batched at session end, budget ran out):
-   - `docs/DESIGN.md` not yet updated for this session's 4 features (still
-     describes old bottom-up fill + file-required model). README IS updated.
-   - The `cliamp-plugin-development` SKILL still documents the old bottom-up
-     density fill and file-required wall — update its density + art-pipeline
-     sections to reflect toward-center fill and the procedural generator.
-   - Optional: fold a git push-verification lesson into the skill — TWICE this
-     session a commit went out with an incomplete staged set (only file deletions,
-     not nova.lua) because `git add` was assumed instead of verified. Always
-     check `git diff --cached --stat` matches the commit message BEFORE committing,
-     and `git show --stat` after, before pushing.
-3. **Then back to the tuning backlog** (see below). #4 dead_zone is flagged PRIORITY.
+### 1. Defaults review
+All 8 presets + the shared constants (ONSET_MARGIN=0.18, BASE_RATE=0.05,
+FLARE_PEAK=0.92) need validation against varied music. Tune by ear.
 
----
+### 2. Code + doc review
+Full audit in `scratchpad/code-doc-review-2026-05-31.md`. Highlights:
+- Stale header comment in nova.lua
+- Missing `debug` key in README config block
+- AGENTS.md feature summary stale (lists only 4 themes)
+- vestigial `var` param in apply_num()
+- active_profile() called twice per frame
+- README shape-cycle section describes old label
 
-## Tuning backlog (unbuilt)
+### 3. Make repo public
+Flip with `gh repo edit 8bit64k/cliamp-plugin-nova --visibility public`.
+Update install instructions from "clone + cp" to `cliamp plugins install`.
 
-- **#4 DEAD ZONE — SHIPPED (1dd55a4).** `dead_zone` knob clamps bands below threshold
-  to 0. Default 0 (off). Try 0.08-0.12.
-- **#3 Gamma / response curve.** Shape the level→brightness mapping.
-- **#5 Aspect ratio knob.** Currently x scaled 0.5 for ~2:1 cell aspect.
-- Defaults (flare onset margin 0.18 / baseline EMA 0.05, density attack 0.6 /
-  release 0.15) are reasoned but NOT yet validated against lots of real music —
-  tune by ear when ready.
-
-### Deferred (bottom of list)
-
-- **Truecolor 24-bit ramp.** Removes the 11-stop brightness ceiling. Detect
-  `COLORTERM=truecolor` via `os.getenv`.
-- **Ring count.** Staying fixed at 10 — 1:1 mapping with cliamp's 10-band EQ
-  is the correct call. Defer until there's a compelling reason to break it.
+### 4. Docs still open
+- docs/DESIGN.md never written (gold-standard plugin doc — see tubeamp)
+- cliamp-plugin-development skill needs toward-center fill + procedural
+  generator updates
 
 ---
 
-## Full current config surface (as of 91f86c5)
+## Full current config surface
 
 ```toml
-[plugins.nova]                 # entire block OPTIONAL — defaults render the black wall
-start = "black"                 # "black" (empty, blooms — default) | "stipple" (faint texture)
-# art_path = "/abs/path.txt"    # OPTIONAL override — load a custom ASCII/braille file
-color_mode = "glow"             # "glow" | "mono" | "passthrough" (passthrough = raw glyphs, no color/density)
-ring_shape = "square"           # "square" | "diamond" | "circle" | "cycle"
-cycle_seconds = 20              # cycle mode: seconds per shape (min 2)
-fit = "contain"                 # "contain" (aspect, letterboxed) | "fill" (stretch to pane)
-ring_blend = true               # smooth radial gradient between rings (default on)
-density = true                  # braille glyphs thicken toward center as they heat (default on)
-density_attack = 0.6            # dots fill speed (high=snappy; 1.0=instant)
-density_release = 0.15          # dots shed speed (low=lingering CRT-phosphor trail)
-theme = "amber"                 # "amber" | "crt" | "vantablack" | "aurora" (4x 11-stop ANSI ramps)
-mono_color = 11                 # ANSI 256 index for mono mode
-attack = 0.55                   # color smoothing attack
-release = 0.18                  # color smoothing release
-overdrive = 0.78                # bass band level above which a flare can fire
-overdrive_decay = 0.82          # bass flare tail: fraction of heat retained/frame (0=snap)
-overdrive_bleed = true          # peak bass flare bleeds warmth into the next ring outward
-tilt = 0.0                      # per-band boost toward treble (try 0.5 if outer rings feel dead)
-max_cols = 0                    # cap drawn width (0=unlimited) — perf on huge fit=fill panes
-max_rows = 0                    # cap drawn height (0=unlimited)
-render_rate = 1.0               # fraction of frames rendered, 0.25..1.0 (1.0=every frame)
+[plugins.nova]                    # entire block OPTIONAL
+start = "black"                   # "black" | "stipple"
+# art_path = "/abs/path.txt"     # OPTIONAL file override
+color_mode = "glow"              # "glow" | "mono" | "passthrough"
+ring_shape = "square"            # square | diamond | circle | squircle | wings | layers | compass | cycle
+cycle_seconds = 20               # seconds per shape/preset in cycle modes
+fit = "contain"                  # "contain" | "fill"
+ring_blend = true                # smooth gradient between rings
+density = true                   # glyphs thicken toward center
+density_attack = 0.6             # 0-1
+density_release = 0.15           # 0-1
+theme = "amber"                  # amber | crt | vantablack | whitehot | blackhot | aurora | ember | predator | flan
+preset = "default"               # default | punch | ethereal | retro | plasma | ghost | bloom | tacutacu
+cycle_presets = false            # auto-rotate presets on cycle_seconds
+debug = false                    # show preset name as footer + init message
+mono_color = 11
+attack = 0.55
+release = 0.18
+overdrive = 0.78
+overdrive_decay = 0.82
+overdrive_bleed = true
+tilt = 0.0
+dead_zone = 0.0                  # 0-0.5
+gamma = 1.0                      # 0.1-3.0
+cell_aspect = 0.5                # 0.2-2.0
+max_cols = 0                     # 0=unlimited
+max_rows = 0
+render_rate = 1.0                # 0.25-1.0
 ```
 
 ---
 
-## Architecture quick map (nova.lua, ~870 lines)
+## Preset quick reference
 
-- **Config reads** (top): all via `clean()` (strips leaked TOML `#` comments);
-  numerics via `tonumber(clean(...))`; bools parsed defensively (string or real).
-- **DIST table**: square=Chebyshev / diamond=Manhattan / circle=Euclidean; ONE
-  dispatch reused for both max_d and per-cell so the metric can't diverge.
-  `ring_shape="cycle"` rotates via `os.time()`.
-- **Braille density**: `FILL_ORDERS[dirx][diry]` (9 toward-center orders),
-  `thicken(base_cp, level, fill_order, dkey)` memoized per direction. 5.1-safe
-  arithmetic only.
-- **PRESETS**: `{glow=11 colors, overdrive=4 colors}` per theme; single swap point
-  (`active_preset`) so upstream `theme_colors()` integration is a one-line change.
-  `glow_color` uses ROUND not floor for the ramp index (else top stop unreachable).
-- **generate_wall()** (no file) and **load_art()** (file path, lazy-loaded on first
-  render if init didn't fire). Sentinel = `art_cells`.
-- **render()**: advance smoothing -> build `effective[]` (smoothed + overdrive heat
-  + bleed) once/frame -> advance `dens[]` envelope -> frame-skip gate -> canvas cap
-  -> fit -> per-cell loop (ring distance -> blend/snap level -> color + toward-center
-  thicken). Hot loop optimized (precomputed ANSI escapes, memoized thicken, hoisted
-  math locals, append-index tracking).
+| Preset    | Theme     | Shape    | Feel                    |
+|-----------|-----------|----------|-------------------------|
+| default   | amber     | circle   | balanced baseline       |
+| punch     | crt       | diamond  | snappy, percussive      |
+| ethereal  | aurora    | diamond  | dreamy, slow glow       |
+| retro     | ember     | square   | CRT-era grit, hard bands|
+| plasma    | predator  | circle   | volatile, electric      |
+| ghost     | vantablack| square   | thin, wispy, slow       |
+| bloom     | whitehot  | diamond  | bright, fast, blooming  |
+| tacutacu  | flan      | diamond  | punchy + warm flan tones|
 
 ---
 
-## Conventions (from /home/nick/builds/AGENTS.md)
+## Architecture quick map (nova.lua, ~1200 lines)
 
-- Git author = **8bit64k ALWAYS**, never Nick:
-  `git -c user.name=8bit64k -c user.email=8bit64k@users.noreply.github.com ...`
-- `scratchpad/` is gitignored — harnesses, probes, the moved wall .txt files,
-  source images stay local; never part of a release.
-- cliamp does NOT hot-reload — re-`cp nova.lua` + restart after every change.
-- Verify end-to-end, not just syntax. Run with PLAIN `lua` for tests, NOT luajit
-  (host has no JIT — luajit perf numbers mislead; relative cost only).
-- 8bit64k reviews visual/terminal software LIVE himself — give pull/install steps,
-  don't over-preview. Fine with git history rewrites/force-push on this private
-  repo (wants clean history); he reconciles with `git reset --hard origin/master`.
+- **Config**: `clean()` strips leaked TOML `#` comments; `cfg_num`/`cfg_bool` absent
+  (went with user_set tracking + profile overlay instead). Bool parsed defensively.
+- **DIST table**: 7 pluggable distance metrics; reused for max_d + per-cell so they
+  can't diverge. `ring_shape="cycle"` rotates via `os.time()`.
+- **PRESETS** (colour): `{glow=11, overdrive=4}` per theme. `glow_color` uses ROUND
+  not floor.
+- **PRESET_PROFILES** (behaviour): bundles dynamics + theme + ring_shape. Profile
+  overlay in render() applies values to cfg_* upvalues each frame, respecting
+  user overrides. Theme swap also swaps glow_ramp/overdrive_ramp.
+- **Braille density**: `FILL_ORDERS[dirx][diry]` (9 toward-center orders),
+  `thicken()` memoized per direction. 5.1-safe arithmetic.
+- **generate_wall()**: procedural 35x188 source grid. `load_art()` for file path.
+  Lazy-loaded on first render. Sentinel = `art_cells`.
+- **render()**: profile overlay → smoothing → effective[] (smoothed + flare +
+  bleed + dead_zone + gamma) → dens[] envelope → frame-skip gate → canvas cap →
+  fit → per-cell loop → debug footer. Hot loop optimized.
+
+## Conventions
+
+- Git author = 8bit64k ALWAYS, never Nick.
+- `scratchpad/` is gitignored.
+- cliamp does NOT hot-reload — re-`cp nova.lua` + restart.
+- Verify with PLAIN `lua`, NOT luajit.
+- 8bit64k reviews visual software LIVE himself — give pull/install steps.
+- OK with force-push on private repo; reconcile via `git reset --hard origin/master`.
