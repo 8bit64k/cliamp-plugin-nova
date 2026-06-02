@@ -3,10 +3,17 @@
 > Transient rolling work-log. DURABLE design rules live in `AGENTS.md`.
 > Prior history archived in `CHECKPOINT.2026-05-31.md` and earlier.
 
-**Last commit:** `5e26fd6` — compass ring shape
+**Last commit:** `96c6594` — updated color ways (new redhot + orangehot themes)
 **Branch:** master. **Repo:** github.com/8bit64k/cliamp-plugin-nova (PRIVATE)
 **Local dir:** /home/nick/builds/cliamp-plugin-nova/
 **Entry file:** nova.lua (repo root, ~1200 lines). Single Lua file, no require/helpers.
+
+## June 2 — color way changes (from laptop)
+
+Two new themes: **redhot** (ANSI red ramp: 185→9) and **orangehot** (ANSI orange
+ramp: 223→9). Extends the "hot" family alongside whitehot and blackhot.
+Ghost preset gamma tweaked from 0.99 → 1 (clean integer). No preset profiles
+reference the new themes yet — they're available for manual config only.
 
 ---
 
