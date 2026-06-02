@@ -765,6 +765,13 @@ local effective = {0,0,0,0,0,0,0,0,0,0}
 -- dots fill/shed on a separate timescale from color (phosphor-persistence feel).
 -- This is the level density mutation reads (NOT effective[] directly).
 local dens      = {0,0,0,0,0,0,0,0,0,0}
+-- Density bleed: per-ring boost from overdrive bleed to adjacent rings.
+-- Latches on a bass transient peak and decays at cfg_od_decay, same clock
+-- as the color bleed so the two channels read as one percussive event.
+-- Set during the effective[] build phase, applied after the density envelope.
+local dens_bleed = {0,0,0,0,0,0,0,0,0,0}
+-- Bleed active this frame (set during effective[] build, read by debug footer).
+local bleeding = false
 
 -- Frame-skip state: cache the last rendered string and a frame counter so we can
 -- cheaply reuse output on skipped frames. onset_fired flags a bass transient this
@@ -779,6 +786,8 @@ function p:init(rows, cols)
     for i = 1, 10 do smoothed[i] = 0; effective[i] = 0; dens[i] = 0 end
     heat[1], heat[2] = 0, 0
     bass_base[1], bass_base[2] = 0, 0
+    for i = 1, 10 do dens_bleed[i] = 0 end
+    bleeding = false
     last_output = nil
     skip_counter = 0
     last_shown_preset = nil
@@ -968,6 +977,34 @@ function p:render(bands, frame, rows, cols)
                 if v > effective[tgt] then effective[tgt] = v end
             end
         end
+        -- Density bleed: the same overdrive that spills COLOR into adjacent rings
+        -- also THICKENS them — the wall bulges outward from the impact. Density
+        -- bleed reaches +1 and +2 rings (vs color's +1 only) because mechanical
+        -- deformation travels further than heat. Decays at cfg_od_decay so the
+        -- density bump shares the flare's tail, reading as one percussive event.
+        for i = 1, 10 do
+            dens_bleed[i] = dens_bleed[i] * cfg_od_decay
+        end
+        for i = 1, 2 do
+            if heat[i] >= FLARE_PEAK then
+                local over = (heat[i] - FLARE_PEAK) / (1 - FLARE_PEAK)
+                local spill = 0.45 * over
+                local t1 = i + 1
+                if spill > dens_bleed[t1] then dens_bleed[t1] = spill end
+                local t2 = i + 2
+                if t2 <= 10 and spill * 0.5 > dens_bleed[t2] then
+                    dens_bleed[t2] = spill * 0.5
+                end
+            end
+        end
+        bleeding = false
+        for i = 1, 10 do
+            if dens_bleed[i] > 0.01 then bleeding = true; break end
+        end
+    else
+        -- When bleed is off, clear any residual density bleed and decay.
+        for i = 1, 10 do dens_bleed[i] = 0 end
+        bleeding = false
     end
 
     -- Dead zone gate: clamp any band level below cfg_dead_zone to 0.
@@ -1000,6 +1037,16 @@ function p:render(bands, frame, rows, cols)
                 dens[i] = dens[i] + (target - dens[i]) * cfg_dens_attack
             else
                 dens[i] = dens[i] - (dens[i] - target) * cfg_dens_release
+            end
+        end
+        -- Add density bleed boost on top of the normal envelope. Bleed decays
+        -- at cfg_od_decay (same clock as color) so the two channels feel like
+        -- one percussive event hitting the wall.
+        for i = 1, 10 do
+            if dens_bleed[i] > 0 then
+                local v = dens[i] + dens_bleed[i]
+                if v > 1 then v = 1 end
+                dens[i] = v
             end
         end
     end
@@ -1203,7 +1250,8 @@ function p:render(bands, frame, rows, cols)
     -- Debug footer: show preset + theme on the last row when cycling.
     -- Safe here (no API calls) — just paints into the output string.
     if cfg_debug and rows > 0 and last_shown_preset then
-        local label = " [" .. last_shown_preset .. " + " .. cfg_theme_name .. "] "
+        local bld = bleeding and " BLD" or ""
+        local label = " [" .. last_shown_preset .. " + " .. cfg_theme_name .. bld .. "] "
         local lc = visible_cols(label)
         local pad = math.floor((cols - lc) / 2)
         if pad < 0 then pad = 0 end
