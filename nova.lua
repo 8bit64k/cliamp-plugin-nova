@@ -381,17 +381,27 @@ local PRESETS = {
     },
     whitehot = {
         name = "White Hot (high contrast)",
-        -- 11 stops across the full grayscale range with 3-5 index gaps.
-        -- 232 = baseline; 234-254 = visible grayscale; 255 = pure white.
+        -- 11 stops across the full white range with 3-5 index gaps.
         glow      = { 0, 232, 235, 238, 241, 244, 247, 251, 254, 255, 231 },
         overdrive = { 251, 254, 255, 231 },
     },
     blackhot = {
         name = "Black Hot (high contrast)",
-        -- 11 stops across the full grayscale range with 3-5 index gaps.
-        -- 232 = baseline; 234-254 = visible grayscale; 255 = pure white.
+        -- 11 stops across the full black range with 3-5 index gaps.
         glow      = { 231, 249, 247, 245, 243, 241, 239, 237, 235, 233, 16 },
         overdrive = { 238, 235, 233, 16},
+    },
+     redhot = {
+        name = "Red Hot (high contrast)",
+        -- 11 stops across the full red range with 3-5 index gaps.
+        glow      = { 185, 187, 224, 217, 211, 210, 204, 196, 197, 160, 9},
+        overdrive = { 196, 197, 160, 9},
+    },
+       orangehot = {
+        name = "Orange Hot (high contrast)",
+        -- 11 stops across the full orange range with 3-5 index gaps.
+        glow      = { 223, 222, 216, 215, 209, 208, 202, 172, 166, 130, 9},
+        overdrive = { 172, 166, 130, 9},
     },
     aurora = {
         name = "Aurora (teal-cyan-green)",
@@ -429,6 +439,7 @@ local PRESETS = {
         -- Overdrive: coral → dusty rose → deep rose → salmon pink
         overdrive = { 209, 174, 167, 210 },
     },
+    
 }
 
 -- ---------- Preset profiles (dynamics + behaviour bundled for one-knob feel) ----
@@ -453,7 +464,7 @@ local PRESET_PROFILES = {
         attack = 1,  release = .25,
         overdrive = 1,  overdrive_decay = 0.9,  overdrive_bleed = false,
         density_attack = 1,  density_release = .85,
-        dead_zone = 0.2,  gamma = .99,  tilt = 0.0,
+        dead_zone = 0.2,  gamma = 1,  tilt = 0.0,
         ring_blend = true,
     },
     ethereal = {
