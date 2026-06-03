@@ -352,6 +352,23 @@ local function thicken(base_cp, level, fill_order, dkey)
     return s
 end
 
+-- ---------- Breathe: snake glyphs for overdrive source indicator --------------
+-- During bleed, source ring cells (bands 1-2) show a 2-dot "snake" rotating
+-- clockwise around the braille cell perimeter instead of their normal density
+-- glyph. 8 phases, one per frame at 20fps = 2.5 rotations/second. Precomputed
+-- as braille_char() strings so the hot loop does zero work per override.
+-- Perimeter clockwise: 1(r0c0)→8(r0c1)→16(r1c1)→32(r2c1)→128(r3c1)→64(r3c0)→4(r2c0)→2(r1c0)
+local SNAKE_GLYPHS = {
+    braille_char(0x2800 + 1 + 8),    -- phase 0: top edge      ⡁
+    braille_char(0x2800 + 8 + 16),   -- phase 1: top→right     ⡘
+    braille_char(0x2800 + 16 + 32),  -- phase 2: right column  ⡰
+    braille_char(0x2800 + 32 + 128), -- phase 3: right→bottom  ⢰
+    braille_char(0x2800 + 128 + 64), -- phase 4: bottom edge   ⣀
+    braille_char(0x2800 + 64 + 4),   -- phase 5: bottom→left  ⢐
+    braille_char(0x2800 + 4 + 2),    -- phase 6: left column   ⠒
+    braille_char(0x2800 + 2 + 1),    -- phase 7: left→top      ⠃
+}
+
 -- ---------- Color presets (single swap point for upstream theme integration) ---
 -- Each preset: { glow = {11 ANSI 256 colors}, overdrive = {4 colors} }.
 -- When cliamp exposes theme_colors(), add a from_cliamp_theme() function that
@@ -772,6 +789,10 @@ local dens      = {0,0,0,0,0,0,0,0,0,0}
 local dens_bleed = {0,0,0,0,0,0,0,0,0,0}
 -- Bleed active this frame (set during effective[] build, read by debug footer).
 local bleeding = false
+-- Breathe: snake animation phase per bass band (0..7). Advances each frame
+-- while that band is bleeding (heat[i] >= FLARE_PEAK). The hot loop reads
+-- the precomputed SNAKE_GLYPHS[phase+1] for source ring cells.
+local breathe_phase = {0, 0}
 
 -- Frame-skip state: cache the last rendered string and a frame counter so we can
 -- cheaply reuse output on skipped frames. onset_fired flags a bass transient this
@@ -788,6 +809,7 @@ function p:init(rows, cols)
     bass_base[1], bass_base[2] = 0, 0
     for i = 1, 10 do dens_bleed[i] = 0 end
     bleeding = false
+    breathe_phase[1], breathe_phase[2] = 0, 0
     last_output = nil
     skip_counter = 0
     last_shown_preset = nil
@@ -965,8 +987,9 @@ function p:render(bands, frame, rows, cols)
     -- the overdrive ramp) does it warm the ring just outside it (1->2, 2->3).
     -- A modest flare stays put; only a full slam blooms outward. Scaled by how
     -- far past the peak-flare cutoff we are, so it's proportional, clamped to <= 1.
+    -- FLARE_PEAK hoisted — also used by breathe indicator below.
+    local FLARE_PEAK = cfg_overdrive > 0.92 and cfg_overdrive or 0.92  -- bleed gate: at least overdrive floor, never below
     if cfg_od_bleed then
-        local FLARE_PEAK = cfg_overdrive > 0.92 and cfg_overdrive or 0.92  -- bleed gate: at least overdrive floor, never below
         for i = 1, 2 do
             if heat[i] >= FLARE_PEAK then
                 local over = (heat[i] - FLARE_PEAK) / (1 - FLARE_PEAK)  -- 0..1
@@ -1005,6 +1028,20 @@ function p:render(bands, frame, rows, cols)
         -- When bleed is off, clear any residual density bleed and decay.
         for i = 1, 10 do dens_bleed[i] = 0 end
         bleeding = false
+    end
+    -- Breathe: advance snake animation phase on each bass band while bleeding.
+    -- Phases 0..7, one per frame = 2.5 rotations/sec at 20fps. Resets to 0
+    -- when bleed stops so the snake always starts from the same position.
+    local breath_active = {false, false}
+    if cfg_od_bleed then
+        for i = 1, 2 do
+            if heat[i] >= FLARE_PEAK then
+                breathe_phase[i] = (breathe_phase[i] + 1) % 8
+                breath_active[i] = true
+            else
+                breathe_phase[i] = 0
+            end
+        end
     end
 
     -- Dead zone gate: clamp any band level below cfg_dead_zone to 0.
@@ -1217,10 +1254,35 @@ function p:render(bands, frame, rows, cols)
                     color = glow_color(lvl, lvl >= cfg_overdrive)
                 end
 
+                -- breathe: snake glyph override on source rings (bands 1-2) while
+                -- that band is actively bleeding. A 2-dot snake rotates clockwise
+                -- around the cell perimeter — a native indicator of where the bleed
+                -- originates. Fires independently of the density knob.
+                -- When active, the snake REPLACES normal density for that cell.
+                local snake_fired = false
+                if cfg_od_bleed and scode then
+                    local src_band = nil
+                    if do_blend then
+                        if pos < 1.0 then src_band = 1
+                        elseif pos < 2.0 then src_band = 2 end
+                    else
+                        local band = 1 + floor(pos + 0.5)
+                        if band == 1 or band == 2 then src_band = band end
+                    end
+                    if src_band and breath_active[src_band] then
+                        local base_cp = scode[sx]
+                        if base_cp then
+                            ch = SNAKE_GLYPHS[breathe_phase[src_band] + 1]
+                            snake_fired = true
+                        end
+                    end
+                end
+
                 -- density: thicken braille glyph (cached lookup). braille cells only.
                 -- Dots fill TOWARD CENTER: pick the fill order by this cell's
                 -- direction from center (dirx selects within the row's diry table).
-                if do_dens and scode then
+                -- SKIPPED when snake override is active for this cell.
+                if not snake_fired and do_dens and scode then
                     local base_cp = scode[sx]
                     if base_cp then
                         local fo, dirx
