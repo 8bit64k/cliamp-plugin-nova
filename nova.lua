@@ -966,7 +966,7 @@ function p:render(bands, frame, rows, cols)
     -- A modest flare stays put; only a full slam blooms outward. Scaled by how
     -- far past the peak-flare cutoff we are, so it's proportional, clamped to <= 1.
     if cfg_od_bleed then
-        local FLARE_PEAK = 0.92     -- top-of-overdrive-ramp cutoff
+        local FLARE_PEAK = cfg_overdrive > 0.92 and cfg_overdrive or 0.92  -- bleed gate: at least overdrive floor, never below
         for i = 1, 2 do
             if heat[i] >= FLARE_PEAK then
                 local over = (heat[i] - FLARE_PEAK) / (1 - FLARE_PEAK)  -- 0..1
