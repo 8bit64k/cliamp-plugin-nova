@@ -3,10 +3,10 @@
 > Transient rolling work-log. DURABLE design rules live in `AGENTS.md`.
 > Prior history archived in `CHECKPOINT.2026-05-31.md` and earlier.
 
-**Last commit:** `628a94c` — density bleed: overdrive thickens +1/+2 rings, BLD debug footer
+**Last commit:** `ea17da4` — fix: FLARE_PEAK gates at max(0.92, cfg_overdrive)
 **Branch:** master. **Repo:** github.com/8bit64k/cliamp-plugin-nova (PRIVATE)
 **Local dir:** /home/nick/builds/cliamp-plugin-nova/
-**Entry file:** nova.lua (repo root, ~1267 lines). Single Lua file, no require/helpers.
+**Entry file:** nova.lua (repo root, ~1268 lines). Single Lua file, no require/helpers.
 
 ## June 2 — color way changes (from laptop)
 
