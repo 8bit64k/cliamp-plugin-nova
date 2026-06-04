@@ -3,39 +3,56 @@
 > Transient rolling work-log. DURABLE design rules live in `AGENTS.md`.
 > Prior history archived in `CHECKPOINT.2026-05-31.md` and earlier.
 
-**Last commit:** `pending` — rename: overdrive_decay→sustain, overdrive_bleed→blend, gamma→knee
+**Last commit:** `dcf5886` — fix UK→US spelling
 **Branch:** master. **Repo:** github.com/8bit64k/cliamp-plugin-nova (PRIVATE)
 **Local dir:** /home/nick/builds/cliamp-plugin-nova/
 **Entry file:** nova.lua (repo root, ~1290 lines). Single Lua file, no require/helpers.
 
-## June 3 — pedalboard rename: sustain, blend, knee
+## June 3 — pedalboard rename session (4 commits: fa7d390 → dcf5886)
 
-Three renames to align with guitar-pedal knob convention:
-- `overdrive_decay` → `sustain` (compressor/OD sustain knob — how long the signal rings)
-- `overdrive_bleed` → `blend` (dry/wet mix on modern pedals)
-- `gamma` → `knee` (compressor knee — hard/soft curve)
+Full knob rename to guitar-pedal convention. Five commits, one session.
 
-All presets updated, all docs synced. Config key, variable name, comments all renamed.
+### Round 1: gate + ceiling (fa7d390)
+- `dead_zone` → `gate` — noise gate threshold
+- New `ceiling` knob (0.01–1.0, default 1.0=off) — limiter brick wall
 
-## June 3 — dead_zone → gate rename + ceiling limiter knob (fa7d390, bd36052)
+### Round 2: pipeline order fix (bd36052)
+- Swap: gate → gamma → ceiling → gate → knee → ceiling
+- Gamma/celling order now matches real mastering chain: EQ before limiter
+- Prevents clamped ceiling from leaking past via gamma < 1 lift
 
-`dead_zone` renamed to `gate` across all surfaces (code, checkpoints, README,
-DESIGN.md). All 8 presets updated. New `ceiling` knob (0.01–1.0, default 1.0=off):
-hard limiter clamp on the top end. Pairs with gate to form a compressor lane:
-bands between gate and ceiling pass through; below gate = silence, above ceiling
-= clamped flat. No preset sets a ceiling value.
+### Round 3: sustain, blend, knee (a0547e8)
+- `overdrive_decay` → `sustain` — flare tail length
+- `overdrive_bleed` → `blend` — dry/wet bleed mix
+- `gamma` → `knee` — response curve hard/soft
 
-Pipeline order fixed in `bd36052`: gate → knee → ceiling (limiter last, like
-a real mastering chain). Knee before ceiling prevents the clamped value from
-leaking past via knee < 1 lift. Docs updated.
+### Round 4: bloom (76b2c89)
+- `density` → `bloom` — glyph thickness toggle
+- `density_attack` → `bloom_attack`
+- `density_release` → `bloom_release`
+- Internal: dens[] → bloom[], dens_bleed → bloom_bleed
 
-### Shimmer lane (vNext discussion)
+### Round 5: UK→US spelling (dcf5886)
+- colour→color, behaviour→behavior
 
-Single-pipe limitation: bloom chases `effective[]` post-ceiling, so a low
-ceiling (~0.2) constrains bloom movement to a narrow 20% band. True shimmer
-(bloom-full, color-compressed) would need a pipeline split — bloom taps
-pre-ceiling, color taps post-ceiling. Deferred to next planning session; the
-ceiling knob is correct and useful as-is.
+### Current pedalboard
+
+```
+Gate / Ceiling       — noise gate + limiter
+Attack / Release     — color smoothing (compressor)
+Overdrive / Sustain / Blend — drive + tail + mix (OD pedal)
+Knee                 — response curve (compressor knee)
+Tilt                 — spectral EQ
+Bloom / Bloom Attack / Bloom Release — glyph thickness (second envelope)
+```
+
+Pipeline: smoothing → flare → bleed → gate → knee → ceiling → bloom → color
+
+### Shimmer lane (vNext)
+
+Single-pipe limitation: bloom chases effective[] post-ceiling. True shimmer
+(density-full, color-compressed) needs pipeline split — bloom taps pre-ceiling.
+XOR mask shimmer also noted as an alternative texture approach.
 
 ## June 2 — DESIGN.md written (#4)
 
