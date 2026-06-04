@@ -31,17 +31,17 @@ leaking past via knee < 1 lift. Docs updated.
 
 ### Shimmer lane (vNext discussion)
 
-Single-pipe limitation: density chases `effective[]` post-ceiling, so a low
-ceiling (~0.2) constrains density movement to a narrow 20% band. True shimmer
-(density-full, color-compressed) would need a pipeline split — density taps
+Single-pipe limitation: bloom chases `effective[]` post-ceiling, so a low
+ceiling (~0.2) constrains bloom movement to a narrow 20% band. True shimmer
+(bloom-full, color-compressed) would need a pipeline split — bloom taps
 pre-ceiling, color taps post-ceiling. Deferred to next planning session; the
 ceiling knob is correct and useful as-is.
 
 ## June 2 — DESIGN.md written (#4)
 
 `docs/DESIGN.md`: 943 lines, 15 sections, following tubeamp's gold-standard format.
-Covers full architecture, 11 colour themes, 7 ring shapes, density mutation with
-toward-center fill + density bleed, 8 preset profiles, effective[] layer pipeline
+Covers full architecture, 11 colour themes, 7 ring shapes, bloom mutation with
+toward-center fill + bloom bleed, 8 preset profiles, effective[] layer pipeline
 order, performance controls, sandbox constraints, testing procedures, and 26-item
 agent handoff checklist. Pushed as `c0b21c4`.
 
@@ -50,7 +50,7 @@ agent handoff checklist. Pushed as `c0b21c4`.
 Branch `breathe-experiment` (off `c0b21c4`, pushed as `d4011ae`): during overdrive
 bleed, source ring cells (bands 1-2) show a 2-dot snake rotating clockwise around
 the braille cell perimeter — 8 phases, 2.5 rotations/sec at 20fps. Snake replaces
-normal density while active; fires independently of density knob. Works correctly
+normal bloom while active; fires independently of bloom knob. Works correctly
 in frame-stepping test; needs live visual tuning (spacing between rings, contrast
 against bleed neighbors). Keep on branch; do not merge to master yet.
 
@@ -61,13 +61,13 @@ ramp: 223→9). Extends the "hot" family alongside whitehot and blackhot.
 Ghost preset knee tweaked from 0.99 → 1 (clean integer). No preset profiles
 reference the new themes yet — they're available for manual config only.
 
-## June 2 — density bleed
+## June 2 — bloom bleed
 
 Overdrive now thickens glyphs in adjacent rings +1 and +2 (color bleed only
-reaches +1 — density travels further, reinforcing the radial bulge metaphor).
+reaches +1 — bloom travels further, reinforcing the radial bulge metaphor).
 Latch-and-decay at `sustain` rate (same clock as color bleed) so the
 two channels read as one percussive event. No new config knob — piggybacks on
-`blend`. Debug footer shows "BLD" when any ring has active density
+`blend`. Debug footer shows "BLD" when any ring has active bloom
 bleed. Native indicator (overdrive source breathing) planned but not yet built.
 
 ---
@@ -102,7 +102,7 @@ Y-only), compass (four-pointed star). `ring_shape = "cycle"` rotates all 7.
 - ceiling (limiter, 0.01-1.0)
 - knee (response curve, 0.1-3.0)
 - cell_aspect (terminal cell ratio, 0.2-2.0)
-- density_attack / density_release (dot fill/shed speed)
+- bloom_attack / bloom_release (dot fill/shed speed)
 - overdrive / sustain / blend (bass flare)
 - tilt (treble boost)
 - attack / release (color smoothing)
@@ -150,9 +150,9 @@ ring_shape = "square"            # square | diamond | circle | squircle | wings 
 cycle_seconds = 20               # seconds per shape/preset in cycle modes
 fit = "contain"                  # "contain" | "fill"
 ring_blend = true                # smooth gradient between rings
-density = true                   # glyphs thicken toward center
-density_attack = 0.6             # 0-1
-density_release = 0.15           # 0-1
+bloom = true                   # glyphs thicken toward center
+bloom_attack = 0.6             # 0-1
+bloom_release = 0.15           # 0-1
 theme = "amber"                  # amber | crt | vantablack | whitehot | blackhot | aurora | ember | predator | flan
 preset = "default"               # default | punch | ethereal | retro | plasma | ghost | bloom | tacutacu
 cycle_presets = false            # auto-rotate presets on cycle_seconds
@@ -201,7 +201,7 @@ render_rate = 1.0                # 0.25-1.0
 - **PRESET_PROFILES** (behaviour): bundles dynamics + theme + ring_shape. Profile
   overlay in render() applies values to cfg_* upvalues each frame, respecting
   user overrides. Theme swap also swaps glow_ramp/overdrive_ramp.
-- **Braille density**: `FILL_ORDERS[dirx][diry]` (9 toward-center orders),
+- **Braille bloom**: `FILL_ORDERS[dirx][diry]` (9 toward-center orders),
   `thicken()` memoized per direction. 5.1-safe arithmetic.
 - **generate_wall()**: procedural 35x188 source grid. `load_art()` for file path.
   Lazy-loaded on first render. Sentinel = `art_cells`.

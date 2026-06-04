@@ -65,14 +65,14 @@ tune it:
 [plugins.nova]
 start = "black"                                # procedural wall when no art_path: "black" = empty canvas, dots bloom in from nothing (default) | "stipple" = faint resting texture that thickens
 # art_path = "/abs/path/to/your_art.txt"       # OPTIONAL — drive a custom ASCII/braille file instead of the generated wall (lives in your clone, read in place)
-color_mode = "glow"                            # "glow" | "mono" | "passthrough"  (NOTE: passthrough shows raw glyphs — no color OR density thickening)
+color_mode = "glow"                            # "glow" | "mono" | "passthrough"  (NOTE: passthrough shows raw glyphs — no color OR bloom thickening)
 ring_shape = "square"                          # "square" | "diamond" | "circle" | "squircle" | "wings" | "layers" | "compass" | "cycle" — geometry of the concentric bands
 cycle_seconds = 20                             # when ring_shape="cycle", seconds per shape before rotating (min 2)
 fit = "contain"                                # "contain" = preserve aspect, letterboxed (pictures) | "fill" = stretch to fill the whole pane (textures / the wall)
 ring_blend = true                              # true = smooth gradient across rings (default) | false = hard stepped band boundaries
-density = true                                  # true = braille glyphs thicken toward center as they heat (default) | false = glyphs fixed, color only
-density_attack = 0.6                            # how fast dots FILL toward the level (high = snappy; 1.0 = instant)
-density_release = 0.15                          # how fast dots SHED when level drops (low = lingering CRT-phosphor trail; 1.0 = instant)
+bloom = true                                  # true = braille glyphs thicken toward center as they heat (default) | false = glyphs fixed, color only
+bloom_attack = 0.6                            # how fast dots FILL toward the level (high = snappy; 1.0 = instant)
+bloom_release = 0.15                          # how fast dots SHED when level drops (low = lingering CRT-phosphor trail; 1.0 = instant)
 theme = "amber"                                # "amber" | "crt" | "vantablack" | "aurora" | "ember" | "predator" | "flan"
 preset = "default"                             # behaviour preset: "default" | "punchy" | "ethereal" | "retro" | "plasma" | "ghost" | "tacutacu" — bundles dynamics + theme + ring_shape into a single feel; individual overrides still work
 cycle_presets = false                           # auto-rotate through all 7 presets on cycle_seconds (like ring_shape=cycle) — hands-free preview
@@ -84,7 +84,7 @@ sustain = 0.82                          # bass flare tail: fraction of heat reta
 blend = true                          # when a bass ring punches hot, bleed warmth into the ring just outside it (true | false)
 tilt = 0.0                                     # per-band boost toward treble (0=off; try 0.5 if outer rings feel dead)
 gate = 0.0                                     # noise gate: clamp band level below this to 0 (0=off; try 0.08-0.12 to silence faint outer-ring glow on quiet passages)
-ceiling = 1.0                                  # limiter: clamp band level above this to ceiling (1.0=off; try 0.2-0.6 for a compressed shimmer lane with density-only animation)
+ceiling = 1.0                                  # limiter: clamp band level above this to ceiling (1.0=off; try 0.2-0.6 for a compressed shimmer lane with bloom-only animation)
 knee = 1.0                                    # response curve: 1.0=linear (default); >1 compresses low end; <1 lifts mids (0.1-3.0)
 cell_aspect = 0.5                              # terminal cell width/height ratio for round circles (0.5=standard; 0.2-2.0)
 

@@ -58,7 +58,7 @@ nova is braille-wall only; ASCII portrait art will be a separate plugin.
 - **7 ring shapes** — square (Chebyshev), diamond (Manhattan), circle (Euclidean),
   squircle (p=4 Minkowski), wings (vertical stripes), layers (horizontal strata),
   compass (four-pointed star). `ring_shape = "cycle"` auto-rotates all 7.
-- **Braille density mutation** — glyphs gain dots toward center as they heat,
+- **Braille bloom mutation** — glyphs gain dots toward center as they heat,
   with a separate attack/release envelope (phosphor persistence). 9 directional
   fill orders so dots always accrete toward center regardless of quadrant.
 - **Density bleed** — overdrive transients thicken adjacent rings +1 and +2
@@ -69,7 +69,7 @@ nova is braille-wall only; ASCII portrait art will be a separate plugin.
   `cycle_presets = true` auto-rotates through all 8 for hands-free review.
 - **Performance controls** — `render_rate` (fraction of frames rendered, 0.25–1.0)
   and `max_cols`/`max_rows` (canvas cap) for large fit=fill fullscreen panes.
-- **Debug footer** — shows preset + theme + density bleed indicator ("BLD") on the
+- **Debug footer** — shows preset + theme + bloom bleed indicator ("BLD") on the
   bottom row when `debug = true`.
 
 ---
@@ -121,7 +121,7 @@ The same band layout is used for the spectrum visualizer feed — the `bands` ta
 passed to `p:render(...)` is normalized FFT energy in those 10 buckets, range
 0.0 to 1.0 each. Bands are already log-magnitude scaled and pre-smoothed by
 cliamp's analysis driver. The plugin does its own additional smoothing pass on
-top for the asymmetric attack/release tube-like feel, and for density's separate
+top for the asymmetric attack/release tube-like feel, and for bloom's separate
 envelope.
 
 ### Audio analysis pipeline (relevant facts)
@@ -157,7 +157,7 @@ local p = plugin.register({
     name        = "nova",
     type        = "visualizer",
     version     = "0.1.0",
-    description = "Braille wall visualizer — EQ-driven glow with presets, themes, and density mutation",
+    description = "Braille wall visualizer — EQ-driven glow with presets, themes, and bloom mutation",
 })
 ```
 
@@ -214,21 +214,21 @@ end
 
 Originally nicknamed "dance" — an ASCII/braille visualizer. Evolved into nova
 after the discovery that a uniform braille wall under concentric ring coloring
-+ density mutation reads as a genuine standalone visualization, not just "a
++ bloom mutation reads as a genuine standalone visualization, not just "a
 picture reacting to EQ."
 
 ### Concrete design goals
 
 1. **Concentric rings, bass at center** — band 1 (32 Hz) drives the innermost ring,
    band 10 (16 kHz) the outermost. The wall is mapped into those rings so color
-   and density radiate from the center outward.
+   and bloom radiate from the center outward.
 2. **Multiple ring shapes** — square (default), diamond, circle, and four more.
    Each is a pure distance metric in a dispatch table, so shape selection is a
    one-line swap with zero downstream changes.
 3. **Color themes from the tubeamp family** — reuse the same ANSI 256 convention
    so the plugin siblings feel consistent. 11-stop glow + 4-stop overdrive ramp
    per theme.
-4. **Braille density mutation** — glyphs don't just recolor; they THICKEN. Dots
+4. **Braille bloom mutation** — glyphs don't just recolor; they THICKEN. Dots
    OR into the base glyph as level rises, ending at solid `⣿` (U+28FF). Dots fill
    TOWARD CENTER (not always bottom-up) so the accretion reinforces the radial
    structure. Separate attack/release envelope (phosphor persistence) so dots pop
@@ -250,10 +250,10 @@ picture reacting to EQ."
 
 - ASCII portrait art — scoped out to a future separate plugin. Nova is braille-wall
   only. Don't re-add portrait-preservation hedging.
-- Positional jitter / art translation — density mutation displaced this. Motion is
+- Positional jitter / art translation — bloom mutation displaced this. Motion is
   shelved.
 - Truecolor / 24-bit color — ANSI 256 only, matching the tubeamp family.
-- Per-frame spatial animation beyond density. The art canvas is fixed; only color
+- Per-frame spatial animation beyond bloom. The art canvas is fixed; only color
   and glyph dots react.
 
 ### Visual model
@@ -275,7 +275,7 @@ ring_blend = false gives hard stepped ring boundaries.
 
 Density: dots fill TOWARD CENTER. Cell left of center fills rightward.
 Cell above center fills upward. Corners fill from the dot nearest center.
-Overdrive density bleed: bass transient thickens +1/+2 rings outward,
+Overdrive bloom bleed: bass transient thickens +1/+2 rings outward,
 reinforcing the radial bulge effect.
 ```
 
@@ -307,7 +307,7 @@ Config defaults:
 - `start = "black"`, `color_mode = "glow"`, `theme = "amber"`, `ring_shape = "square"`
 - `attack = 0.55`, `release = 0.18` (same as tubeamp)
 - `overdrive = 0.78`, `sustain = 0.82`, `blend = true`
-- `density = true`, `density_attack = 0.6`, `density_release = 0.15`
+- `bloom = true`, `bloom_attack = 0.6`, `bloom_release = 0.15`
 - `gate = 0.0`, `ceiling = 1.0`, `knee = 1.0`, `tilt = 0.0`
 - `cell_aspect = 0.5`, `ring_blend = true`, `fit = "contain"`
 - `max_cols = 0`, `max_rows = 0`, `render_rate = 1.0`
@@ -353,7 +353,7 @@ in the hot loop, only in the debug footer).
 Math functions are hoisted to locals: `floor`, `abs`, `sqrt` — saving two hash
 lookups per call in the per-cell hot loop.
 
-### Braille density mutation (lines 264–353)
+### Braille bloom mutation (lines 264–353)
 
 All bit math is plain arithmetic (gopher-lua = Lua 5.1 safe). No `|`, `>>`, `&`.
 
@@ -418,7 +418,7 @@ Two paths:
 1. **Procedural generation** (`generate_wall()`) — fills a fixed 35×188 source
    grid with the `start_cp` base glyph. `start = "black"` → U+2800 (empty braille).
    `start = "stipple"` → U+2821 (faint resting texture). `art_code[y][x] = start_cp`
-   everywhere — uniform, zero decode cost, density mutation has its base ready.
+   everywhere — uniform, zero decode cost, bloom mutation has its base ready.
 
 2. **File loading** (`load_art()`) — reads via `cliamp.fs.read()`, splits into
    lines, pre-extracts `art_cells[y][x]` (UTF-8 glyph strings) and
@@ -440,8 +440,8 @@ smoothed  = {0,0,0,0,0,0,0,0,0,0}  -- asymmetric attack/release envelope
 heat      = {0, 0}                   -- overdrive flare latch-and-decay (bands 1-2)
 bass_base = {0, 0}                   -- slow baseline EMA for transient onset detection
 effective = {0,0,0,0,0,0,0,0,0,0}  -- the final level COLORS read (after all effects)
-dens      = {0,0,0,0,0,0,0,0,0,0}  -- density envelope (chases effective[] with its own attack/release)
-dens_bleed= {0,0,0,0,0,0,0,0,0,0}  -- density bleed boost (latch-and-decay at sustain)
+dens      = {0,0,0,0,0,0,0,0,0,0}  -- bloom envelope (chases effective[] with its own attack/release)
+dens_bleed= {0,0,0,0,0,0,0,0,0,0}  -- bloom bleed boost (latch-and-decay at sustain)
 bleeding  = false                    -- set during effective[] build, read by debug footer
 ```
 
@@ -472,8 +472,8 @@ Each `render()` call:
    d. Density bleed: same `FLARE_PEAK` gate. Separate `dens_bleed[]` array
       decays at `cfg_sustain` (same clock as color bleed). Latches on bass
       transient: +1 ring gets full spill, +2 ring gets `spill * 0.5`. Applied
-      AFTER the density envelope (step 6 below) so bleed is independent of
-      `density_release`.
+      AFTER the bloom envelope (step 6 below) so bleed is independent of
+      `bloom_release`.
    e. Gate: clamp `effective[i] < cfg_gate` → 0 (noise gate).
    f. Knee curve: `effective[i] = effective[i] ^ cfg_knee` (skip already-dead bands).
    g. Ceiling: final hard clamp `effective[i] > cfg_ceiling` → cfg_ceiling (limiter, last in chain).
@@ -481,8 +481,8 @@ Each `render()` call:
 4. **Density envelope**: `dens[i]` chases `effective[i]` with its own attack/release
    (`cfg_dens_attack`, `cfg_dens_release`). Density reads `dens[]`, not `effective[]`.
 
-5. **Apply density bleed boost**: `dens[i] += dens_bleed[i]`. Bleed decays at
-   `sustain`, not `density_release` — the two channels feel like one event.
+5. **Apply bloom bleed boost**: `dens[i] += dens_bleed[i]`. Bleed decays at
+   `sustain`, not `bloom_release` — the two channels feel like one event.
 
 6. **Lazy-load guard** — load art if `art_cells` is nil.
 
@@ -516,7 +516,7 @@ Each `render()` call:
 
 12. **Debug footer** — if `cfg_debug`, paint `[preset + theme + BLD]` centered on
     the last output row using `fg256(244) + bg256(232)`. BLD only shows when
-    density bleed is active.
+    bloom bleed is active.
 
 13. **Cache** — stash `result`, `last_rows`, `last_cols` for frame-skip reuse.
 
@@ -610,22 +610,22 @@ making no physical sense.
 3. Copy `smoothed[]` → `effective[]`
 4. Layer overdrive heat (transient-onset flare latch-and-decay on bass 1-2)
 5. Layer color bleed (spill from peak flare into adjacent ring +1)
-6. Layer density bleed latch + decay (`dens_bleed[]` — separate array, +1/+2 rings,
+6. Layer bloom bleed latch + decay (`dens_bleed[]` — separate array, +1/+2 rings,
    same `sustain` clock)
 7. Apply gate (clamp bands below `cfg_gate` to 0)
 8. Apply knee curve (`effective[i] = effective[i] ^ cfg_knee`)
 9. Apply ceiling (final clamp: bands above `cfg_ceiling` → cfg_ceiling)
-10. Advance density envelope (`dens[]` chases `effective[]` with own attack/release)
-11. Apply density bleed boost (`dens[] += dens_bleed[]` — added AFTER the envelope
-    so bleed decays at `sustain`, not `density_release`)
+10. Advance bloom envelope (`dens[]` chases `effective[]` with own attack/release)
+11. Apply bloom bleed boost (`dens[] += dens_bleed[]` — added AFTER the envelope
+    so bleed decays at `sustain`, not `bloom_release`)
 
-Per-cell: color reads `effective[]` (via ring blend or snap), glyph density reads `dens[]`.
+Per-cell: color reads `effective[]` (via ring blend or snap), glyph bloom reads `dens[]`.
 
 ### Frame-skip
 
 `render_rate` (0.25–1.0) maps to `cfg_frame_skip = round(1/rate) - 1`. The
 counter renders 1 frame, then reuses `last_output` for the next N frames. Audio
-state (smoothing, heat, baseline, density) ALWAYS advances — skipping only
+state (smoothing, heat, baseline, bloom) ALWAYS advances — skipping only
 elides the expensive per-cell render loop. A bass transient (`onset_fired`)
 bypasses the skip so flares are never dropped. Pane resize also invalidates the
 cache (dimensions changed).
@@ -649,14 +649,14 @@ Lives in `~/.config/cliamp/config.toml`:
 start = "black"                   # "black" | "stipple" — procedural wall resting glyph
 # art_path = "/abs/path.txt"     # OPTIONAL file override (stays in your clone)
 color_mode = "glow"              # "glow" | "mono" | "passthrough"
-                                 #   passthrough: raw glyphs, NO color OR density
+                                 #   passthrough: raw glyphs, NO color OR bloom
 ring_shape = "square"            # square | diamond | circle | squircle | wings | layers | compass | cycle
 cycle_seconds = 20               # seconds per shape/preset in cycle modes (min 2)
 fit = "contain"                  # "contain" | "fill"
 ring_blend = true                # smooth gradient between rings
-density = true                   # glyphs thicken toward center
-density_attack = 0.6             # 0–1, how fast dots FILL (high = snappy)
-density_release = 0.15           # 0–1, how fast dots SHED (low = lingering)
+bloom = true                   # glyphs thicken toward center
+bloom_attack = 0.6             # 0–1, how fast dots FILL (high = snappy)
+bloom_release = 0.15           # 0–1, how fast dots SHED (low = lingering)
 theme = "amber"                  # amber | crt | vantablack | whitehot | blackhot | redhot | orangehot | aurora | ember | predator | flan
 preset = "default"               # default | punch | ethereal | retro | plasma | ghost | bloom | tacutacu
 cycle_presets = false            # auto-rotate presets on cycle_seconds
@@ -666,7 +666,7 @@ attack = 0.55                    # smoothing attack (0–1)
 release = 0.18                   # smoothing release (0–1)
 overdrive = 0.78                 # 0–1, band level above which bass flares hot
 sustain = 0.82           # 0–0.97, fraction of heat RETAINED per frame (0=snap, 0.85=long tail)
-blend = true           # when bass punches hot, spill color + density into adjacent rings
+blend = true           # when bass punches hot, spill color + bloom into adjacent rings
 tilt = 0.0                       # 0–? — per-band boost toward treble (0=off; try 0.5)
 gate = 0.0                       # 0–0.5, noise gate: clamp bands below this to 0
 ceiling = 1.0                    # 0.01–1.0, limiter: clamp bands above this (1.0=off)
@@ -697,7 +697,7 @@ overrides survive preset cycling.
 |-------|--------|---------------------|
 | 10ms per `render()` call | `luaplugin/visualizer.go` | Hot loop is O(draw_h × draw_w) with cached table lookups. At normal pane sizes (5×80) this is trivial. At fullscreen fit=fill on a 4K terminal it tightens — use `render_rate` and `max_cols`/`max_rows` to cap cost. |
 | Return-string only | host | Every exit path must return a string. Non-string → silent frame reuse. |
-| gopher-lua = Lua 5.1, no bitops | sandbox | All density math uses arithmetic on powers of two. `luac -p` cannot catch bitops (local Lua accepts them, host rejects silently). |
+| gopher-lua = Lua 5.1, no bitops | sandbox | All bloom math uses arithmetic on powers of two. `luac -p` cannot catch bitops (local Lua accepts them, host rejects silently). |
 | No `os.execute`, no `io.*` | sandbox | Not needed. All state is in-memory. Art reads via `cliamp.fs`. |
 | `cliamp.message()` deadlocks in `render()` | gopher-lua UI mutex | Only call from `init()`. Debug footer uses inline ANSI labels on output rows instead. |
 | Render serialized per plugin | host mutex | State mutation needs no locks. |
@@ -756,13 +756,13 @@ grid — independent of color. Bass should be center, treble at edges, clean rin
    - Set `debug = true` — footer shows preset name + theme + BLD indicator.
    - On loud music, bass overdrive flares and bleeds into adjacent rings.
    - Fullscreen mode (Shift+V): wall scales smoothly, no rendering glitches.
-   - Set `density = false` and confirm glyphs stay fixed (color only).
-   - Set `color_mode = "passthrough"` — raw braille wall, no color or density.
+   - Set `bloom = false` and confirm glyphs stay fixed (color only).
+   - Set `color_mode = "passthrough"` — raw braille wall, no color or bloom.
 
 ### Deterministic stateful-effect testing
 
-For effects with per-frame state (overdrive decay, baseline EMA, density
-envelope, density bleed), the scratchpad probes verify transitions
+For effects with per-frame state (overdrive decay, baseline EMA, bloom
+envelope, bloom bleed), the scratchpad probes verify transitions
 deterministically:
 
 ```sh
@@ -846,7 +846,7 @@ cliamp does NOT hot-reload — re-copy and restart after every change.
    is minimal.
 
 5. **No sub-cell glyph block fill.** Fractional vertical fill (like native bar
-   modes' `▁▂▃▄▅▆▇█`) is not used. Nova uses braille density mutation (OR-ing dots)
+   modes' `▁▂▃▄▅▆▇█`) is not used. Nova uses braille bloom mutation (OR-ing dots)
    which is a different visual language — more "texture thickening" than
    "level meter." Reconsider if users want more precise level reading.
 
@@ -866,7 +866,7 @@ cliamp does NOT hot-reload — re-copy and restart after every change.
 - **Peak hold markers** — a dot floating at the recent band maximum, decaying slowly.
 - **Braille wall art gallery** — ship multiple procedural wall textures
   (uniform, twill, noise, lattice) as named presets or a `wall` config key.
-- **Native overdrive indicator** — currently density bleed is shown via the "BLD"
+- **Native overdrive indicator** — currently bloom bleed is shown via the "BLD"
   debug footer tag. A native indicator (the source ring's glyphs pulsing bold
   during a flare) would provide the same information without chrome.
 - **More themes** — `military` (green phosphor), `nixie` (orange), `cathode`

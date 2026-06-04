@@ -13,7 +13,7 @@ local p = plugin.register({
     name        = "nova",
     type        = "visualizer",
     version     = "0.1.0",
-    description = "Braille wall visualizer — EQ-driven glow with presets, themes, and density mutation",
+    description = "Braille wall visualizer — EQ-driven glow with presets, themes, and bloom mutation",
 })
 
 -- ---------- Configuration (read once at load) --------------------------------
@@ -32,7 +32,7 @@ local cfg_art_path   = clean(p:config("art_path"))
 -- is generated on load (no file needed) -- "black" starts empty (⠀, U+2800) and
 -- blooms dots in from nothing as the music lights each ring; "stipple" starts at
 -- the faint least-dense texture (⠡, U+2821, the old dots_braille look) that
--- thickens toward solid. Same additive toward-center density either way; only the
+-- thickens toward solid. Same additive toward-center bloom either way; only the
 -- resting floor differs. art_path (if set) overrides this with a loaded file.
 local cfg_start = clean(p:config("start")) or "black"
 local START_GLYPH = { black = 0x2800, stipple = 0x2821 }
@@ -62,7 +62,7 @@ do
 end
 
 -- Gate: noise gate threshold — clamp bands below this to exactly 0 before the
--- color and density paths read them. The round-mapping ramp-index fix bumped
+-- color and bloom paths read them. The round-mapping ramp-index fix bumped
 -- low-level signal up one visible stop, making the outer rings glow faintly on
 -- quiet passages. A small gate (~0.08-0.12) restores a clean noise floor without
 -- affecting real musical content. 0 = off (default).
@@ -73,7 +73,7 @@ if cfg_gate > 0.5 then cfg_gate = 0.5 end
 -- Ceiling: limiter threshold — clamp bands ABOVE this to the ceiling value.
 -- Pairs with gate to form a compressor lane: bands between gate and ceiling pass
 -- through untouched; below gate = silence, above ceiling = clamped flat.
--- 1.0 = off (default); try 0.2-0.6 to constrain color while letting density
+-- 1.0 = off (default); try 0.2-0.6 to constrain color while letting bloom
 -- animate in a narrow shimmer band.
 local cfg_ceiling = tonumber(clean(p:config("ceiling"))) or 1.0
 if cfg_ceiling < 0.01 then cfg_ceiling = 0.01 end
@@ -114,7 +114,7 @@ if cfg_max_rows < 0 then cfg_max_rows = 0 end
 -- (~5 FPS). On the un-rendered frames the last output string is REUSED, cutting
 -- AVERAGE render cost by ~(1-rate) regardless of pane size -- and unlike the
 -- canvas cap it keeps fit=fill edge-to-edge (it trades refresh rate, not coverage).
--- Audio state (smoothing/heat/density) still advances every frame so the envelope
+-- Audio state (smoothing/heat/bloom) still advances every frame so the envelope
 -- never freezes; only the expensive cell loop is skipped. A bass-transient ONSET
 -- force-renders even on a skipped frame so kick FLARES are never dropped.
 --
@@ -130,30 +130,30 @@ if cfg_render_rate < 0.25 then cfg_render_rate = 0.25 end
 local cfg_frame_skip = math.floor(1 / cfg_render_rate + 0.5) - 1
 if cfg_frame_skip < 0 then cfg_frame_skip = 0 end
 
--- Density mutation: as a braille cell climbs the level/color ramp, OR in dots so
--- the glyph thickens toward solid (toward full). This makes the braille WALL not
--- just brighten but gain matter on the peaks — a flare thickens the core. Only
--- braille glyphs (U+2800..U+28FF) mutate; anything else is left as-is. Default ON
--- (nova is a braille-wall plugin). Toggle off to keep the art's glyphs fixed.
-local cfg_density = true
+-- Bloom: glyph bloom mutation — as a braille cell heats, OR in dots so the
+-- glyph thickens toward solid (toward full). Like CRT phosphor bloom: the wall
+-- gains matter on peaks. Only braille glyphs (U+2800..U+28FF) mutate; anything
+-- else is left as-is. Default ON (nova is a braille-wall plugin). Toggle off
+-- to keep glyphs fixed.
+local cfg_bloom = true
 do
-    local raw = p:config("density")
+    local raw = p:config("bloom")
     if type(raw) == "boolean" then
-        cfg_density = raw
+        cfg_bloom = raw
     elseif raw ~= nil then
         local v = clean(tostring(raw)):lower():gsub("%s+", "")
-        if v == "false" or v == "off" or v == "0" or v == "no" then cfg_density = false end
+        if v == "false" or v == "off" or v == "0" or v == "no" then cfg_bloom = false end
     end
 end
 
--- Density envelope: dots fill/shed on their OWN attack/release, separate from
+-- Bloom envelope: dots fill/shed on their OWN attack/release, separate from
 -- color smoothing — so the wall can pop dots in fast and melt them away slowly,
--- like CRT phosphor persistence. density_attack = fill speed (high=snappy),
--- density_release = shed speed (low=lingering trail). Both 1.0 = track instantly.
-local cfg_dens_attack  = tonumber(clean(p:config("density_attack")))  or 0.6
-local cfg_dens_release = tonumber(clean(p:config("density_release"))) or 0.15
-if cfg_dens_attack  < 0 then cfg_dens_attack  = 0 elseif cfg_dens_attack  > 1 then cfg_dens_attack  = 1 end
-if cfg_dens_release < 0 then cfg_dens_release = 0 elseif cfg_dens_release > 1 then cfg_dens_release = 1 end
+-- like CRT phosphor persistence. bloom_attack = fill speed (high=snappy),
+-- bloom_release = shed speed (low=lingering trail). Both 1.0 = track instantly.
+local cfg_bloom_attack  = tonumber(clean(p:config("bloom_attack")))  or 0.6
+local cfg_bloom_release = tonumber(clean(p:config("bloom_release"))) or 0.15
+if cfg_bloom_attack  < 0 then cfg_bloom_attack  = 0 elseif cfg_bloom_attack  > 1 then cfg_bloom_attack  = 1 end
+if cfg_bloom_release < 0 then cfg_bloom_release = 0 elseif cfg_bloom_release > 1 then cfg_bloom_release = 1 end
 -- cool over time instead of snapping off, so a kick flashes-and-fades.
 -- sustain = fraction of heat RETAINED per frame: higher = longer tail.
 -- 0 = no retention = instant snap (old behavior); ~0.85 = long glowing tail.
@@ -199,8 +199,8 @@ local user_set_tilt           = (p:config("tilt") ~= nil)
 local user_set_gate         = (p:config("gate") ~= nil)
 local user_set_ceiling      = (p:config("ceiling") ~= nil)
 local user_set_knee           = (p:config("knee") ~= nil)
-local user_set_density_attack  = (p:config("density_attack") ~= nil)
-local user_set_density_release = (p:config("density_release") ~= nil)
+local user_set_bloom_attack  = (p:config("bloom_attack") ~= nil)
+local user_set_bloom_release = (p:config("bloom_release") ~= nil)
 local user_set_sustain = (p:config("sustain") ~= nil)
 local user_set_blend   = (p:config("blend") ~= nil)
 local user_set_ring_blend      = (p:config("ring_blend") ~= nil)
@@ -272,7 +272,7 @@ local function fg256(n) return FG[n] or (ESC .. "[38;5;" .. n .. "m") end
 local function bg256(n) return ESC .. "[48;5;" .. n .. "m" end
 local function reset()  return ESC .. "[0m" end
 
--- ---------- Braille density mutation ----------------------------------------
+-- ---------- Braille bloom mutation ----------------------------------------
 -- A braille glyph is U+2800 + an 8-bit dot mask. "Toward full" = OR additional
 -- dots into the base glyph as level rises, ending at solid ⣿ (U+28FF). Dots are
 -- added in a bottom-up visual order so the cell appears to FILL UP, like a tiny
@@ -465,7 +465,7 @@ local PRESET_PROFILES = {
         theme = "amber",  ring_shape = "circle",
         attack = 0.55,  release = 0.18,
         overdrive = 0.78,  sustain = 0.82,  blend = true,
-        density_attack = 0.6,  density_release = 0.15,
+        bloom_attack = 0.6,  bloom_release = 0.15,
         gate = 0.0,  knee = 1.0,  tilt = 0.0,
         ring_blend = true,
     },
@@ -473,7 +473,7 @@ local PRESET_PROFILES = {
         theme = "crt",  ring_shape = "diamond",
         attack = 1,  release = .25,
         overdrive = 1,  sustain = 0.9,  blend = false,
-        density_attack = 1,  density_release = .85,
+        bloom_attack = 1,  bloom_release = .85,
         gate = 0.2,  knee = 1,  tilt = 0.0,
         ring_blend = true,
     },
@@ -481,7 +481,7 @@ local PRESET_PROFILES = {
         theme = "aurora",  ring_shape = "diamond",
         attack = 0.3,  release = 0.08,
         overdrive = 0.85,  sustain = 0.9,  blend = true,
-        density_attack = 0.4,  density_release = 0.05,
+        bloom_attack = 0.4,  bloom_release = 0.05,
         gate = 0.0,  knee = 0.6,  tilt = 0.4,
         ring_blend = true,
     },
@@ -489,7 +489,7 @@ local PRESET_PROFILES = {
         theme = "ember",  ring_shape = "square",
         attack = 0.6,  release = 0.15,
         overdrive = 0.82,  sustain = 0.78,  blend = false,
-        density_attack = 0.7,  density_release = 0.2,
+        bloom_attack = 0.7,  bloom_release = 0.2,
         gate = 0.12,  knee = 1.4,  tilt = 0.0,
         ring_blend = false,
     },
@@ -497,7 +497,7 @@ local PRESET_PROFILES = {
         theme = "predator",  ring_shape = "circle",
         attack = 0.65,  release = 0.1,
         overdrive = 0.65,  sustain = 0.88,  blend = true,
-        density_attack = 0.85,  density_release = 0.06,
+        bloom_attack = 0.85,  bloom_release = 0.06,
         gate = 0.03,  knee = 0.9,  tilt = 0.2,
         ring_blend = true,
     },
@@ -505,7 +505,7 @@ local PRESET_PROFILES = {
         theme = "vantablack",  ring_shape = "square",
         attack = 0.3,  release = 0.05,
         overdrive = 0.88,  sustain = 0.9,  blend = false,
-        density_attack = 0.05,  density_release = 0.9,
+        bloom_attack = 0.05,  bloom_release = 0.9,
         gate = 0.00,  knee = 2.6,  tilt = 0.5,
         ring_blend = true,
     },
@@ -513,7 +513,7 @@ local PRESET_PROFILES = {
         theme = "flan",  ring_shape = "diamond",
         attack = 0.75,  release = 0.25,
         overdrive = 0.70,  sustain = 0.75,  blend = true,
-        density_attack = 0.8,  density_release = 0.3,
+        bloom_attack = 0.8,  bloom_release = 0.3,
         gate = 0.05,  knee = 1.1,  tilt = 0.0,
         ring_blend = true,
     },
@@ -521,7 +521,7 @@ local PRESET_PROFILES = {
         theme = "whitehot",  ring_shape = "diamond",
         attack = 1,  release = 0.01,
         overdrive = 0.85,  sustain = 0.05,  blend = true,
-        density_attack = 1,  density_release = 0.01,
+        bloom_attack = 1,  bloom_release = 0.01,
         gate = 0.0,  knee = 0.95,  tilt = 0.5,
         ring_blend = true,
     },
@@ -646,7 +646,7 @@ end
 -- the EQ exactly as it would a loaded file. We fill a fixed source grid (35x188,
 -- matching the old dots_braille.txt dims) so fit=contain/fill behave identically
 -- to the file the wall used to ship as. art_code[y][x] = start_cp everywhere
--- (uniform), so density mutation has its base with zero per-cell decode.
+-- (uniform), so bloom mutation has its base with zero per-cell decode.
 local GEN_W, GEN_H = 188, 35
 local function generate_wall()
     art_lines, load_error = nil, nil
@@ -716,7 +716,7 @@ local function load_art()
     -- Pre-extract each row into a flat array of display-cell glyphs so render
     -- can index art cells in O(1) (avoids re-walking UTF-8 every frame).
     -- art_code[y][x] = the braille codepoint (0x2800..0x28FF) if the cell is a
-    -- braille glyph, else nil. Precomputed so density mutation never decodes
+    -- braille glyph, else nil. Precomputed so bloom mutation never decodes
     -- UTF-8 in the hot loop.
     art_cells = {}
     art_code  = {}
@@ -771,15 +771,15 @@ local bass_base = {0, 0}
 -- per frame; the per-cell color path reads this instead of smoothed[] so the
 -- flare is uniform across each concentric ring (correct) and costs nothing per cell.
 local effective = {0,0,0,0,0,0,0,0,0,0}
--- Density envelope per band: chases effective[] with its own attack/release so
+-- Bloom envelope per band: chases effective[] with its own attack/release so
 -- dots fill/shed on a separate timescale from color (phosphor-persistence feel).
--- This is the level density mutation reads (NOT effective[] directly).
-local dens      = {0,0,0,0,0,0,0,0,0,0}
--- Density bleed: per-ring boost from overdrive bleed to adjacent rings.
+-- This is the level bloom mutation reads (NOT effective[] directly).
+local bloom      = {0,0,0,0,0,0,0,0,0,0}
+-- Bloom bleed: per-ring boost from overdrive bleed to adjacent rings.
 -- Latches on a bass transient peak and decays at cfg_sustain, same clock
 -- as the color bleed so the two channels read as one percussive event.
--- Set during the effective[] build phase, applied after the density envelope.
-local dens_bleed = {0,0,0,0,0,0,0,0,0,0}
+-- Set during the effective[] build phase, applied after the bloom envelope.
+local bloom_bleed = {0,0,0,0,0,0,0,0,0,0}
 -- Bleed active this frame (set during effective[] build, read by debug footer).
 local bleeding = false
 
@@ -793,10 +793,10 @@ local last_cols = 0
 local last_shown_preset = nil
 
 function p:init(rows, cols)
-    for i = 1, 10 do smoothed[i] = 0; effective[i] = 0; dens[i] = 0 end
+    for i = 1, 10 do smoothed[i] = 0; effective[i] = 0; bloom[i] = 0 end
     heat[1], heat[2] = 0, 0
     bass_base[1], bass_base[2] = 0, 0
-    for i = 1, 10 do dens_bleed[i] = 0 end
+    for i = 1, 10 do bloom_bleed[i] = 0 end
     bleeding = false
     last_output = nil
     skip_counter = 0
@@ -849,7 +849,7 @@ function p:render(bands, frame, rows, cols)
                         if v < 0.01 then v = 0.01 elseif v > 1.0 then v = 1.0 end
                     elseif key == "knee" then
                         if v < 0.1 then v = 0.1 elseif v > 3.0 then v = 3.0 end
-                    elseif key == "density_attack" or key == "density_release" then
+                    elseif key == "bloom_attack" or key == "bloom_release" then
                         if v < 0 then v = 0 elseif v > 1 then v = 1 end
                     elseif key == "sustain" then
                         if v < 0 then v = 0 elseif v > 0.97 then v = 0.97 end
@@ -863,8 +863,8 @@ function p:render(bands, frame, rows, cols)
                     elseif key == "gate" then cfg_gate = v
                     elseif key == "ceiling" then cfg_ceiling = v
                     elseif key == "knee" then cfg_knee = v
-                    elseif key == "density_attack" then cfg_dens_attack = v
-                    elseif key == "density_release" then cfg_dens_release = v
+                    elseif key == "bloom_attack" then cfg_bloom_attack = v
+                    elseif key == "bloom_release" then cfg_bloom_release = v
                     elseif key == "sustain" then cfg_sustain = v
                     end
                 end
@@ -887,8 +887,8 @@ function p:render(bands, frame, rows, cols)
         apply_num("gate", cfg_gate, user_set_gate)
         apply_num("ceiling", cfg_ceiling, user_set_ceiling)
         apply_num("knee", cfg_knee, user_set_knee)
-        apply_num("density_attack", cfg_dens_attack, user_set_density_attack)
-        apply_num("density_release", cfg_dens_release, user_set_density_release)
+        apply_num("bloom_attack", cfg_bloom_attack, user_set_bloom_attack)
+        apply_num("bloom_release", cfg_bloom_release, user_set_bloom_release)
         apply_num("sustain", cfg_sustain, user_set_sustain)
         apply_bool("blend", user_set_blend)
         apply_bool("ring_blend", user_set_ring_blend)
@@ -991,33 +991,33 @@ function p:render(bands, frame, rows, cols)
                 if v > effective[tgt] then effective[tgt] = v end
             end
         end
-        -- Density bleed: the same overdrive that spills COLOR into adjacent rings
-        -- also THICKENS them — the wall bulges outward from the impact. Density
+        -- Bloom bleed: the same overdrive that spills COLOR into adjacent rings
+        -- also THICKENS them — the wall bulges outward from the impact. Bloom
         -- bleed reaches +1 and +2 rings (vs color's +1 only) because mechanical
         -- deformation travels further than heat. Decays at cfg_sustain so the
-        -- density bump shares the flare's tail, reading as one percussive event.
+        -- bloom bump shares the flare's tail, reading as one percussive event.
         for i = 1, 10 do
-            dens_bleed[i] = dens_bleed[i] * cfg_sustain
+            bloom_bleed[i] = bloom_bleed[i] * cfg_sustain
         end
         for i = 1, 2 do
             if heat[i] >= FLARE_PEAK then
                 local over = (heat[i] - FLARE_PEAK) / (1 - FLARE_PEAK)
                 local spill = 0.45 * over
                 local t1 = i + 1
-                if spill > dens_bleed[t1] then dens_bleed[t1] = spill end
+                if spill > bloom_bleed[t1] then bloom_bleed[t1] = spill end
                 local t2 = i + 2
-                if t2 <= 10 and spill * 0.5 > dens_bleed[t2] then
-                    dens_bleed[t2] = spill * 0.5
+                if t2 <= 10 and spill * 0.5 > bloom_bleed[t2] then
+                    bloom_bleed[t2] = spill * 0.5
                 end
             end
         end
         bleeding = false
         for i = 1, 10 do
-            if dens_bleed[i] > 0.01 then bleeding = true; break end
+            if bloom_bleed[i] > 0.01 then bleeding = true; break end
         end
     else
-        -- When bleed is off, clear any residual density bleed and decay.
-        for i = 1, 10 do dens_bleed[i] = 0 end
+        -- When bleed is off, clear any residual bloom bleed and decay.
+        for i = 1, 10 do bloom_bleed[i] = 0 end
         bleeding = false
     end
 
@@ -1048,26 +1048,26 @@ function p:render(bands, frame, rows, cols)
         end
     end
 
-    -- Density envelope: chase effective[] with its OWN attack/release so dots
+    -- Bloom envelope: chase effective[] with its OWN attack/release so dots
     -- fill fast and shed slow (CRT phosphor persistence) independent of color.
-    -- Only advanced when density is on. dens[] is what the glyph mutation reads.
-    if cfg_density then
+    -- Only advanced when bloom is on. bloom[] is what the glyph mutation reads.
+    if cfg_bloom then
         for i = 1, 10 do
             local target = effective[i]
-            if target > dens[i] then
-                dens[i] = dens[i] + (target - dens[i]) * cfg_dens_attack
+            if target > bloom[i] then
+                bloom[i] = bloom[i] + (target - bloom[i]) * cfg_bloom_attack
             else
-                dens[i] = dens[i] - (dens[i] - target) * cfg_dens_release
+                bloom[i] = bloom[i] - (bloom[i] - target) * cfg_bloom_release
             end
         end
-        -- Add density bleed boost on top of the normal envelope. Bleed decays
+        -- Add bloom bleed boost on top of the normal envelope. Bleed decays
         -- at cfg_sustain (same clock as color) so the two channels feel like
         -- one percussive event hitting the wall.
         for i = 1, 10 do
-            if dens_bleed[i] > 0 then
-                local v = dens[i] + dens_bleed[i]
+            if bloom_bleed[i] > 0 then
+                local v = bloom[i] + bloom_bleed[i]
                 if v > 1 then v = 1 end
-                dens[i] = v
+                bloom[i] = v
             end
         end
     end
@@ -1089,7 +1089,7 @@ function p:render(bands, frame, rows, cols)
     end
     if rows < 1 or cols < 1 then return "" end
 
-    -- Frame-skip gate. All audio state (smoothing/heat/baseline/density) has been
+    -- Frame-skip gate. All audio state (smoothing/heat/baseline/bloom) has been
     -- advanced above, so skipping here only elides the expensive per-cell render
     -- -- the envelope keeps moving underneath. Reuse the cached frame UNLESS:
     --   * frame_skip is 0 (feature off), or
@@ -1175,7 +1175,7 @@ function p:render(bands, frame, rows, cols)
     local nine_over_maxd = 9 / max_d  -- pos = d * this
     local is_pass  = (cfg_color_mode == "passthrough")
     local is_mono  = (cfg_color_mode == "mono")
-    local do_dens  = cfg_density
+    local do_bloom  = cfg_bloom
     local do_blend = cfg_ring_blend
 
     local out = {}
@@ -1191,7 +1191,7 @@ function p:render(bands, frame, rows, cols)
         -- vertical distance is constant across this row -> hoist out of x-loop
         local dy = abs(oy - ocy)
         -- vertical direction toward center (sign of offset): -1 above, +1 below,
-        -- 0 on the center line. Density fills toward center, so pick the row's
+        -- 0 on the center line. Bloom fills toward center, so pick the row's
         -- fill-order sub-table once here; the per-cell dirx selects within it.
         local diry = (oy < ocy) and -1 or ((oy > ocy) and 1 or 0)
         local fill_row = FILL_ORDERS[-1][diry]   -- left-of-center orders (default)
@@ -1221,13 +1221,13 @@ function p:render(bands, frame, rows, cols)
                     local frac = pos - lo
                     local a = effective[lo + 1]; local b = effective[lo + 2]
                     lvl = a + (b - a) * frac
-                    local da = dens[lo + 1]; local db = dens[lo + 2]
+                    local da = bloom[lo + 1]; local db = bloom[lo + 2]
                     dlvl = da + (db - da) * frac
                 else
                     local band = 1 + floor(pos + 0.5)
                     if band < 1 then band = 1 elseif band > 10 then band = 10 end
                     lvl = effective[band]
-                    dlvl = dens[band]
+                    dlvl = bloom[band]
                 end
 
                 local color
@@ -1238,10 +1238,10 @@ function p:render(bands, frame, rows, cols)
                     color = glow_color(lvl, lvl >= cfg_overdrive)
                 end
 
-                -- density: thicken braille glyph (cached lookup). braille cells only.
+                -- bloom: thicken braille glyph (cached lookup). braille cells only.
                 -- Dots fill TOWARD CENTER: pick the fill order by this cell's
                 -- direction from center (dirx selects within the row's diry table).
-                if do_dens and scode then
+                if do_bloom and scode then
                     local base_cp = scode[sx]
                     if base_cp then
                         local fo, dirx
