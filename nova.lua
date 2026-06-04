@@ -452,7 +452,7 @@ local PRESETS = {
     
 }
 
--- ---------- Preset profiles (dynamics + behaviour bundled for one-knob feel) ----
+-- ---------- Preset profiles (dynamics + behavior bundled for one-knob feel) ----
 -- Each profile sets defaults for the dynamics/config keys that shape how the
 -- wall MOVES and FEELS. The user's explicit TOML keys ALWAYS override. Keys not
 -- listed in a profile fall back to their standard defaults (the "default" profile).
@@ -528,7 +528,7 @@ local PRESET_PROFILES = {
 
 }
 
--- Resolve active behaviour preset. preset = "default" | profile name.
+-- Resolve active behavior preset. preset = "default" | profile name.
 -- cycle_presets = true rotates through all profiles on cycle_seconds (same timer
 -- as ring_shape cycle) so you can preview without config edits.
 local cfg_preset_name = clean(p:config("preset")) or "default"
@@ -894,7 +894,7 @@ function p:render(bands, frame, rows, cols)
         apply_bool("ring_blend", user_set_ring_blend)
 
         -- Theme swap: if profile specifies a theme the user didn't set,
-        -- resolve the colour ramp and swap glow_ramp / overdrive_ramp.
+        -- resolve the color ramp and swap glow_ramp / overdrive_ramp.
         if not user_set_theme then
             local t = prof["theme"]
             if t then

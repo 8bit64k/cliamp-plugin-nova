@@ -40,7 +40,7 @@ ceiling knob is correct and useful as-is.
 ## June 2 — DESIGN.md written (#4)
 
 `docs/DESIGN.md`: 943 lines, 15 sections, following tubeamp's gold-standard format.
-Covers full architecture, 11 colour themes, 7 ring shapes, bloom mutation with
+Covers full architecture, 11 color themes, 7 ring shapes, bloom mutation with
 toward-center fill + bloom bleed, 8 preset profiles, effective[] layer pipeline
 order, performance controls, sandbox constraints, testing procedures, and 26-item
 agent handoff checklist. Pushed as `c0b21c4`.
@@ -88,7 +88,7 @@ default, punch, ethereal, retro, plasma, ghost, bloom, tacutacu.
 Individual TOML keys override preset values. Debug flag shows preset name
 as a footer bar + fires `cliamp.message()` in init().
 
-### 8 colour themes
+### 8 color themes
 amber, crt, vantablack, whitehot, blackhot, aurora, ember, predator, flan.
 All 11-stop ANSI 256 glow + 4-stop overdrive.
 
@@ -196,9 +196,9 @@ render_rate = 1.0                # 0.25-1.0
   (went with user_set tracking + profile overlay instead). Bool parsed defensively.
 - **DIST table**: 7 pluggable distance metrics; reused for max_d + per-cell so they
   can't diverge. `ring_shape="cycle"` rotates via `os.time()`.
-- **PRESETS** (colour): `{glow=11, overdrive=4}` per theme. `glow_color` uses ROUND
+- **PRESETS** (color): `{glow=11, overdrive=4}` per theme. `glow_color` uses ROUND
   not floor.
-- **PRESET_PROFILES** (behaviour): bundles dynamics + theme + ring_shape. Profile
+- **PRESET_PROFILES** (behavior): bundles dynamics + theme + ring_shape. Profile
   overlay in render() applies values to cfg_* upvalues each frame, respecting
   user overrides. Theme swap also swaps glow_ramp/overdrive_ramp.
 - **Braille bloom**: `FILL_ORDERS[dirx][diry]` (9 toward-center orders),

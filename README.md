@@ -74,7 +74,7 @@ bloom = true                                  # true = braille glyphs thicken to
 bloom_attack = 0.6                            # how fast dots FILL toward the level (high = snappy; 1.0 = instant)
 bloom_release = 0.15                          # how fast dots SHED when level drops (low = lingering CRT-phosphor trail; 1.0 = instant)
 theme = "amber"                                # "amber" | "crt" | "vantablack" | "aurora" | "ember" | "predator" | "flan"
-preset = "default"                             # behaviour preset: "default" | "punchy" | "ethereal" | "retro" | "plasma" | "ghost" | "tacutacu" — bundles dynamics + theme + ring_shape into a single feel; individual overrides still work
+preset = "default"                             # behavior preset: "default" | "punchy" | "ethereal" | "retro" | "plasma" | "ghost" | "tacutacu" — bundles dynamics + theme + ring_shape into a single feel; individual overrides still work
 cycle_presets = false                           # auto-rotate through all 7 presets on cycle_seconds (like ring_shape=cycle) — hands-free preview
 mono_color = 11                                # ANSI 256 index, used when color_mode = "mono"
 attack = 0.55                                  # smoothing attack (shared defaults with tubeamp)

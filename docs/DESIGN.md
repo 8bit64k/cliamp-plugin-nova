@@ -64,7 +64,7 @@ nova is braille-wall only; ASCII portrait art will be a separate plugin.
 - **Density bleed** — overdrive transients thicken adjacent rings +1 and +2
   (mechanical bulge travels further than color heat), sharing the overdrive
   decay clock so the two channels read as one percussive event.
-- **8 behaviour presets** — default, punch, ethereal, retro, plasma, ghost, bloom,
+- **8 behavior presets** — default, punch, ethereal, retro, plasma, ghost, bloom,
   tacutacu. One-knob feel selection: each bundles dynamics + theme + ring_shape.
   `cycle_presets = true` auto-rotates through all 8 for hands-free review.
 - **Performance controls** — `render_rate` (fraction of frames rendered, 0.25–1.0)
@@ -387,7 +387,7 @@ index 11) is reachable on real musical peaks, not just at exact `level == 1.0`.
 
 ### Preset profiles (lines 445–552)
 
-Eight behaviour profiles in `PRESET_PROFILES`. Each bundles theme, ring_shape,
+Eight behavior profiles in `PRESET_PROFILES`. Each bundles theme, ring_shape,
 and all dynamics knobs into a single named feel:
 
 | Preset    | Theme     | Shape    | Feel |
