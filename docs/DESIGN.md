@@ -306,9 +306,9 @@ which keys to not overwrite.
 Config defaults:
 - `start = "black"`, `color_mode = "glow"`, `theme = "amber"`, `ring_shape = "square"`
 - `attack = 0.55`, `release = 0.18` (same as tubeamp)
-- `overdrive = 0.78`, `overdrive_decay = 0.82`, `overdrive_bleed = true`
+- `overdrive = 0.78`, `sustain = 0.82`, `blend = true`
 - `density = true`, `density_attack = 0.6`, `density_release = 0.15`
-- `gate = 0.0`, `ceiling = 1.0`, `gamma = 1.0`, `tilt = 0.0`
+- `gate = 0.0`, `ceiling = 1.0`, `knee = 1.0`, `tilt = 0.0`
 - `cell_aspect = 0.5`, `ring_blend = true`, `fit = "contain"`
 - `max_cols = 0`, `max_rows = 0`, `render_rate = 1.0`
 
@@ -441,7 +441,7 @@ heat      = {0, 0}                   -- overdrive flare latch-and-decay (bands 1
 bass_base = {0, 0}                   -- slow baseline EMA for transient onset detection
 effective = {0,0,0,0,0,0,0,0,0,0}  -- the final level COLORS read (after all effects)
 dens      = {0,0,0,0,0,0,0,0,0,0}  -- density envelope (chases effective[] with its own attack/release)
-dens_bleed= {0,0,0,0,0,0,0,0,0,0}  -- density bleed boost (latch-and-decay at overdrive_decay)
+dens_bleed= {0,0,0,0,0,0,0,0,0,0}  -- density bleed boost (latch-and-decay at sustain)
 bleeding  = false                    -- set during effective[] build, read by debug footer
 ```
 
@@ -463,26 +463,26 @@ Each `render()` call:
    a. Copy `smoothed[]` → `effective[]`
    b. Overdrive flare: transient-onset detection on bands 1-2. Fire when
       `smoothed[i] >= cfg_overdrive AND smoothed[i] >= bass_base[i] + ONSET_MARGIN(0.18)`.
-      Latch `heat[i]` to the live level; otherwise `heat[i] *= cfg_od_decay`.
+      Latch `heat[i]` to the live level; otherwise `heat[i] *= cfg_sustain`.
       `effective[i] = max(effective[i], heat[i])`.
       Advance `bass_base[i]` AFTER the onset test (spike doesn't raise its own bar).
    c. Color bleed: when `heat[i] >= FLARE_PEAK` (where `FLARE_PEAK = max(0.92,
       cfg_overdrive)` — never below the overdrive floor), spill
       `0.45 * over` into the ring just outside (`effective[i+1]`). Clamped to ≤1.
    d. Density bleed: same `FLARE_PEAK` gate. Separate `dens_bleed[]` array
-      decays at `cfg_od_decay` (same clock as color bleed). Latches on bass
+      decays at `cfg_sustain` (same clock as color bleed). Latches on bass
       transient: +1 ring gets full spill, +2 ring gets `spill * 0.5`. Applied
       AFTER the density envelope (step 6 below) so bleed is independent of
       `density_release`.
    e. Gate: clamp `effective[i] < cfg_gate` → 0 (noise gate).
-   f. Gamma curve: `effective[i] = effective[i] ^ cfg_gamma` (skip already-dead bands).
+   f. Knee curve: `effective[i] = effective[i] ^ cfg_knee` (skip already-dead bands).
    g. Ceiling: final hard clamp `effective[i] > cfg_ceiling` → cfg_ceiling (limiter, last in chain).
 
 4. **Density envelope**: `dens[i]` chases `effective[i]` with its own attack/release
    (`cfg_dens_attack`, `cfg_dens_release`). Density reads `dens[]`, not `effective[]`.
 
 5. **Apply density bleed boost**: `dens[i] += dens_bleed[i]`. Bleed decays at
-   `overdrive_decay`, not `density_release` — the two channels feel like one event.
+   `sustain`, not `density_release` — the two channels feel like one event.
 
 6. **Lazy-load guard** — load art if `art_cells` is nil.
 
@@ -591,8 +591,8 @@ Sustained-loud bass produces no event; only a genuine jump (a kick) does.
 
 ### Overdrive decay tail
 
-On fire: `heat[i] = smoothed[i]` (latch). Else: `heat[i] *= cfg_od_decay`.
-`cfg_od_decay` is the fraction RETAINED per frame: 0 = instant snap, ~0.85 =
+On fire: `heat[i] = smoothed[i]` (latch). Else: `heat[i] *= cfg_sustain`.
+`cfg_sustain` is the fraction RETAINED per frame: 0 = instant snap, ~0.85 =
 long glowing tail. `effective[i] = max(smoothed[i], heat[i])` so the tail
 never dims below the live level.
 
@@ -611,13 +611,13 @@ making no physical sense.
 4. Layer overdrive heat (transient-onset flare latch-and-decay on bass 1-2)
 5. Layer color bleed (spill from peak flare into adjacent ring +1)
 6. Layer density bleed latch + decay (`dens_bleed[]` — separate array, +1/+2 rings,
-   same `overdrive_decay` clock)
+   same `sustain` clock)
 7. Apply gate (clamp bands below `cfg_gate` to 0)
-8. Apply gamma curve (`effective[i] = effective[i] ^ cfg_gamma`)
+8. Apply knee curve (`effective[i] = effective[i] ^ cfg_knee`)
 9. Apply ceiling (final clamp: bands above `cfg_ceiling` → cfg_ceiling)
 10. Advance density envelope (`dens[]` chases `effective[]` with own attack/release)
 11. Apply density bleed boost (`dens[] += dens_bleed[]` — added AFTER the envelope
-    so bleed decays at `overdrive_decay`, not `density_release`)
+    so bleed decays at `sustain`, not `density_release`)
 
 Per-cell: color reads `effective[]` (via ring blend or snap), glyph density reads `dens[]`.
 
@@ -665,12 +665,12 @@ mono_color = 11                  # ANSI 256 index, used in color_mode="mono"
 attack = 0.55                    # smoothing attack (0–1)
 release = 0.18                   # smoothing release (0–1)
 overdrive = 0.78                 # 0–1, band level above which bass flares hot
-overdrive_decay = 0.82           # 0–0.97, fraction of heat RETAINED per frame (0=snap, 0.85=long tail)
-overdrive_bleed = true           # when bass punches hot, spill color + density into adjacent rings
+sustain = 0.82           # 0–0.97, fraction of heat RETAINED per frame (0=snap, 0.85=long tail)
+blend = true           # when bass punches hot, spill color + density into adjacent rings
 tilt = 0.0                       # 0–? — per-band boost toward treble (0=off; try 0.5)
 gate = 0.0                       # 0–0.5, noise gate: clamp bands below this to 0
 ceiling = 1.0                    # 0.01–1.0, limiter: clamp bands above this (1.0=off)
-gamma = 1.0                      # 0.1–3.0, response curve (1.0=linear)
+knee = 1.0                      # 0.1–3.0, response curve (1.0=linear)
 cell_aspect = 0.5                # 0.2–2.0, terminal cell width/height ratio for round circles
 
 # --- performance (0 = off / unlimited) ---

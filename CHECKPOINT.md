@@ -3,10 +3,19 @@
 > Transient rolling work-log. DURABLE design rules live in `AGENTS.md`.
 > Prior history archived in `CHECKPOINT.2026-05-31.md` and earlier.
 
-**Last commit:** `bd36052` — fix: swap pipeline order, gamma before ceiling
+**Last commit:** `pending` — rename: overdrive_decay→sustain, overdrive_bleed→blend, gamma→knee
 **Branch:** master. **Repo:** github.com/8bit64k/cliamp-plugin-nova (PRIVATE)
 **Local dir:** /home/nick/builds/cliamp-plugin-nova/
 **Entry file:** nova.lua (repo root, ~1290 lines). Single Lua file, no require/helpers.
+
+## June 3 — pedalboard rename: sustain, blend, knee
+
+Three renames to align with guitar-pedal knob convention:
+- `overdrive_decay` → `sustain` (compressor/OD sustain knob — how long the signal rings)
+- `overdrive_bleed` → `blend` (dry/wet mix on modern pedals)
+- `gamma` → `knee` (compressor knee — hard/soft curve)
+
+All presets updated, all docs synced. Config key, variable name, comments all renamed.
 
 ## June 3 — dead_zone → gate rename + ceiling limiter knob (fa7d390, bd36052)
 
@@ -16,9 +25,9 @@ hard limiter clamp on the top end. Pairs with gate to form a compressor lane:
 bands between gate and ceiling pass through; below gate = silence, above ceiling
 = clamped flat. No preset sets a ceiling value.
 
-Pipeline order fixed in `bd36052`: gate → gamma → ceiling (limiter last, like
-a real mastering chain). Gamma before ceiling prevents the clamped value from
-leaking past via gamma < 1 lift. Docs updated.
+Pipeline order fixed in `bd36052`: gate → knee → ceiling (limiter last, like
+a real mastering chain). Knee before ceiling prevents the clamped value from
+leaking past via knee < 1 lift. Docs updated.
 
 ### Shimmer lane (vNext discussion)
 
@@ -49,16 +58,16 @@ against bleed neighbors). Keep on branch; do not merge to master yet.
 
 Two new themes: **redhot** (ANSI red ramp: 185→9) and **orangehot** (ANSI orange
 ramp: 223→9). Extends the "hot" family alongside whitehot and blackhot.
-Ghost preset gamma tweaked from 0.99 → 1 (clean integer). No preset profiles
+Ghost preset knee tweaked from 0.99 → 1 (clean integer). No preset profiles
 reference the new themes yet — they're available for manual config only.
 
 ## June 2 — density bleed
 
 Overdrive now thickens glyphs in adjacent rings +1 and +2 (color bleed only
 reaches +1 — density travels further, reinforcing the radial bulge metaphor).
-Latch-and-decay at `overdrive_decay` rate (same clock as color bleed) so the
+Latch-and-decay at `sustain` rate (same clock as color bleed) so the
 two channels read as one percussive event. No new config knob — piggybacks on
-`overdrive_bleed`. Debug footer shows "BLD" when any ring has active density
+`blend`. Debug footer shows "BLD" when any ring has active density
 bleed. Native indicator (overdrive source breathing) planned but not yet built.
 
 ---
@@ -91,10 +100,10 @@ Y-only), compass (four-pointed star). `ring_shape = "cycle"` rotates all 7.
 ### Dynamics knobs (all built and shipped)
 - gate (noise gate, 0-0.5)
 - ceiling (limiter, 0.01-1.0)
-- gamma (response curve, 0.1-3.0)
+- knee (response curve, 0.1-3.0)
 - cell_aspect (terminal cell ratio, 0.2-2.0)
 - density_attack / density_release (dot fill/shed speed)
-- overdrive / overdrive_decay / overdrive_bleed (bass flare)
+- overdrive / sustain / blend (bass flare)
 - tilt (treble boost)
 - attack / release (color smoothing)
 - ring_blend (smooth/hard band boundaries)
@@ -152,12 +161,12 @@ mono_color = 11
 attack = 0.55
 release = 0.18
 overdrive = 0.78
-overdrive_decay = 0.82
-overdrive_bleed = true
+sustain = 0.82
+blend = true
 tilt = 0.0
 gate = 0.0                       # 0-0.5, noise gate: clamp bands below this to 0
 ceiling = 1.0                    # 0.01-1.0, limiter: clamp bands above this (1.0=off)
-gamma = 1.0                      # 0.1-3.0
+knee = 1.0                      # 0.1-3.0
 cell_aspect = 0.5                # 0.2-2.0
 max_cols = 0                     # 0=unlimited
 max_rows = 0
@@ -197,7 +206,7 @@ render_rate = 1.0                # 0.25-1.0
 - **generate_wall()**: procedural 35x188 source grid. `load_art()` for file path.
   Lazy-loaded on first render. Sentinel = `art_cells`.
 - **render()**: profile overlay → smoothing → effective[] (smoothed + flare +
-  bleed + gate + gamma + ceiling) → dens[] envelope → frame-skip gate → canvas cap →
+  bleed + gate + knee + ceiling) → dens[] envelope → frame-skip gate → canvas cap →
   fit → per-cell loop → debug footer. Hot loop optimized.
 
 ## Conventions

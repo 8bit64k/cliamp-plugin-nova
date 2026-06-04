@@ -79,13 +79,13 @@ local cfg_ceiling = tonumber(clean(p:config("ceiling"))) or 1.0
 if cfg_ceiling < 0.01 then cfg_ceiling = 0.01 end
 if cfg_ceiling > 1.0  then cfg_ceiling = 1.0 end
 
--- Gamma: response curve shaping the level->brightness mapping. 1.0 = linear
--- (default, no change). > 1.0 compresses the low end (darker, more contrast
--- toward the top); < 1.0 lifts mid-levels (brighter, more even). Applied to
--- effective[] after the dead zone gate, before density and color.
-local cfg_gamma = tonumber(clean(p:config("gamma"))) or 1.0
-if cfg_gamma < 0.1 then cfg_gamma = 0.1 end
-if cfg_gamma > 3.0 then cfg_gamma = 3.0 end
+-- Knee: response curve shaping the level→brightness mapping. 1.0 = linear
+-- (default, no change). > 1.0 = hard knee (darker, more contrast toward the
+-- top); < 1.0 = soft knee (brighter, more even). Applied after gate, before
+-- ceiling — same as EQ before limiter in a mastering chain.
+local cfg_knee = tonumber(clean(p:config("knee"))) or 1.0
+if cfg_knee < 0.1 then cfg_knee = 0.1 end
+if cfg_knee > 3.0 then cfg_knee = 3.0 end
 
 -- Cell aspect ratio: terminal cells are ~2x tall, so x-distances are scaled
 -- down so circles read round instead of egg-shaped. 0.5 is the standard for
@@ -155,21 +155,21 @@ local cfg_dens_release = tonumber(clean(p:config("density_release"))) or 0.15
 if cfg_dens_attack  < 0 then cfg_dens_attack  = 0 elseif cfg_dens_attack  > 1 then cfg_dens_attack  = 1 end
 if cfg_dens_release < 0 then cfg_dens_release = 0 elseif cfg_dens_release > 1 then cfg_dens_release = 1 end
 -- cool over time instead of snapping off, so a kick flashes-and-fades.
--- overdrive_decay = fraction of heat RETAINED per frame: higher = longer tail.
+-- sustain = fraction of heat RETAINED per frame: higher = longer tail.
 -- 0 = no retention = instant snap (old behavior); ~0.85 = long glowing tail.
-local cfg_od_decay = tonumber(clean(p:config("overdrive_decay"))) or 0.82
-if cfg_od_decay < 0 then cfg_od_decay = 0 elseif cfg_od_decay > 0.97 then cfg_od_decay = 0.97 end
--- Bleed: only when a bass ring punches WHITE-HOT does it warm the ring just
+local cfg_sustain = tonumber(clean(p:config("sustain"))) or 0.82
+if cfg_sustain < 0 then cfg_sustain = 0 elseif cfg_sustain > 0.97 then cfg_sustain = 0.97 end
+-- Blend: only when a bass ring punches WHITE-HOT does it warm the ring just
 -- outside it (band1->band2, band2->band3). Modest flares stay in place; only a
 -- full slam blooms outward. Default on; toggle off for clean rings (e.g. CRT art).
-local cfg_od_bleed = true
+local cfg_blend = true
 do
-    local raw = p:config("overdrive_bleed")
+    local raw = p:config("blend")
     if type(raw) == "boolean" then
-        cfg_od_bleed = raw
+        cfg_blend = raw
     elseif raw ~= nil then
         local v = clean(tostring(raw)):lower():gsub("%s+", "")
-        if v == "false" or v == "off" or v == "0" or v == "no" then cfg_od_bleed = false end
+        if v == "false" or v == "off" or v == "0" or v == "no" then cfg_blend = false end
     end
 end
 
@@ -198,11 +198,11 @@ local user_set_overdrive      = (p:config("overdrive") ~= nil)
 local user_set_tilt           = (p:config("tilt") ~= nil)
 local user_set_gate         = (p:config("gate") ~= nil)
 local user_set_ceiling      = (p:config("ceiling") ~= nil)
-local user_set_gamma          = (p:config("gamma") ~= nil)
+local user_set_knee           = (p:config("knee") ~= nil)
 local user_set_density_attack  = (p:config("density_attack") ~= nil)
 local user_set_density_release = (p:config("density_release") ~= nil)
-local user_set_overdrive_decay = (p:config("overdrive_decay") ~= nil)
-local user_set_overdrive_bleed = (p:config("overdrive_bleed") ~= nil)
+local user_set_sustain = (p:config("sustain") ~= nil)
+local user_set_blend   = (p:config("blend") ~= nil)
 local user_set_ring_blend      = (p:config("ring_blend") ~= nil)
 local user_set_theme         = (p:config("theme") ~= nil)
 local user_set_ring_shape    = (p:config("ring_shape") ~= nil)
@@ -464,65 +464,65 @@ local PRESET_PROFILES = {
     ["default"] = {
         theme = "amber",  ring_shape = "circle",
         attack = 0.55,  release = 0.18,
-        overdrive = 0.78,  overdrive_decay = 0.82,  overdrive_bleed = true,
+        overdrive = 0.78,  sustain = 0.82,  blend = true,
         density_attack = 0.6,  density_release = 0.15,
-        gate = 0.0,  gamma = 1.0,  tilt = 0.0,
+        gate = 0.0,  knee = 1.0,  tilt = 0.0,
         ring_blend = true,
     },
     punch = {
         theme = "crt",  ring_shape = "diamond",
         attack = 1,  release = .25,
-        overdrive = 1,  overdrive_decay = 0.9,  overdrive_bleed = false,
+        overdrive = 1,  sustain = 0.9,  blend = false,
         density_attack = 1,  density_release = .85,
-        gate = 0.2,  gamma = 1,  tilt = 0.0,
+        gate = 0.2,  knee = 1,  tilt = 0.0,
         ring_blend = true,
     },
     ethereal = {
         theme = "aurora",  ring_shape = "diamond",
         attack = 0.3,  release = 0.08,
-        overdrive = 0.85,  overdrive_decay = 0.9,  overdrive_bleed = true,
+        overdrive = 0.85,  sustain = 0.9,  blend = true,
         density_attack = 0.4,  density_release = 0.05,
-        gate = 0.0,  gamma = 0.6,  tilt = 0.4,
+        gate = 0.0,  knee = 0.6,  tilt = 0.4,
         ring_blend = true,
     },
     retro = {
         theme = "ember",  ring_shape = "square",
         attack = 0.6,  release = 0.15,
-        overdrive = 0.82,  overdrive_decay = 0.78,  overdrive_bleed = false,
+        overdrive = 0.82,  sustain = 0.78,  blend = false,
         density_attack = 0.7,  density_release = 0.2,
-        gate = 0.12,  gamma = 1.4,  tilt = 0.0,
+        gate = 0.12,  knee = 1.4,  tilt = 0.0,
         ring_blend = false,
     },
     plasma = {
         theme = "predator",  ring_shape = "circle",
         attack = 0.65,  release = 0.1,
-        overdrive = 0.65,  overdrive_decay = 0.88,  overdrive_bleed = true,
+        overdrive = 0.65,  sustain = 0.88,  blend = true,
         density_attack = 0.85,  density_release = 0.06,
-        gate = 0.03,  gamma = 0.9,  tilt = 0.2,
+        gate = 0.03,  knee = 0.9,  tilt = 0.2,
         ring_blend = true,
     },
     ghost = {
         theme = "vantablack",  ring_shape = "square",
         attack = 0.3,  release = 0.05,
-        overdrive = 0.88,  overdrive_decay = 0.9,  overdrive_bleed = false,
+        overdrive = 0.88,  sustain = 0.9,  blend = false,
         density_attack = 0.05,  density_release = 0.9,
-        gate = 0.00,  gamma = 2.6,  tilt = 0.5,
+        gate = 0.00,  knee = 2.6,  tilt = 0.5,
         ring_blend = true,
     },
     tacutacu = {
         theme = "flan",  ring_shape = "diamond",
         attack = 0.75,  release = 0.25,
-        overdrive = 0.70,  overdrive_decay = 0.75,  overdrive_bleed = true,
+        overdrive = 0.70,  sustain = 0.75,  blend = true,
         density_attack = 0.8,  density_release = 0.3,
-        gate = 0.05,  gamma = 1.1,  tilt = 0.0,
+        gate = 0.05,  knee = 1.1,  tilt = 0.0,
         ring_blend = true,
     },
      bloom = {
         theme = "whitehot",  ring_shape = "diamond",
         attack = 1,  release = 0.01,
-        overdrive = 0.85,  overdrive_decay = 0.05,  overdrive_bleed = true,
+        overdrive = 0.85,  sustain = 0.05,  blend = true,
         density_attack = 1,  density_release = 0.01,
-        gate = 0.0,  gamma = 0.95,  tilt = 0.5,
+        gate = 0.0,  knee = 0.95,  tilt = 0.5,
         ring_blend = true,
     },
 
@@ -776,7 +776,7 @@ local effective = {0,0,0,0,0,0,0,0,0,0}
 -- This is the level density mutation reads (NOT effective[] directly).
 local dens      = {0,0,0,0,0,0,0,0,0,0}
 -- Density bleed: per-ring boost from overdrive bleed to adjacent rings.
--- Latches on a bass transient peak and decays at cfg_od_decay, same clock
+-- Latches on a bass transient peak and decays at cfg_sustain, same clock
 -- as the color bleed so the two channels read as one percussive event.
 -- Set during the effective[] build phase, applied after the density envelope.
 local dens_bleed = {0,0,0,0,0,0,0,0,0,0}
@@ -847,11 +847,11 @@ function p:render(bands, frame, rows, cols)
                         if v < 0 then v = 0 elseif v > 0.5 then v = 0.5 end
                     elseif key == "ceiling" then
                         if v < 0.01 then v = 0.01 elseif v > 1.0 then v = 1.0 end
-                    elseif key == "gamma" then
+                    elseif key == "knee" then
                         if v < 0.1 then v = 0.1 elseif v > 3.0 then v = 3.0 end
                     elseif key == "density_attack" or key == "density_release" then
                         if v < 0 then v = 0 elseif v > 1 then v = 1 end
-                    elseif key == "overdrive_decay" then
+                    elseif key == "sustain" then
                         if v < 0 then v = 0 elseif v > 0.97 then v = 0.97 end
                     end
                     -- Assign to the upvalue (non-local assignment in Lua
@@ -862,10 +862,10 @@ function p:render(bands, frame, rows, cols)
                     elseif key == "tilt" then cfg_tilt = v
                     elseif key == "gate" then cfg_gate = v
                     elseif key == "ceiling" then cfg_ceiling = v
-                    elseif key == "gamma" then cfg_gamma = v
+                    elseif key == "knee" then cfg_knee = v
                     elseif key == "density_attack" then cfg_dens_attack = v
                     elseif key == "density_release" then cfg_dens_release = v
-                    elseif key == "overdrive_decay" then cfg_od_decay = v
+                    elseif key == "sustain" then cfg_sustain = v
                     end
                 end
             end
@@ -874,7 +874,7 @@ function p:render(bands, frame, rows, cols)
             if not user_set then
                 local v = prof[key]
                 if v ~= nil then
-                    if key == "overdrive_bleed" then cfg_od_bleed = v
+                    if key == "blend" then cfg_blend = v
                     elseif key == "ring_blend" then cfg_ring_blend = v
                     end
                 end
@@ -886,11 +886,11 @@ function p:render(bands, frame, rows, cols)
         apply_num("tilt", cfg_tilt, user_set_tilt)
         apply_num("gate", cfg_gate, user_set_gate)
         apply_num("ceiling", cfg_ceiling, user_set_ceiling)
-        apply_num("gamma", cfg_gamma, user_set_gamma)
+        apply_num("knee", cfg_knee, user_set_knee)
         apply_num("density_attack", cfg_dens_attack, user_set_density_attack)
         apply_num("density_release", cfg_dens_release, user_set_density_release)
-        apply_num("overdrive_decay", cfg_od_decay, user_set_overdrive_decay)
-        apply_bool("overdrive_bleed", user_set_overdrive_bleed)
+        apply_num("sustain", cfg_sustain, user_set_sustain)
+        apply_bool("blend", user_set_blend)
         apply_bool("ring_blend", user_set_ring_blend)
 
         -- Theme swap: if profile specifies a theme the user didn't set,
@@ -953,9 +953,9 @@ function p:render(bands, frame, rows, cols)
     -- fires on a kick ONSET — when the live level jumps a margin above its slow
     -- baseline AND clears the overdrive floor — not merely when bass sits high
     -- (which it often does). On a fired onset, heat latches to the live level
-    -- (fast attack); otherwise heat is RETAINED at cfg_od_decay per frame so the
+    -- (fast attack); otherwise heat is RETAINED at cfg_sustain per frame so the
     -- flare flashes then cools. effective = max(smoothed, heat), so the fading
-    -- tail never dims below the live level. cfg_od_decay=0 => no tail => snap.
+    -- tail never dims below the live level. cfg_sustain=0 => no tail => snap.
     local BASE_RATE   = 0.05   -- baseline EMA: slow, so it tracks recent average
     local ONSET_MARGIN = 0.18  -- live must exceed baseline by this to be an onset
     local onset_fired = false  -- a bass transient this frame -> override frame-skip
@@ -966,7 +966,7 @@ function p:render(bands, frame, rows, cols)
         if onset and smoothed[i] > heat[i] then
             heat[i] = smoothed[i]                 -- latch hot on the punch
         else
-            heat[i] = heat[i] * cfg_od_decay      -- retain a fraction; tail cools
+            heat[i] = heat[i] * cfg_sustain      -- retain a fraction; tail cools
             if heat[i] < smoothed[i] then heat[i] = smoothed[i] end
         end
         if heat[i] > effective[i] then effective[i] = heat[i] end
@@ -979,7 +979,7 @@ function p:render(bands, frame, rows, cols)
     -- the overdrive ramp) does it warm the ring just outside it (1->2, 2->3).
     -- A modest flare stays put; only a full slam blooms outward. Scaled by how
     -- far past the peak-flare cutoff we are, so it's proportional, clamped to <= 1.
-    if cfg_od_bleed then
+    if cfg_blend then
         local FLARE_PEAK = cfg_overdrive > 0.92 and cfg_overdrive or 0.92  -- bleed gate: at least overdrive floor, never below
         for i = 1, 2 do
             if heat[i] >= FLARE_PEAK then
@@ -994,10 +994,10 @@ function p:render(bands, frame, rows, cols)
         -- Density bleed: the same overdrive that spills COLOR into adjacent rings
         -- also THICKENS them — the wall bulges outward from the impact. Density
         -- bleed reaches +1 and +2 rings (vs color's +1 only) because mechanical
-        -- deformation travels further than heat. Decays at cfg_od_decay so the
+        -- deformation travels further than heat. Decays at cfg_sustain so the
         -- density bump shares the flare's tail, reading as one percussive event.
         for i = 1, 10 do
-            dens_bleed[i] = dens_bleed[i] * cfg_od_decay
+            dens_bleed[i] = dens_bleed[i] * cfg_sustain
         end
         for i = 1, 2 do
             if heat[i] >= FLARE_PEAK then
@@ -1029,12 +1029,12 @@ function p:render(bands, frame, rows, cols)
         end
     end
 
-    -- Gamma: shape the response curve. Applied after gate so bands that were
-    -- clamped to 0 stay at 0 regardless of gamma.
-    if cfg_gamma ~= 1.0 then
+    -- Knee: shape the response curve. Applied after gate so bands that were
+    -- clamped to 0 stay at 0 regardless of knee.
+    if cfg_knee ~= 1.0 then
         for i = 1, 10 do
             if effective[i] > 0 then
-                effective[i] = effective[i] ^ cfg_gamma
+                effective[i] = effective[i] ^ cfg_knee
             end
         end
     end
@@ -1061,7 +1061,7 @@ function p:render(bands, frame, rows, cols)
             end
         end
         -- Add density bleed boost on top of the normal envelope. Bleed decays
-        -- at cfg_od_decay (same clock as color) so the two channels feel like
+        -- at cfg_sustain (same clock as color) so the two channels feel like
         -- one percussive event hitting the wall.
         for i = 1, 10 do
             if dens_bleed[i] > 0 then
