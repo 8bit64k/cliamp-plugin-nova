@@ -975,6 +975,52 @@ function p:render(bands, frame, rows, cols)
         bass_base[i] = bass_base[i] + (smoothed[i] - bass_base[i]) * BASE_RATE
     end
 
+    -- Bleed: ONLY when a bass ring reaches PEAK FLARE (heat at the very top of
+    -- the overdrive ramp) does it warm the ring just outside it (1->2, 2->3).
+    -- A modest flare stays put; only a full slam blooms outward. Scaled by how
+    -- far past the peak-flare cutoff we are, so it's proportional, clamped to <= 1.
+    if cfg_blend then
+        local FLARE_PEAK = cfg_overdrive > 0.92 and cfg_overdrive or 0.92  -- bleed gate: at least overdrive floor, never below
+        for i = 1, 2 do
+            if heat[i] >= FLARE_PEAK then
+                local over = (heat[i] - FLARE_PEAK) / (1 - FLARE_PEAK)  -- 0..1
+                local spill = 0.45 * over            -- partial warmth, never full
+                local tgt = i + 1                    -- ring just outside
+                local v = effective[tgt] + spill
+                if v > 1 then v = 1 end
+                if v > effective[tgt] then effective[tgt] = v end
+            end
+        end
+        -- Bloom bleed: the same overdrive that spills COLOR into adjacent rings
+        -- also THICKENS them — the wall bulges outward from the impact. Bloom
+        -- bleed reaches +1 and +2 rings (vs color's +1 only) because mechanical
+        -- deformation travels further than heat. Decays at cfg_sustain so the
+        -- bloom bump shares the flare's tail, reading as one percussive event.
+        for i = 1, 10 do
+            bloom_bleed[i] = bloom_bleed[i] * cfg_sustain
+        end
+        for i = 1, 2 do
+            if heat[i] >= FLARE_PEAK then
+                local over = (heat[i] - FLARE_PEAK) / (1 - FLARE_PEAK)
+                local spill = 0.45 * over
+                local t1 = i + 1
+                if spill > bloom_bleed[t1] then bloom_bleed[t1] = spill end
+                local t2 = i + 2
+                if t2 <= 10 and spill * 0.5 > bloom_bleed[t2] then
+                    bloom_bleed[t2] = spill * 0.5
+                end
+            end
+        end
+        bleeding = false
+        for i = 1, 10 do
+            if bloom_bleed[i] > 0.01 then bleeding = true; break end
+        end
+    else
+        -- When bleed is off, clear any residual bloom bleed and decay.
+        for i = 1, 10 do bloom_bleed[i] = 0 end
+        bleeding = false
+    end
+
     -- Gate: clamp bands below cfg_gate to 0. Runs after the full effective[]
     -- layer is built (smoothed + heat + bleed). 0 = off (default).
     if cfg_gate > 0 then
@@ -994,58 +1040,12 @@ function p:render(bands, frame, rows, cols)
     end
 
     -- Ceiling: final hard clamp — nothing escapes past this. Last in the
-    -- gate→knee→ceiling chain, same as a real limiter at mastering output.
+    -- gate→gamma→ceiling chain, same as a real limiter at mastering output.
     -- 1.0 = off (default).
     if cfg_ceiling < 1.0 then
         for i = 1, 10 do
             if effective[i] > cfg_ceiling then effective[i] = cfg_ceiling end
         end
-    end
-
-    -- Bleed: ONLY when a bass ring reaches PEAK FLARE (effective[i] at the very
-    -- top of the overdrive ramp) does it warm the ring just outside it (1->2,
-    -- 2->3). Reads effective[] AFTER the full gate→knee→ceiling chain, so ceiling
-    -- is the true final word — no bleed escapes the limiter.
-    -- A modest flare stays put; only a full slam blooms outward. Scaled by how
-    -- far past the peak-flare cutoff we are, so it's proportional, clamped to ≤1.
-    if cfg_blend then
-        local FLARE_PEAK = cfg_overdrive > 0.92 and cfg_overdrive or 0.92
-        for i = 1, 2 do
-            if effective[i] >= FLARE_PEAK then
-                local over = (effective[i] - FLARE_PEAK) / (1 - FLARE_PEAK)
-                local spill = 0.45 * over
-                local tgt = i + 1
-                local v = effective[tgt] + spill
-                if v > 1 then v = 1 end
-                if v > effective[tgt] then effective[tgt] = v end
-            end
-        end
-        -- Bloom bleed: same overdrive that spills color also thickens adjacent
-        -- rings — the wall bulges outward. Reaches +1 and +2 rings
-        -- (vs color's +1 only). Decays at cfg_sustain so the two channels
-        -- feel like one percussive event.
-        for i = 1, 10 do
-            bloom_bleed[i] = bloom_bleed[i] * cfg_sustain
-        end
-        for i = 1, 2 do
-            if effective[i] >= FLARE_PEAK then
-                local over = (effective[i] - FLARE_PEAK) / (1 - FLARE_PEAK)
-                local spill = 0.45 * over
-                local t1 = i + 1
-                if spill > bloom_bleed[t1] then bloom_bleed[t1] = spill end
-                local t2 = i + 2
-                if t2 <= 10 and spill * 0.5 > bloom_bleed[t2] then
-                    bloom_bleed[t2] = spill * 0.5
-                end
-            end
-        end
-        bleeding = false
-        for i = 1, 10 do
-            if bloom_bleed[i] > 0.01 then bleeding = true; break end
-        end
-    else
-        for i = 1, 10 do bloom_bleed[i] = 0 end
-        bleeding = false
     end
 
     -- Bloom envelope: chase effective[] with its OWN attack/release so dots
