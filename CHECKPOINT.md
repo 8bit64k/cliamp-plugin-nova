@@ -3,10 +3,30 @@
 > Transient rolling work-log. DURABLE design rules live in `AGENTS.md`.
 > Prior history archived in `CHECKPOINT.2026-05-31.md` and earlier.
 
-**Last commit:** `c0b21c4` — docs: write DESIGN.md (943-line gold-standard reference)
+**Last commit:** `bd36052` — fix: swap pipeline order, gamma before ceiling
 **Branch:** master. **Repo:** github.com/8bit64k/cliamp-plugin-nova (PRIVATE)
 **Local dir:** /home/nick/builds/cliamp-plugin-nova/
-**Entry file:** nova.lua (repo root, ~1268 lines). Single Lua file, no require/helpers.
+**Entry file:** nova.lua (repo root, ~1290 lines). Single Lua file, no require/helpers.
+
+## June 3 — dead_zone → gate rename + ceiling limiter knob (fa7d390, bd36052)
+
+`dead_zone` renamed to `gate` across all surfaces (code, checkpoints, README,
+DESIGN.md). All 8 presets updated. New `ceiling` knob (0.01–1.0, default 1.0=off):
+hard limiter clamp on the top end. Pairs with gate to form a compressor lane:
+bands between gate and ceiling pass through; below gate = silence, above ceiling
+= clamped flat. No preset sets a ceiling value.
+
+Pipeline order fixed in `bd36052`: gate → gamma → ceiling (limiter last, like
+a real mastering chain). Gamma before ceiling prevents the clamped value from
+leaking past via gamma < 1 lift. Docs updated.
+
+### Shimmer lane (vNext discussion)
+
+Single-pipe limitation: density chases `effective[]` post-ceiling, so a low
+ceiling (~0.2) constrains density movement to a narrow 20% band. True shimmer
+(density-full, color-compressed) would need a pipeline split — density taps
+pre-ceiling, color taps post-ceiling. Deferred to next planning session; the
+ceiling knob is correct and useful as-is.
 
 ## June 2 — DESIGN.md written (#4)
 
