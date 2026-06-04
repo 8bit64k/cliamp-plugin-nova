@@ -1022,30 +1022,29 @@ function p:render(bands, frame, rows, cols)
     end
 
     -- Gate: clamp bands below cfg_gate to 0. Runs after the full effective[]
-    -- layer is built (smoothed + heat + bleed) but before gamma — one gate,
-    -- kills both color and density at once. 0 = off (default).
+    -- layer is built (smoothed + heat + bleed). 0 = off (default).
     if cfg_gate > 0 then
         for i = 1, 10 do
             if effective[i] < cfg_gate then effective[i] = 0 end
         end
     end
 
-    -- Ceiling: clamp bands ABOVE cfg_ceiling to the ceiling value. Pairs with
-    -- gate to form a compressor lane — the shimmer is whatever lives between
-    -- the two thresholds. 1.0 = off (default).
-    if cfg_ceiling < 1.0 then
-        for i = 1, 10 do
-            if effective[i] > cfg_ceiling then effective[i] = cfg_ceiling end
-        end
-    end
-
-    -- Gamma: shape the response curve. Applied after the dead zone gate so
-    -- bands that were clamped to 0 stay at 0 regardless of gamma.
+    -- Gamma: shape the response curve. Applied after gate so bands that were
+    -- clamped to 0 stay at 0 regardless of gamma.
     if cfg_gamma ~= 1.0 then
         for i = 1, 10 do
             if effective[i] > 0 then
                 effective[i] = effective[i] ^ cfg_gamma
             end
+        end
+    end
+
+    -- Ceiling: final hard clamp — nothing escapes past this. Last in the
+    -- gate→gamma→ceiling chain, same as a real limiter at mastering output.
+    -- 1.0 = off (default).
+    if cfg_ceiling < 1.0 then
+        for i = 1, 10 do
+            if effective[i] > cfg_ceiling then effective[i] = cfg_ceiling end
         end
     end
 

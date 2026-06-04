@@ -177,7 +177,7 @@ render_rate = 1.0                # 0.25-1.0
 - **generate_wall()**: procedural 35x188 source grid. `load_art()` for file path.
   Lazy-loaded on first render. Sentinel = `art_cells`.
 - **render()**: profile overlay → smoothing → effective[] (smoothed + flare +
-  bleed + gate + ceiling + gamma) → dens[] envelope → frame-skip gate → canvas cap →
+  bleed + gate + gamma + ceiling) → dens[] envelope → frame-skip gate → canvas cap →
   fit → per-cell loop → debug footer. Hot loop optimized.
 
 ## Conventions

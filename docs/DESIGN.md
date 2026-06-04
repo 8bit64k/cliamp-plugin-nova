@@ -475,8 +475,8 @@ Each `render()` call:
       AFTER the density envelope (step 6 below) so bleed is independent of
       `density_release`.
    e. Gate: clamp `effective[i] < cfg_gate` → 0 (noise gate).
-   f. Ceiling: clamp `effective[i] > cfg_ceiling` → cfg_ceiling (limiter).
-   g. Gamma curve: `effective[i] = effective[i] ^ cfg_gamma` (skip already-dead bands).
+   f. Gamma curve: `effective[i] = effective[i] ^ cfg_gamma` (skip already-dead bands).
+   g. Ceiling: final hard clamp `effective[i] > cfg_ceiling` → cfg_ceiling (limiter, last in chain).
 
 4. **Density envelope**: `dens[i]` chases `effective[i]` with its own attack/release
    (`cfg_dens_attack`, `cfg_dens_release`). Density reads `dens[]`, not `effective[]`.
@@ -613,8 +613,8 @@ making no physical sense.
 6. Layer density bleed latch + decay (`dens_bleed[]` — separate array, +1/+2 rings,
    same `overdrive_decay` clock)
 7. Apply gate (clamp bands below `cfg_gate` to 0)
-8. Apply ceiling (clamp bands above `cfg_ceiling` to ceiling)
-9. Apply gamma curve (`effective[i] = effective[i] ^ cfg_gamma`)
+8. Apply gamma curve (`effective[i] = effective[i] ^ cfg_gamma`)
+9. Apply ceiling (final clamp: bands above `cfg_ceiling` → cfg_ceiling)
 10. Advance density envelope (`dens[]` chases `effective[]` with own attack/release)
 11. Apply density bleed boost (`dens[] += dens_bleed[]` — added AFTER the envelope
     so bleed decays at `overdrive_decay`, not `density_release`)
