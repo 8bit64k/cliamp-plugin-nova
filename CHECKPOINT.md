@@ -3,10 +3,27 @@
 > Transient rolling work-log. DURABLE design rules live in `AGENTS.md`.
 > Prior history archived in `CHECKPOINT.2026-05-31.md` and earlier.
 
-**Last commit:** `ea17da4` — fix: FLARE_PEAK gates at max(0.92, cfg_overdrive)
+**Last commit:** `c0b21c4` — docs: write DESIGN.md (943-line gold-standard reference)
 **Branch:** master. **Repo:** github.com/8bit64k/cliamp-plugin-nova (PRIVATE)
 **Local dir:** /home/nick/builds/cliamp-plugin-nova/
 **Entry file:** nova.lua (repo root, ~1268 lines). Single Lua file, no require/helpers.
+
+## June 2 — DESIGN.md written (#4)
+
+`docs/DESIGN.md`: 943 lines, 15 sections, following tubeamp's gold-standard format.
+Covers full architecture, 11 colour themes, 7 ring shapes, density mutation with
+toward-center fill + density bleed, 8 preset profiles, effective[] layer pipeline
+order, performance controls, sandbox constraints, testing procedures, and 26-item
+agent handoff checklist. Pushed as `c0b21c4`.
+
+## June 2 — breathe snake experiment (branch, not merged)
+
+Branch `breathe-experiment` (off `c0b21c4`, pushed as `d4011ae`): during overdrive
+bleed, source ring cells (bands 1-2) show a 2-dot snake rotating clockwise around
+the braille cell perimeter — 8 phases, 2.5 rotations/sec at 20fps. Snake replaces
+normal density while active; fires independently of density knob. Works correctly
+in frame-stepping test; needs live visual tuning (spacing between rings, contrast
+against bleed neighbors). Keep on branch; do not merge to master yet.
 
 ## June 2 — color way changes (from laptop)
 
