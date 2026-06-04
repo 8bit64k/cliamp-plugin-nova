@@ -83,7 +83,8 @@ overdrive = 0.78                               # band level above which a bass r
 overdrive_decay = 0.82                          # bass flare tail: fraction of heat retained per frame (0 = instant snap, ~0.85 = long glowing fade)
 overdrive_bleed = true                          # when a bass ring punches hot, bleed warmth into the ring just outside it (true | false)
 tilt = 0.0                                     # per-band boost toward treble (0=off; try 0.5 if outer rings feel dead)
-dead_zone = 0.0                                # noise gate: clamp band level below this to 0 (0=off; try 0.08-0.12 to silence faint outer-ring glow on quiet passages)
+gate = 0.0                                     # noise gate: clamp band level below this to 0 (0=off; try 0.08-0.12 to silence faint outer-ring glow on quiet passages)
+ceiling = 1.0                                  # limiter: clamp band level above this to ceiling (1.0=off; try 0.2-0.6 for a compressed shimmer lane with density-only animation)
 gamma = 1.0                                    # response curve: 1.0=linear (default); >1 compresses low end; <1 lifts mids (0.1-3.0)
 cell_aspect = 0.5                              # terminal cell width/height ratio for round circles (0.5=standard; 0.2-2.0)
 

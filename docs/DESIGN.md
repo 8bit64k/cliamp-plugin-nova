@@ -308,7 +308,7 @@ Config defaults:
 - `attack = 0.55`, `release = 0.18` (same as tubeamp)
 - `overdrive = 0.78`, `overdrive_decay = 0.82`, `overdrive_bleed = true`
 - `density = true`, `density_attack = 0.6`, `density_release = 0.15`
-- `dead_zone = 0.0`, `gamma = 1.0`, `tilt = 0.0`
+- `gate = 0.0`, `ceiling = 1.0`, `gamma = 1.0`, `tilt = 0.0`
 - `cell_aspect = 0.5`, `ring_blend = true`, `fit = "contain"`
 - `max_cols = 0`, `max_rows = 0`, `render_rate = 1.0`
 
@@ -474,8 +474,9 @@ Each `render()` call:
       transient: +1 ring gets full spill, +2 ring gets `spill * 0.5`. Applied
       AFTER the density envelope (step 6 below) so bleed is independent of
       `density_release`.
-   e. Dead zone gate: clamp `effective[i] < cfg_dead_zone` → 0.
-   f. Gamma curve: `effective[i] = effective[i] ^ cfg_gamma` (skip already-dead bands).
+   e. Gate: clamp `effective[i] < cfg_gate` → 0 (noise gate).
+   f. Ceiling: clamp `effective[i] > cfg_ceiling` → cfg_ceiling (limiter).
+   g. Gamma curve: `effective[i] = effective[i] ^ cfg_gamma` (skip already-dead bands).
 
 4. **Density envelope**: `dens[i]` chases `effective[i]` with its own attack/release
    (`cfg_dens_attack`, `cfg_dens_release`). Density reads `dens[]`, not `effective[]`.
@@ -611,10 +612,11 @@ making no physical sense.
 5. Layer color bleed (spill from peak flare into adjacent ring +1)
 6. Layer density bleed latch + decay (`dens_bleed[]` — separate array, +1/+2 rings,
    same `overdrive_decay` clock)
-7. Apply dead_zone gate (clamp bands below `cfg_dead_zone` to 0)
-8. Apply gamma curve (`effective[i] = effective[i] ^ cfg_gamma`)
-9. Advance density envelope (`dens[]` chases `effective[]` with own attack/release)
-10. Apply density bleed boost (`dens[] += dens_bleed[]` — added AFTER the envelope
+7. Apply gate (clamp bands below `cfg_gate` to 0)
+8. Apply ceiling (clamp bands above `cfg_ceiling` to ceiling)
+9. Apply gamma curve (`effective[i] = effective[i] ^ cfg_gamma`)
+10. Advance density envelope (`dens[]` chases `effective[]` with own attack/release)
+11. Apply density bleed boost (`dens[] += dens_bleed[]` — added AFTER the envelope
     so bleed decays at `overdrive_decay`, not `density_release`)
 
 Per-cell: color reads `effective[]` (via ring blend or snap), glyph density reads `dens[]`.
@@ -666,7 +668,8 @@ overdrive = 0.78                 # 0–1, band level above which bass flares hot
 overdrive_decay = 0.82           # 0–0.97, fraction of heat RETAINED per frame (0=snap, 0.85=long tail)
 overdrive_bleed = true           # when bass punches hot, spill color + density into adjacent rings
 tilt = 0.0                       # 0–? — per-band boost toward treble (0=off; try 0.5)
-dead_zone = 0.0                  # 0–0.5, noise gate: clamp bands below this to 0
+gate = 0.0                       # 0–0.5, noise gate: clamp bands below this to 0
+ceiling = 1.0                    # 0.01–1.0, limiter: clamp bands above this (1.0=off)
 gamma = 1.0                      # 0.1–3.0, response curve (1.0=linear)
 cell_aspect = 0.5                # 0.2–2.0, terminal cell width/height ratio for round circles
 

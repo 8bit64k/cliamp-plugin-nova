@@ -69,7 +69,8 @@ Minkowski), wings (vertical stripes, X-only), layers (horizontal strata,
 Y-only), compass (four-pointed star). `ring_shape = "cycle"` rotates all 7.
 
 ### Dynamics knobs (all built and shipped)
-- dead_zone (noise gate, 0-0.5)
+- gate (noise gate, 0-0.5)
+- ceiling (limiter, 0.01-1.0)
 - gamma (response curve, 0.1-3.0)
 - cell_aspect (terminal cell ratio, 0.2-2.0)
 - density_attack / density_release (dot fill/shed speed)
@@ -134,7 +135,8 @@ overdrive = 0.78
 overdrive_decay = 0.82
 overdrive_bleed = true
 tilt = 0.0
-dead_zone = 0.0                  # 0-0.5
+gate = 0.0                       # 0-0.5, noise gate: clamp bands below this to 0
+ceiling = 1.0                    # 0.01-1.0, limiter: clamp bands above this (1.0=off)
 gamma = 1.0                      # 0.1-3.0
 cell_aspect = 0.5                # 0.2-2.0
 max_cols = 0                     # 0=unlimited
@@ -175,7 +177,7 @@ render_rate = 1.0                # 0.25-1.0
 - **generate_wall()**: procedural 35x188 source grid. `load_art()` for file path.
   Lazy-loaded on first render. Sentinel = `art_cells`.
 - **render()**: profile overlay → smoothing → effective[] (smoothed + flare +
-  bleed + dead_zone + gamma) → dens[] envelope → frame-skip gate → canvas cap →
+  bleed + gate + ceiling + gamma) → dens[] envelope → frame-skip gate → canvas cap →
   fit → per-cell loop → debug footer. Hot loop optimized.
 
 ## Conventions

@@ -61,14 +61,23 @@ do
     end
 end
 
--- Dead zone: noise gate — clamp band levels below this threshold to exactly 0
--- before the color and density paths read them. The round-mapping ramp-index fix
--- bumped low-level signal up one visible stop, making the outer rings glow faintly
--- on quiet passages. A small dead zone (~0.08-0.12) restores a clean noise floor
--- without affecting real musical content. 0 = off (default).
-local cfg_dead_zone = tonumber(clean(p:config("dead_zone"))) or 0.0
-if cfg_dead_zone < 0   then cfg_dead_zone = 0.0 end
-if cfg_dead_zone > 0.5 then cfg_dead_zone = 0.5 end
+-- Gate: noise gate threshold — clamp bands below this to exactly 0 before the
+-- color and density paths read them. The round-mapping ramp-index fix bumped
+-- low-level signal up one visible stop, making the outer rings glow faintly on
+-- quiet passages. A small gate (~0.08-0.12) restores a clean noise floor without
+-- affecting real musical content. 0 = off (default).
+local cfg_gate = tonumber(clean(p:config("gate"))) or 0.0
+if cfg_gate < 0   then cfg_gate = 0.0 end
+if cfg_gate > 0.5 then cfg_gate = 0.5 end
+
+-- Ceiling: limiter threshold — clamp bands ABOVE this to the ceiling value.
+-- Pairs with gate to form a compressor lane: bands between gate and ceiling pass
+-- through untouched; below gate = silence, above ceiling = clamped flat.
+-- 1.0 = off (default); try 0.2-0.6 to constrain color while letting density
+-- animate in a narrow shimmer band.
+local cfg_ceiling = tonumber(clean(p:config("ceiling"))) or 1.0
+if cfg_ceiling < 0.01 then cfg_ceiling = 0.01 end
+if cfg_ceiling > 1.0  then cfg_ceiling = 1.0 end
 
 -- Gamma: response curve shaping the level->brightness mapping. 1.0 = linear
 -- (default, no change). > 1.0 compresses the low end (darker, more contrast
@@ -187,7 +196,8 @@ local user_set_attack         = (p:config("attack") ~= nil)
 local user_set_release        = (p:config("release") ~= nil)
 local user_set_overdrive      = (p:config("overdrive") ~= nil)
 local user_set_tilt           = (p:config("tilt") ~= nil)
-local user_set_dead_zone      = (p:config("dead_zone") ~= nil)
+local user_set_gate         = (p:config("gate") ~= nil)
+local user_set_ceiling      = (p:config("ceiling") ~= nil)
 local user_set_gamma          = (p:config("gamma") ~= nil)
 local user_set_density_attack  = (p:config("density_attack") ~= nil)
 local user_set_density_release = (p:config("density_release") ~= nil)
@@ -456,7 +466,7 @@ local PRESET_PROFILES = {
         attack = 0.55,  release = 0.18,
         overdrive = 0.78,  overdrive_decay = 0.82,  overdrive_bleed = true,
         density_attack = 0.6,  density_release = 0.15,
-        dead_zone = 0.0,  gamma = 1.0,  tilt = 0.0,
+        gate = 0.0,  gamma = 1.0,  tilt = 0.0,
         ring_blend = true,
     },
     punch = {
@@ -464,7 +474,7 @@ local PRESET_PROFILES = {
         attack = 1,  release = .25,
         overdrive = 1,  overdrive_decay = 0.9,  overdrive_bleed = false,
         density_attack = 1,  density_release = .85,
-        dead_zone = 0.2,  gamma = 1,  tilt = 0.0,
+        gate = 0.2,  gamma = 1,  tilt = 0.0,
         ring_blend = true,
     },
     ethereal = {
@@ -472,7 +482,7 @@ local PRESET_PROFILES = {
         attack = 0.3,  release = 0.08,
         overdrive = 0.85,  overdrive_decay = 0.9,  overdrive_bleed = true,
         density_attack = 0.4,  density_release = 0.05,
-        dead_zone = 0.0,  gamma = 0.6,  tilt = 0.4,
+        gate = 0.0,  gamma = 0.6,  tilt = 0.4,
         ring_blend = true,
     },
     retro = {
@@ -480,7 +490,7 @@ local PRESET_PROFILES = {
         attack = 0.6,  release = 0.15,
         overdrive = 0.82,  overdrive_decay = 0.78,  overdrive_bleed = false,
         density_attack = 0.7,  density_release = 0.2,
-        dead_zone = 0.12,  gamma = 1.4,  tilt = 0.0,
+        gate = 0.12,  gamma = 1.4,  tilt = 0.0,
         ring_blend = false,
     },
     plasma = {
@@ -488,7 +498,7 @@ local PRESET_PROFILES = {
         attack = 0.65,  release = 0.1,
         overdrive = 0.65,  overdrive_decay = 0.88,  overdrive_bleed = true,
         density_attack = 0.85,  density_release = 0.06,
-        dead_zone = 0.03,  gamma = 0.9,  tilt = 0.2,
+        gate = 0.03,  gamma = 0.9,  tilt = 0.2,
         ring_blend = true,
     },
     ghost = {
@@ -496,7 +506,7 @@ local PRESET_PROFILES = {
         attack = 0.3,  release = 0.05,
         overdrive = 0.88,  overdrive_decay = 0.9,  overdrive_bleed = false,
         density_attack = 0.05,  density_release = 0.9,
-        dead_zone = 0.00,  gamma = 2.6,  tilt = 0.5,
+        gate = 0.00,  gamma = 2.6,  tilt = 0.5,
         ring_blend = true,
     },
     tacutacu = {
@@ -504,7 +514,7 @@ local PRESET_PROFILES = {
         attack = 0.75,  release = 0.25,
         overdrive = 0.70,  overdrive_decay = 0.75,  overdrive_bleed = true,
         density_attack = 0.8,  density_release = 0.3,
-        dead_zone = 0.05,  gamma = 1.1,  tilt = 0.0,
+        gate = 0.05,  gamma = 1.1,  tilt = 0.0,
         ring_blend = true,
     },
      bloom = {
@@ -512,7 +522,7 @@ local PRESET_PROFILES = {
         attack = 1,  release = 0.01,
         overdrive = 0.85,  overdrive_decay = 0.05,  overdrive_bleed = true,
         density_attack = 1,  density_release = 0.01,
-        dead_zone = 0.0,  gamma = 0.95,  tilt = 0.5,
+        gate = 0.0,  gamma = 0.95,  tilt = 0.5,
         ring_blend = true,
     },
 
@@ -833,8 +843,10 @@ function p:render(bands, frame, rows, cols)
                 local v = prof[key]
                 if v ~= nil then
                     -- Re-apply clamping (same ranges as the config reads)
-                    if key == "dead_zone" then
+                    if key == "gate" then
                         if v < 0 then v = 0 elseif v > 0.5 then v = 0.5 end
+                    elseif key == "ceiling" then
+                        if v < 0.01 then v = 0.01 elseif v > 1.0 then v = 1.0 end
                     elseif key == "gamma" then
                         if v < 0.1 then v = 0.1 elseif v > 3.0 then v = 3.0 end
                     elseif key == "density_attack" or key == "density_release" then
@@ -848,7 +860,8 @@ function p:render(bands, frame, rows, cols)
                     elseif key == "release" then cfg_release = v
                     elseif key == "overdrive" then cfg_overdrive = v
                     elseif key == "tilt" then cfg_tilt = v
-                    elseif key == "dead_zone" then cfg_dead_zone = v
+                    elseif key == "gate" then cfg_gate = v
+                    elseif key == "ceiling" then cfg_ceiling = v
                     elseif key == "gamma" then cfg_gamma = v
                     elseif key == "density_attack" then cfg_dens_attack = v
                     elseif key == "density_release" then cfg_dens_release = v
@@ -871,7 +884,8 @@ function p:render(bands, frame, rows, cols)
         apply_num("release", cfg_release, user_set_release)
         apply_num("overdrive", cfg_overdrive, user_set_overdrive)
         apply_num("tilt", cfg_tilt, user_set_tilt)
-        apply_num("dead_zone", cfg_dead_zone, user_set_dead_zone)
+        apply_num("gate", cfg_gate, user_set_gate)
+        apply_num("ceiling", cfg_ceiling, user_set_ceiling)
         apply_num("gamma", cfg_gamma, user_set_gamma)
         apply_num("density_attack", cfg_dens_attack, user_set_density_attack)
         apply_num("density_release", cfg_dens_release, user_set_density_release)
@@ -1007,13 +1021,21 @@ function p:render(bands, frame, rows, cols)
         bleeding = false
     end
 
-    -- Dead zone gate: clamp any band level below cfg_dead_zone to 0.
-    -- This runs after the full effective[] layer is built (smoothed + heat + bleed)
-    -- but before the per-cell color loop and the density envelope — one gate,
+    -- Gate: clamp bands below cfg_gate to 0. Runs after the full effective[]
+    -- layer is built (smoothed + heat + bleed) but before gamma — one gate,
     -- kills both color and density at once. 0 = off (default).
-    if cfg_dead_zone > 0 then
+    if cfg_gate > 0 then
         for i = 1, 10 do
-            if effective[i] < cfg_dead_zone then effective[i] = 0 end
+            if effective[i] < cfg_gate then effective[i] = 0 end
+        end
+    end
+
+    -- Ceiling: clamp bands ABOVE cfg_ceiling to the ceiling value. Pairs with
+    -- gate to form a compressor lane — the shimmer is whatever lives between
+    -- the two thresholds. 1.0 = off (default).
+    if cfg_ceiling < 1.0 then
+        for i = 1, 10 do
+            if effective[i] > cfg_ceiling then effective[i] = cfg_ceiling end
         end
     end
 
