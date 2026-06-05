@@ -979,51 +979,32 @@ function p:render(bands, frame, rows, cols)
         bass_base[i] = bass_base[i] + (smoothed[i] - bass_base[i]) * BASE_RATE
     end
 
-    -- Gate: clamp bands below cfg_gate to 0.
-    if cfg_gate > 0 then
-        for i = 1, 10 do
-            if effective[i] < cfg_gate then effective[i] = 0 end
-        end
-    end
-
-    -- Knee: shape the response curve.
-    if cfg_knee ~= 1.0 then
-        for i = 1, 10 do
-            if effective[i] > 0 then
-                effective[i] = effective[i] ^ cfg_knee
-            end
-        end
-    end
-
-    -- Ceiling: final hard clamp. Last in the gate→knee→ceiling chain.
-    if cfg_ceiling < 1.0 then
-        for i = 1, 10 do
-            if effective[i] > cfg_ceiling then effective[i] = cfg_ceiling end
-        end
-    end
-
-    -- Bleed: reads effective[] AFTER the full gate→knee→ceiling chain, so
-    -- ceiling is the true final word — no bleed escapes the limiter. Uses
-    -- heat[i] for transient detection (not effective[i], which carries
-    -- sustained signal) with effective[i] as a safety gate.
+    -- Bleed: ONLY when a bass ring reaches PEAK FLARE (heat at the very top of
+    -- the overdrive ramp) does it warm the ring just outside it (1->2, 2->3).
+    -- A modest flare stays put; only a full slam blooms outward. Scaled by how
+    -- far past the peak-flare cutoff we are, so it's proportional, clamped to <= 1.
     if cfg_blend then
-        local FLARE_PEAK = cfg_overdrive > 0.92 and cfg_overdrive or 0.92
+        local FLARE_PEAK = cfg_overdrive > 0.92 and cfg_overdrive or 0.92  -- bleed gate: at least overdrive floor, never below
         for i = 1, 2 do
-            if heat[i] >= FLARE_PEAK and effective[i] >= FLARE_PEAK then
-                local over = (heat[i] - FLARE_PEAK) / (1 - FLARE_PEAK)
-                local spill = 0.45 * over
-                local tgt = i + 1
+            if heat[i] >= FLARE_PEAK then
+                local over = (heat[i] - FLARE_PEAK) / (1 - FLARE_PEAK)  -- 0..1
+                local spill = 0.45 * over            -- partial warmth, never full
+                local tgt = i + 1                    -- ring just outside
                 local v = effective[tgt] + spill
                 if v > 1 then v = 1 end
                 if v > effective[tgt] then effective[tgt] = v end
             end
         end
-        -- Bloom bleed: +1 and +2 rings. Decays at cfg_sustain.
+        -- Bloom bleed: the same overdrive that spills COLOR into adjacent rings
+        -- also THICKENS them — the wall bulges outward from the impact. Bloom
+        -- bleed reaches +1 and +2 rings (vs color's +1 only) because mechanical
+        -- deformation travels further than heat. Decays at cfg_sustain so the
+        -- bloom bump shares the flare's tail, reading as one percussive event.
         for i = 1, 10 do
             bloom_bleed[i] = bloom_bleed[i] * cfg_sustain
         end
         for i = 1, 2 do
-            if heat[i] >= FLARE_PEAK and effective[i] >= FLARE_PEAK then
+            if heat[i] >= FLARE_PEAK then
                 local over = (heat[i] - FLARE_PEAK) / (1 - FLARE_PEAK)
                 local spill = 0.45 * over
                 local t1 = i + 1
@@ -1039,8 +1020,36 @@ function p:render(bands, frame, rows, cols)
             if bloom_bleed[i] > 0.01 then bleeding = true; break end
         end
     else
+        -- When bleed is off, clear any residual bloom bleed and decay.
         for i = 1, 10 do bloom_bleed[i] = 0 end
         bleeding = false
+    end
+
+    -- Gate: clamp bands below cfg_gate to 0. Runs after the full effective[]
+    -- layer is built (smoothed + heat + bleed). 0 = off (default).
+    if cfg_gate > 0 then
+        for i = 1, 10 do
+            if effective[i] < cfg_gate then effective[i] = 0 end
+        end
+    end
+
+    -- Knee: shape the response curve. Applied after gate so bands that were
+    -- clamped to 0 stay at 0 regardless of knee.
+    if cfg_knee ~= 1.0 then
+        for i = 1, 10 do
+            if effective[i] > 0 then
+                effective[i] = effective[i] ^ cfg_knee
+            end
+        end
+    end
+
+    -- Ceiling: final hard clamp — nothing escapes past this. Last in the
+    -- gate→gamma→ceiling chain, same as a real limiter at mastering output.
+    -- 1.0 = off (default).
+    if cfg_ceiling < 1.0 then
+        for i = 1, 10 do
+            if effective[i] > cfg_ceiling then effective[i] = cfg_ceiling end
+        end
     end
 
     -- Bloom envelope: chase effective[] with its OWN attack/release so dots
