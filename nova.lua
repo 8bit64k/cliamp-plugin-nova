@@ -298,24 +298,28 @@ local function reset()  return ESC .. "[0m" end
 -- BOTTOM up; corners fill from the dot nearest the center. We pick a fill order
 -- per cell by the SIGN of its offset from center (dirx, diry in {-1,0,1}).
 --
--- The 9 orders below were derived by sorting the 8 dots so the ones on the
--- center-facing side fill first, then VISUALLY verified (scratchpad/viz_fill.lua:
--- every spatial position marches its dots toward center). Keyed
+-- The 9 orders below fill toward center. They are paired so that vertically-
+-- mirrored cells (diry=-1 vs +1) and horizontally-mirrored cells (dirx=-1 vs +1)
+-- are exact dot-mirrors of each other at every fill count. The three CENTER-AXIS
+-- orders (any dirx or diry == 0) list dots in mirror-PAIRS (or quads for dead
+-- center) so that, combined with the even/quad add-snap in thicken(), a cell
+-- sitting ON the center row/column fills symmetrically about that axis -- a
+-- single-dot step can never land off-axis and break the mirror. Keyed
 -- FILL_ORDERS[dirx][diry] with dirx,diry in {-1,0,1}.
 local FILL_ORDERS = {
     [-1] = {  -- cell LEFT of center (center is to the right)
         [-1] = {128,32,64,16,4,8,2,1},   -- up-left:  toward down-right corner
-        [ 0] = {8,16,32,128,1,2,4,64},   -- left:     toward right column
+        [ 0] = {16,32,8,128,2,4,1,64},   -- left:     V-pairs, lean right (col1 first)
         [ 1] = {8,16,1,32,2,128,4,64},   -- dn-left:  toward up-right corner
     },
     [ 0] = {  -- cell on the vertical center line
-        [-1] = {64,128,4,32,2,16,1,8},   -- up:       toward bottom (center below)
-        [ 0] = {1,2,8,4,16,64,32,128},   -- on-center: balanced
-        [ 1] = {1,8,2,16,4,32,64,128},   -- down:     toward top (center above)
+        [-1] = {64,128,4,32,2,16,1,8},   -- up:       H-pairs, lean down (rows 3,2 first)
+        [ 0] = {2,4,16,32,1,64,8,128},   -- on-center: quads (inner then outer)
+        [ 1] = {1,8,2,16,4,32,64,128},   -- down:     H-pairs, lean up (rows 0,1 first)
     },
     [ 1] = {  -- cell RIGHT of center (center is to the left)
         [-1] = {64,4,128,2,32,1,16,8},   -- up-right: toward down-left corner
-        [ 0] = {1,2,4,64,8,16,32,128},   -- right:    toward left column
+        [ 0] = {2,4,1,64,16,32,8,128},   -- right:    V-pairs, lean left (col0 first)
         [ 1] = {1,2,8,4,16,64,32,128},   -- dn-right: toward up-left corner
     },
 }
@@ -341,14 +345,23 @@ local function set_bit(mask, bit)
 end
 
 -- thicken(base_cp, level, fill_order, dkey) -> thickened glyph string, MEMOIZED.
--- The result depends on (dkey, base_cp, add) where add = round(level*8) in 0..8
--- and dkey identifies the toward-center fill order (0..8) -- at most 9 dirs x 256
--- base glyphs x 9 buckets. After warmup this is a couple table lookups, no bit
--- loop and no allocation in the hot path. thicken_cache[dkey][base_cp][add].
+-- add = round(level*8) in 0..8. For CENTER-AXIS cells the add is snapped down so
+-- mirror-pairs (or quads at dead center) are always completed: a cell ON the
+-- center row/column would otherwise add a single off-axis dot at odd fill counts
+-- and visibly break the wall's mirror symmetry. dkey = (dirx+1)*3 + (diry+1), so
+-- we recover dirx/diry to decide the snap: dkey 4 = dead center (quads, mult-of-4),
+-- dkey in {1,3,5,7} = one axis is centered (pairs, even). Off-axis cells unchanged.
+-- thicken_cache[dkey][base_cp][add].
 local thicken_cache = {}
 local function thicken(base_cp, level, fill_order, dkey)
     local add = floor(level * 8 + 0.5)
     if add < 0 then add = 0 elseif add > 8 then add = 8 end
+    -- center-axis add-snap (keeps mirror pairs/quads whole)
+    if dkey == 4 then          -- dead center (dirx==0 and diry==0): quads
+        add = add - (add % 4)
+    elseif dkey % 2 == 1 then  -- one axis centered (dkey 1,3,5,7): pairs
+        add = add - (add % 2)
+    end
     local dcache = thicken_cache[dkey]
     if not dcache then dcache = {}; thicken_cache[dkey] = dcache end
     local row = dcache[base_cp]
