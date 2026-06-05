@@ -1,13 +1,14 @@
--- nova.lua — cliamp visualizer: braille wall that glows to the EQ feed.
+-- nova.lua — cliamp visualizer: a braille wall that glows AND thickens to the EQ.
 --
--- v0.1 "square rings": the art is mapped into 10 concentric SQUARE rings
--- (Chebyshev distance from center). The innermost ring is driven by the lowest
--- EQ band (32 Hz bass), each ring outward by the next band, the outermost by
--- the highest band (16 kHz treble). Each cell is recolored by its ring's
--- smoothed band level using the shared tubeamp glow ramp. The art's original
--- glyphs are preserved (they carry the image density) — only color reacts.
+-- The pane is mapped into 10 concentric rings by a selectable distance metric
+-- (square/diamond/circle/squircle/wings/layers/compass). The innermost ring is
+-- driven by the lowest EQ band (32 Hz bass), each ring outward by the next band,
+-- the outermost by the highest (16 kHz treble). Each cell recolors by its ring's
+-- smoothed level on a themed ANSI-256 ramp, AND its braille glyph blooms (gains
+-- dots toward center) as the ring heats — so the wall gains matter on peaks, not
+-- just brightness. Audio drives color and glyph density; it never moves the art.
 --
--- No motion/jitter in v0.1 (deferred). See BRAINSTORM.md + README.md.
+-- See AGENTS.md for durable design principles, CHECKPOINT.md for session state.
 
 local p = plugin.register({
     name        = "nova",
@@ -44,8 +45,11 @@ local start_cp = START_GLYPH[cfg_start] or START_GLYPH["stipple"]
 local cfg_color_mode = clean(p:config("color_mode")) or "glow"
 local cfg_mono_color = tonumber(clean(p:config("mono_color"))) or 11
 local cfg_attack     = tonumber(clean(p:config("attack"))) or 0.55
+if cfg_attack  < 0 then cfg_attack  = 0 elseif cfg_attack  > 1 then cfg_attack  = 1 end
 local cfg_release    = tonumber(clean(p:config("release"))) or 0.18
+if cfg_release < 0 then cfg_release = 0 elseif cfg_release > 1 then cfg_release = 1 end
 local cfg_overdrive  = tonumber(clean(p:config("overdrive"))) or 0.78
+if cfg_overdrive < 0 then cfg_overdrive = 0 elseif cfg_overdrive > 1 then cfg_overdrive = 1 end
 local cfg_tilt       = tonumber(clean(p:config("tilt"))) or 0.0
 local cfg_theme_name = clean(p:config("theme")) or "amber"
 local cfg_ring_shape = clean(p:config("ring_shape")) or "square"
@@ -200,16 +204,16 @@ local user_set_attack         = (p:config("attack") ~= nil)
 local user_set_release        = (p:config("release") ~= nil)
 local user_set_overdrive      = (p:config("overdrive") ~= nil)
 local user_set_tilt           = (p:config("tilt") ~= nil)
-local user_set_gate         = (p:config("gate") ~= nil)
-local user_set_ceiling      = (p:config("ceiling") ~= nil)
+local user_set_gate           = (p:config("gate") ~= nil)
+local user_set_ceiling        = (p:config("ceiling") ~= nil)
 local user_set_knee           = (p:config("knee") ~= nil)
-local user_set_bloom_attack  = (p:config("bloom_attack") ~= nil)
-local user_set_bloom_release = (p:config("bloom_release") ~= nil)
-local user_set_sustain = (p:config("sustain") ~= nil)
-local user_set_blend   = (p:config("blend") ~= nil)
-local user_set_ring_blend      = (p:config("ring_blend") ~= nil)
-local user_set_theme         = (p:config("theme") ~= nil)
-local user_set_ring_shape    = (p:config("ring_shape") ~= nil)
+local user_set_bloom_attack   = (p:config("bloom_attack") ~= nil)
+local user_set_bloom_release  = (p:config("bloom_release") ~= nil)
+local user_set_sustain        = (p:config("sustain") ~= nil)
+local user_set_blend          = (p:config("blend") ~= nil)
+local user_set_ring_blend     = (p:config("ring_blend") ~= nil)
+local user_set_theme          = (p:config("theme") ~= nil)
+local user_set_ring_shape     = (p:config("ring_shape") ~= nil)
 
 -- ---------- Ring distance metric --------------------------------------------
 -- Rings are level sets of a distance-from-center metric on the OUTPUT grid.
@@ -473,8 +477,8 @@ local PRESETS = {
 -- Each profile sets defaults for the dynamics/config keys that shape how the
 -- wall MOVES and FEELS. The user's explicit TOML keys ALWAYS override. Keys not
 -- listed in a profile fall back to their standard defaults (the "default" profile).
--- preset = "default" | "punchy" | "ethereal" | "retro" | "plasma"
--- cycle_presets = true to auto-rotate through all five on the cycle_seconds timer.
+-- preset = default | punch | ethereal | retro | plasma | ghost | whiteout | tacutacu
+-- cycle_presets = true to auto-rotate through all of them on the cycle_seconds timer.
 local PRESET_PROFILES = {
     -- Presets bundle dynamics + theme + ring_shape into a single feel.
     -- Keys not listed fall back to the "default" profile values.
@@ -534,7 +538,7 @@ local PRESET_PROFILES = {
         gate = 0.05,  knee = 1.1,  tilt = 0.0,
         ring_blend = true,
     },
-     bloom = {
+     whiteout = {
         theme = "whitehot",  ring_shape = "diamond",
         attack = 1,  release = 0.01,
         overdrive = 0.85,  sustain = 0.05,  blend = true,
@@ -562,7 +566,7 @@ do
     end
 end
 
-local CYCLE_PRESET_NAMES = { "default", "punch", "ethereal", "retro", "plasma", "ghost", "bloom", "tacutacu" }
+local CYCLE_PRESET_NAMES = { "default", "punch", "ethereal", "retro", "plasma", "ghost", "whiteout", "tacutacu" }
 
 -- Resolve the active profile for THIS frame. In fixed mode this is constant;
 -- in cycle mode it advances with wall-clock time (same cycle_t0 as ring_shape).
@@ -599,7 +603,9 @@ local function glow_color(level, hot)
 end
 
 -- ---------- Art loading + ring precompute ------------------------------------
--- Loaded once. art_lines = {string,...}; ring_of[y][x] = band index 1..10.
+-- Loaded once. art_cells[y][x] = display-cell glyph; art_code[y][x] = braille
+-- codepoint (or nil for non-braille). Ring band index is computed per-cell in
+-- the render loop from the distance metric, not precomputed.
 
 local art_lines   = nil
 local art_cells   = nil    -- [y][x] -> single display-cell glyph string
@@ -617,28 +623,6 @@ local function visible_cols(s)
         if b < 0x80 or b >= 0xC0 then n = n + 1 end
     end
     return n
-end
-
--- Index the i-th display column's byte range in a (possibly UTF-8) string.
--- Returns the substring for display column `col` (1-based), or " " past the end.
-local function char_at(s, col)
-    local seen = 0
-    local i = 1
-    local n = #s
-    while i <= n do
-        local b = s:byte(i)
-        -- width of this UTF-8 sequence in bytes
-        local len = 1
-        if b >= 0xF0 then len = 4
-        elseif b >= 0xE0 then len = 3
-        elseif b >= 0xC0 then len = 2 end
-        seen = seen + 1
-        if seen == col then
-            return s:sub(i, i + len - 1)
-        end
-        i = i + len
-    end
-    return " "
 end
 
 -- Expand a leading ~ or $HOME / ${HOME} to the absolute home dir. cliamp's
@@ -784,9 +768,9 @@ local heat      = {0, 0}
 -- only genuine punches stand out.
 local bass_base = {0, 0}
 -- effective[] = the level the COLOR uses per band each frame: smoothed plus any
--- overdrive heat (bands 1-2) and white-hot bleed (into bands 2-3). Built once
--- per frame; the per-cell color path reads this instead of smoothed[] so the
--- flare is uniform across each concentric ring (correct) and costs nothing per cell.
+-- overdrive heat (bands 1-2) and peak-flare bleed (into the adjacent ring +1).
+-- Built once per frame; the per-cell color path reads this instead of smoothed[]
+-- so the flare is uniform across each concentric ring (correct) and costs nothing per cell.
 local effective = {0,0,0,0,0,0,0,0,0,0}
 -- Bloom envelope per band: chases effective[] with its own attack/release so
 -- dots fill/shed on a separate timescale from color (phosphor-persistence feel).
@@ -855,19 +839,21 @@ function p:render(bands, frame, rows, cols)
     -- Called every frame (not just on preset change) — cost is negligible.
     do
         local prof, _ = active_profile()
-        local function apply_num(key, var, user_set)
+        local function apply_num(key, user_set)
             if not user_set then
                 local v = prof[key]
                 if v ~= nil then
-                    -- Re-apply clamping (same ranges as the config reads)
-                    if key == "gate" then
+                    -- Re-apply clamping (same ranges as the config reads) so a
+                    -- preset value is bounded exactly like a user-supplied one.
+                    if key == "attack" or key == "release" or key == "overdrive"
+                       or key == "bloom_attack" or key == "bloom_release" then
+                        if v < 0 then v = 0 elseif v > 1 then v = 1 end
+                    elseif key == "gate" then
                         if v < 0 then v = 0 elseif v > 0.5 then v = 0.5 end
                     elseif key == "ceiling" then
                         if v < 0.01 then v = 0.01 elseif v > 1.0 then v = 1.0 end
                     elseif key == "knee" then
                         if v < 0.1 then v = 0.1 elseif v > 3.0 then v = 3.0 end
-                    elseif key == "bloom_attack" or key == "bloom_release" then
-                        if v < 0 then v = 0 elseif v > 1 then v = 1 end
                     elseif key == "sustain" then
                         if v < 0 then v = 0 elseif v > 0.97 then v = 0.97 end
                     end
@@ -897,16 +883,16 @@ function p:render(bands, frame, rows, cols)
                 end
             end
         end
-        apply_num("attack", cfg_attack, user_set_attack)
-        apply_num("release", cfg_release, user_set_release)
-        apply_num("overdrive", cfg_overdrive, user_set_overdrive)
-        apply_num("tilt", cfg_tilt, user_set_tilt)
-        apply_num("gate", cfg_gate, user_set_gate)
-        apply_num("ceiling", cfg_ceiling, user_set_ceiling)
-        apply_num("knee", cfg_knee, user_set_knee)
-        apply_num("bloom_attack", cfg_bloom_attack, user_set_bloom_attack)
-        apply_num("bloom_release", cfg_bloom_release, user_set_bloom_release)
-        apply_num("sustain", cfg_sustain, user_set_sustain)
+        apply_num("attack", user_set_attack)
+        apply_num("release", user_set_release)
+        apply_num("overdrive", user_set_overdrive)
+        apply_num("tilt", user_set_tilt)
+        apply_num("gate", user_set_gate)
+        apply_num("ceiling", user_set_ceiling)
+        apply_num("knee", user_set_knee)
+        apply_num("bloom_attack", user_set_bloom_attack)
+        apply_num("bloom_release", user_set_bloom_release)
+        apply_num("sustain", user_set_sustain)
         apply_bool("blend", user_set_blend)
         apply_bool("ring_blend", user_set_ring_blend)
 

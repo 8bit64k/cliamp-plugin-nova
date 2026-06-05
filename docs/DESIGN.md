@@ -64,7 +64,7 @@ nova is braille-wall only; ASCII portrait art will be a separate plugin.
 - **Density bleed** — overdrive transients thicken adjacent rings +1 and +2
   (mechanical bulge travels further than color heat), sharing the overdrive
   decay clock so the two channels read as one percussive event.
-- **8 behavior presets** — default, punch, ethereal, retro, plasma, ghost, bloom,
+- **8 behavior presets** — default, punch, ethereal, retro, plasma, ghost, whiteout,
   tacutacu. One-knob feel selection: each bundles dynamics + theme + ring_shape.
   `cycle_presets = true` auto-rotates through all 8 for hands-free review.
 - **Performance controls** — `render_rate` (fraction of frames rendered, 0.25–1.0)
@@ -398,7 +398,7 @@ and all dynamics knobs into a single named feel:
 | retro     | ember     | square   | CRT-era grit, hard rings |
 | plasma    | predator  | circle   | volatile, electric |
 | ghost     | vantablack| square   | thin, wispy, slow |
-| bloom     | whitehot  | diamond  | bright, fast, blooming |
+| whiteout  | whitehot  | diamond  | bright, fast, blooming |
 | tacutacu  | flan      | diamond  | punchy + warm flan tones |
 
 The profile overlay runs at the start of `render()`. For each key, it checks
@@ -658,7 +658,7 @@ bloom = true                   # glyphs thicken toward center
 bloom_attack = 0.6             # 0–1, how fast dots FILL (high = snappy)
 bloom_release = 0.15           # 0–1, how fast dots SHED (low = lingering)
 theme = "amber"                  # amber | crt | vantablack | whitehot | blackhot | redhot | orangehot | aurora | ember | predator | flan
-preset = "default"               # default | punch | ethereal | retro | plasma | ghost | bloom | tacutacu
+preset = "default"               # default | punch | ethereal | retro | plasma | ghost | whiteout | tacutacu
 cycle_presets = false            # auto-rotate presets on cycle_seconds
 debug = false                    # show preset + theme + BLD on bottom row
 mono_color = 11                  # ANSI 256 index, used in color_mode="mono"

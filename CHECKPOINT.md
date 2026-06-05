@@ -100,7 +100,7 @@ Core features built and shipped this session:
 
 ### Presets system — one-knob feel selection
 `preset` knob bundles dynamics + theme + ring_shape. 8 presets shipped:
-default, punch, ethereal, retro, plasma, ghost, bloom, tacutacu.
+default, punch, ethereal, retro, plasma, ghost, whiteout, tacutacu.
 `cycle_presets = true` auto-rotates through all 8 on cycle_seconds timer.
 Individual TOML keys override preset values. Debug flag shows preset name
 as a footer bar + fires `cliamp.message()` in init().
@@ -171,7 +171,7 @@ bloom = true                   # glyphs thicken toward center
 bloom_attack = 0.6             # 0-1
 bloom_release = 0.15           # 0-1
 theme = "amber"                  # amber | crt | vantablack | whitehot | blackhot | aurora | ember | predator | flan
-preset = "default"               # default | punch | ethereal | retro | plasma | ghost | bloom | tacutacu
+preset = "default"               # default | punch | ethereal | retro | plasma | ghost | whiteout | tacutacu
 cycle_presets = false            # auto-rotate presets on cycle_seconds
 debug = false                    # show preset name as footer + init message
 mono_color = 11
@@ -202,7 +202,7 @@ render_rate = 1.0                # 0.25-1.0
 | retro     | ember     | square   | CRT-era grit, hard bands|
 | plasma    | predator  | circle   | volatile, electric      |
 | ghost     | vantablack| square   | thin, wispy, slow       |
-| bloom     | whitehot  | diamond  | bright, fast, blooming  |
+| whiteout  | whitehot  | diamond  | bright, fast, blooming  |
 | tacutacu  | flan      | diamond  | punchy + warm flan tones|
 
 ---

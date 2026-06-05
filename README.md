@@ -91,7 +91,7 @@ bloom_release = 0.15
 
 # --- preset (one-knob feel: bundles dynamics + theme + ring_shape) ---
 preset = "default"
-#   default | punch | ethereal | retro | plasma | ghost | bloom | tacutacu
+#   default | punch | ethereal | retro | plasma | ghost | whiteout | tacutacu
 cycle_presets = false
 #   auto-rotate through all presets on cycle_seconds
 
