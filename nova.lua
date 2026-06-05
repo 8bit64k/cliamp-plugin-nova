@@ -24,10 +24,10 @@ local p = plugin.register({
 local function clean(v)
     if v == nil then return nil end
     if type(v) ~= "string" then return v end
-    -- Strip trailing whitespace + optional #-comment, then surrounding quotes
-    v = (v:gsub("%s*#.*$", ""))
-    v = (v:gsub('^%s*"', ""))
-    v = (v:gsub('"%s*$', ""))
+    -- Strip trailing #-comment (TOML parser leaks them), then surrounding quotes
+    v = string.gsub(v, "%s*#.*$", "")
+    v = string.gsub(v, '^%s*"', "")
+    v = string.gsub(v, '"%s*$', "")
     return v
 end
 
