@@ -57,7 +57,9 @@ theme = "amber"
 #   amber | crt | vantablack | whitehot | blackhot | redhot | orangehot
 #   aurora | ember | predator | flan
 ring_shape = "circle"
-#   circle | diamond | wings
+#   circle | diamond | wings | cycle
+cycle_seconds = 20
+#   seconds per shape when ring_shape = "cycle"
 ring_blend = true
 #   true = smooth gradient across rings | false = hard banded rings
 fit = "fill"
@@ -100,6 +102,7 @@ The full config surface with every knob and its range is documented in
 
 - Press **Shift+V** in cliamp for fullscreen — nova really shines when it fills
   the terminal.
+- Set `ring_shape = "cycle"` to preview every shape hands-free.
 - Set `cycle_presets = true` to try all eight feels without touching config.
 - If the outer rings feel dead on treble-heavy music, try `tilt = 0.5`.
 - For a subtle shimmer with barely any color, try `gate = 0.03, ceiling = 0.20`.

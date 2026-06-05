@@ -231,8 +231,21 @@ local DIST = {
     wings    = function(adx, _)   return adx end,
 }
 
+-- ring_shape = "cycle" auto-rotates through all shapes every cycle_seconds
+-- for hands-free review. Anchored to load-time so it always starts on "circle".
+local CYCLE_ORDER = { "circle", "diamond", "wings" }
+local cycle_mode  = (cfg_ring_shape == "cycle")
+local cycle_t0    = os.time()
+
 -- Resolve the active distance metric for THIS frame.
 local function active_dist()
+    if cycle_mode then
+        local elapsed = os.time() - cycle_t0
+        if elapsed < 0 then elapsed = 0 end
+        local idx = (math.floor(elapsed / cfg_cycle_secs) % #CYCLE_ORDER) + 1
+        local name = CYCLE_ORDER[idx]
+        return DIST[name], name
+    end
     return (DIST[cfg_ring_shape] or DIST["circle"]),
            (DIST[cfg_ring_shape] and cfg_ring_shape or "circle")
 end
@@ -1139,7 +1152,8 @@ function p:render(bands, frame, rows, cols)
     -- Rings are level sets of the selected distance metric (circle/diamond/
     -- circle); x scaled 0.5 for the ~2:1 terminal cell aspect ratio so circles
     -- read as circles, not eggs. Band 1 (bass) = center, 10 = edge.
-    -- Resolve the metric ONCE per frame.
+    -- Resolve the metric ONCE per frame (in cycle mode it advances with the
+    -- wall clock; resolving once keeps the whole frame on a single shape).
     local dist = active_dist()
     local ocx = (draw_w + 1) / 2
     local ocy = (draw_h + 1) / 2
