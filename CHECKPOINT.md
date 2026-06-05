@@ -3,7 +3,8 @@
 > Transient rolling work-log. DURABLE design rules live in `AGENTS.md`.
 > Prior history archived in `CHECKPOINT.2026-05-31.md` and earlier.
 
-**Last commit:** (pending — release prep)
+**Last commit:** `94f915b` — release: v0.1.0 public
+**Tag:** `v0.1.0`
 **Branch:** master. **Repo:** github.com/8bit64k/cliamp-plugin-nova (PUBLIC)
 **Local dir:** /home/nick/builds/cliamp-plugin-nova/
 **Entry file:** nova.lua (repo root, ~1302 lines). Single Lua file, no require/helpers.
@@ -34,7 +35,7 @@ Release readiness pass. Cleaned up for v0.1.0 public release.
 - ✅ AGENTS.md feature summary current
 - ✅ DESIGN.md public references updated
 - ✅ LICENSE added
-- ⬜ Make repo public, tag v0.1.0
+- ✅ Make repo public, tag v0.1.0
 
 ## June 4 — symmetry bug, ceiling-bleed fix, code review (4 commits: 4ffd5aa → 43f1e4c)
 
