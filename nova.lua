@@ -413,8 +413,13 @@ local PRESETS = {
             glow      = { 17, 21, 39, 46, 112, 142, 184, 220, 208, 196, 224 },
             overdrive = { 196, 160, 125, 224 },
         },
+    native = {
+        name = "Native (cliamp default spectrum)",
+        glow      = { 232, 46, 46, 40, 226, 226, 220, 214, 202, 196, 9 },
+        overdrive = { 196, 202, 208, 9 },
+    },
 
-    }
+}
 -- ---------- Preset profiles (dynamics + behavior bundled for one-knob feel) ----
 -- Each profile sets defaults for the dynamics/config keys that shape how the
 -- wall MOVES and FEELS. The user's explicit TOML keys ALWAYS override. Keys not
