@@ -419,7 +419,7 @@ local PRESETS = {
 -- Each profile sets defaults for the dynamics/config keys that shape how the
 -- wall MOVES and FEELS. The user's explicit TOML keys ALWAYS override. Keys not
 -- listed in a profile fall back to their standard defaults (the "default" profile).
--- preset = default | punch | ethereal | retro | plasma | ghost | whiteout | tacutacu
+-- preset = default | punch | ethereal | plasma | ghost
 -- cycle_presets = true to auto-rotate through all of them on the cycle_seconds timer.
 local PRESET_PROFILES = {
     -- Presets bundle dynamics + theme + ring_shape into a single feel.
@@ -448,14 +448,6 @@ local PRESET_PROFILES = {
         gate = 0.0,  knee = 0.6,  tilt = 0.4,
         ring_blend = true,
     },
-    retro = {
-        theme = "crt",  ring_shape = "circle",
-        attack = 0.6,  release = 0.15,
-        overdrive = 0.82,  sustain = 0.78,  blend = false,
-        bloom_attack = 0.7,  bloom_release = 0.2,
-        gate = 0.12,  knee = 1.4,  tilt = 0.0,
-        ring_blend = false,
-    },
     plasma = {
         theme = "predator",  ring_shape = "circle",
         attack = 0.65,  release = 0.1,
@@ -470,22 +462,6 @@ local PRESET_PROFILES = {
         overdrive = 0.88,  sustain = 0.9,  blend = false,
         bloom_attack = 0.05,  bloom_release = 0.9,
         gate = 0.00,  knee = 2.6,  tilt = 0.5,
-        ring_blend = true,
-    },
-    tacutacu = {
-        theme = "predator",  ring_shape = "diamond",
-        attack = 0.75,  release = 0.25,
-        overdrive = 0.70,  sustain = 0.75,  blend = true,
-        bloom_attack = 0.8,  bloom_release = 0.3,
-        gate = 0.05,  knee = 1.1,  tilt = 0.0,
-        ring_blend = true,
-    },
-     whiteout = {
-        theme = "whitehot",  ring_shape = "diamond",
-        attack = 1,  release = 0.01,
-        overdrive = 0.85,  sustain = 0.05,  blend = true,
-        bloom_attack = 1,  bloom_release = 0.01,
-        gate = 0.0,  knee = 0.95,  tilt = 0.5,
         ring_blend = true,
     },
 
@@ -508,7 +484,7 @@ do
     end
 end
 
-local CYCLE_PRESET_NAMES = { "default", "punch", "ethereal", "retro", "plasma", "ghost", "whiteout", "tacutacu" }
+local CYCLE_PRESET_NAMES = { "default", "punch", "ethereal", "plasma", "ghost" }
 
 -- Resolve the active profile for THIS frame. In fixed mode this is constant;
 -- in cycle mode it advances with wall-clock time (same cycle_t0 as ring_shape).
