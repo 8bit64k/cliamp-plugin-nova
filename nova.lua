@@ -23,8 +23,11 @@ local p = plugin.register({
 
 local function clean(v)
     if v == nil then return nil end
-    -- Strip trailing whitespace + optional #-comment
-    return (v:gsub("%s*#.*$", ""))
+    -- Strip trailing whitespace + optional #-comment, then surrounding quotes
+    v = (v:gsub("%s*#.*$", ""))
+    v = (v:gsub('^%s*"', ""))
+    v = (v:gsub('"%s*$', ""))
+    return v
 end
 
 local cfg_art_path   = clean(p:config("art_path"))
@@ -35,7 +38,7 @@ local cfg_art_path   = clean(p:config("art_path"))
 -- thickens toward solid. Same additive toward-center bloom either way; only the
 -- resting floor differs. art_path (if set) overrides this with a loaded file.
 local cfg_start = clean(p:config("start")) or "black"
-local START_GLYPH = { black = 0x2800, stipple = 0x2821 }
+local START_GLYPH = { black = 0x2800, stipple = 0x2824 }
 local start_cp = START_GLYPH[cfg_start] or START_GLYPH["stipple"]
 local cfg_color_mode = clean(p:config("color_mode")) or "glow"
 local cfg_mono_color = tonumber(clean(p:config("mono_color"))) or 11
