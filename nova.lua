@@ -1,7 +1,7 @@
 -- nova.lua — cliamp visualizer: a braille wall that glows AND thickens to the EQ.
 --
 -- The pane is mapped into 10 concentric rings by a selectable distance metric
--- (square/diamond/circle/squircle/wings/layers/compass). The innermost ring is
+-- (circle/diamond/wings). The innermost ring is
 -- driven by the lowest EQ band (32 Hz bass), each ring outward by the next band,
 -- the outermost by the highest (16 kHz treble). Each cell recolors by its ring's
 -- smoothed level on a themed ANSI-256 ramp, AND its braille glyph blooms (gains
@@ -52,7 +52,7 @@ local cfg_overdrive  = tonumber(clean(p:config("overdrive"))) or 0.78
 if cfg_overdrive < 0 then cfg_overdrive = 0 elseif cfg_overdrive > 1 then cfg_overdrive = 1 end
 local cfg_tilt       = tonumber(clean(p:config("tilt"))) or 0.0
 local cfg_theme_name = clean(p:config("theme")) or "amber"
-local cfg_ring_shape = clean(p:config("ring_shape")) or "square"
+local cfg_ring_shape = clean(p:config("ring_shape")) or "circle"
 local cfg_cycle_secs = tonumber(clean(p:config("cycle_seconds"))) or 20
 if cfg_cycle_secs < 2 then cfg_cycle_secs = 2 end  -- guard against 0/typo thrash
 local cfg_fit        = clean(p:config("fit")) or "contain"
@@ -219,47 +219,22 @@ local user_set_ring_shape     = (p:config("ring_shape") ~= nil)
 -- Rings are level sets of a distance-from-center metric on the OUTPUT grid.
 -- The shape of a ring is determined entirely by which metric we use; band
 -- index, color, and everything downstream are identical across shapes.
---   square  : Chebyshev  d = max(|dx|, |dy|)  -> nested square frames (default)
---   diamond : Manhattan  d = |dx| + |dy|       -> nested diamonds (rotated squares)
---   circle  : Euclidean  d = sqrt(dx^2 + dy^2) -> nested circles/ellipses
+--   diamond : Manhattan  d = |dx| + |dy|       -> nested diamonds
+--   circle  : Euclidean  d = sqrt(dx^2 + dy^2) -> nested circles
 -- dist() receives deltas that are ALREADY absolute AND already x-scaled (the
 -- caller applies the *0.5 terminal-cell aspect correction before calling), so
 -- this function is pure geometry and is reused verbatim for both the max_d
 -- normalization and the per-cell band lookup -- they can never diverge.
 local DIST = {
-    square   = function(adx, ady) return (adx > ady) and adx or ady end,
-    diamond  = function(adx, ady) return adx + ady end,
     circle   = function(adx, ady) return math.sqrt(adx * adx + ady * ady) end,
-    squircle = function(adx, ady) return (adx^4 + ady^4) ^ 0.25 end,
+    diamond  = function(adx, ady) return adx + ady end,
     wings    = function(adx, _)   return adx end,
-    layers   = function(_, ady)   return ady end,
-    compass  = function(adx, ady) return math.min(adx, ady) + 0.4 * math.abs(adx - ady) end,
 }
 
--- ring_shape = "cycle" rotates square -> diamond -> circle every
--- cfg_cycle_secs seconds for hands-off visual review (no restart needed:
--- cliamp doesn't hot-reload config, but os.time() advances live while the
--- plugin runs, so the shape changes within a single session). os.time() is
--- one of the four os functions the cliamp sandbox keeps (time/date/clock/
--- getenv). The cycle is anchored to a load-time baseline so it always starts
--- on "square" when the visualizer is (re)selected.
-local CYCLE_ORDER = { "square", "diamond", "circle", "squircle", "wings", "layers", "compass" }
-local cycle_mode  = (cfg_ring_shape == "cycle")
-local cycle_t0    = os.time()
-
--- Resolve the active distance metric for THIS frame. In fixed-shape mode this
--- is constant; in cycle mode it advances with wall-clock time. Returns both
--- the metric function and the shape name (so render can label the active shape).
+-- Resolve the active distance metric for THIS frame.
 local function active_dist()
-    if cycle_mode then
-        local elapsed = os.time() - cycle_t0
-        if elapsed < 0 then elapsed = 0 end  -- clock skew guard
-        local idx = (math.floor(elapsed / cfg_cycle_secs) % #CYCLE_ORDER) + 1
-        local name = CYCLE_ORDER[idx]
-        return DIST[name], name
-    end
-    return (DIST[cfg_ring_shape] or DIST["square"]),
-           (DIST[cfg_ring_shape] and cfg_ring_shape or "square")
+    return (DIST[cfg_ring_shape] or DIST["circle"]),
+           (DIST[cfg_ring_shape] and cfg_ring_shape or "circle")
 end
 
 -- ---------- ANSI helpers -----------------------------------------------------
@@ -507,7 +482,7 @@ local PRESET_PROFILES = {
         ring_blend = true,
     },
     retro = {
-        theme = "ember",  ring_shape = "square",
+        theme = "ember",  ring_shape = "circle",
         attack = 0.6,  release = 0.15,
         overdrive = 0.82,  sustain = 0.78,  blend = false,
         bloom_attack = 0.7,  bloom_release = 0.2,
@@ -523,7 +498,7 @@ local PRESET_PROFILES = {
         ring_blend = true,
     },
     ghost = {
-        theme = "vantablack",  ring_shape = "square",
+        theme = "vantablack",  ring_shape = "circle",
         attack = 0.3,  release = 0.05,
         overdrive = 0.88,  sustain = 0.9,  blend = false,
         bloom_attack = 0.05,  bloom_release = 0.9,
@@ -1161,12 +1136,10 @@ function p:render(bands, frame, rows, cols)
     end
 
     -- Ring geometry computed on the OUTPUT grid (resolution-independent).
-    -- Rings are level sets of the selected distance metric (square/diamond/
+    -- Rings are level sets of the selected distance metric (circle/diamond/
     -- circle); x scaled 0.5 for the ~2:1 terminal cell aspect ratio so circles
     -- read as circles, not eggs. Band 1 (bass) = center, 10 = edge.
-    -- Resolve the metric ONCE per frame (in cycle mode it advances with the
-    -- wall clock; resolving once keeps the whole frame on a single shape and
-    -- keeps max_d consistent with the per-cell lookup).
+    -- Resolve the metric ONCE per frame.
     local dist = active_dist()
     local ocx = (draw_w + 1) / 2
     local ocy = (draw_h + 1) / 2

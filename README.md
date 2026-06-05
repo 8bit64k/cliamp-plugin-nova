@@ -31,9 +31,7 @@ To update later: `cliamp plugins update nova`
 
 - **Concentric rings** — 10 bands of your EQ laid out in rings, bass at the
   center, treble at the edge. The wall breathes from the middle outward.
-- **Seven ring shapes** — square, diamond, circle, squircle, vertical stripes,
-  horizontal layers, and a four-point compass. Set one you like, or set `cycle`
-  to rotate through all of them automatically.
+- **Three ring shapes** — circle, diamond, and vertical wings.
 - **Eleven color themes** — from warm amber to green phosphor to thermal-vision
   predator. Pick one or let presets choose for you.
 - **The wall thickens on the beat** — dots fill in toward the center as the
@@ -58,8 +56,8 @@ tune it:
 theme = "amber"
 #   amber | crt | vantablack | whitehot | blackhot | redhot | orangehot
 #   aurora | ember | predator | flan
-ring_shape = "square"
-#   square | diamond | circle | squircle | wings | layers | compass | cycle
+ring_shape = "circle"
+#   circle | diamond | wings
 ring_blend = true
 #   true = smooth gradient across rings | false = hard banded rings
 fit = "fill"
@@ -102,7 +100,6 @@ The full config surface with every knob and its range is documented in
 
 - Press **Shift+V** in cliamp for fullscreen — nova really shines when it fills
   the terminal.
-- Set `ring_shape = "cycle"` to preview every shape hands-free.
 - Set `cycle_presets = true` to try all eight feels without touching config.
 - If the outer rings feel dead on treble-heavy music, try `tilt = 0.5`.
 - For a subtle shimmer with barely any color, try `gate = 0.03, ceiling = 0.20`.
