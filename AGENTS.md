@@ -48,8 +48,33 @@ SEPARATE plugin. Don't re-add portrait-preservation hedging here.
    Implemented as 9 direction-specific fill orders (`FILL_ORDERS[dirx][diry]`,
    signs in {-1,0,1}) chosen per cell; `thicken()` is memoized per direction so
    there's no per-frame cost. This is NOT a knob — it's the correct default for a
-   radial visualizer; do not revert to a single fixed fill order. (Verify any
-   change with `scratchpad/test_center_fill.lua` + the visual `show_final.lua`.)
+   radial visualizer; do not revert to a single fixed fill order.
+
+   **The wall MUST be mirror-symmetric (V and H) — INVARIANT (2026-06-04).**
+   Opposite cells across the pane center are exact dot-mirrors. This is non-
+   negotiable; it's the most visually obvious defect when broken. Two subtleties
+   that caused a long bug hunt:
+   (a) Off-axis quadrant orders mirror each OTHER (up-left ↔ down-left etc.).
+   (b) CENTER-AXIS cells (dirx==0 or diry==0) sit ON the mirror axis and must
+       self-mirror. A single dot can't straddle the axis, so at odd fill counts
+       they break. Fix: center-axis FILL_ORDERS list dots in mirror-PAIRS (quads
+       for dead center), and `thicken()` snaps the add count for those cells —
+       even (pairs) for single-centered, mult-of-4 (quads) for dead center
+       (dkey 4 = dead center, dkey {1,3,5,7} = one axis centered). Off-axis
+       cells take `add` as-is. The trade-off: a possible 1-cell gap on the outer
+       center-line ring at some heights — accepted, far milder than asymmetry.
+   VERIFY any fill-order or thicken change with `scratchpad/test_mirror_symmetry.lua`
+   (checks EXACT opposite-cell mirroring across 7 shapes × 5 pane sizes). The
+   older `test_center_fill.lua` only checks "leans toward center" and will NOT
+   catch a symmetry break — do not trust it alone.
+
+   **Bug-hunt lesson (2026-06-04, do not repeat):** when Nick reports a visual
+   defect, pixel-analyze his screenshot FIRST (`convert x.png -colorspace gray
+   -depth 8 txt:-`). Do NOT argue from harness tests until you've (1) confirmed
+   the harness uses CURRENT config keys — after any knob rename the harness/probe
+   stubs must be updated in lockstep or they silently render defaults — and (2)
+   verified the test's own pairing math (geometric mirror is `2*ocy-oy`, NOT
+   `H-1-i`). A green test on stale tooling is worse than no test.
 
 3. **User content stays in the user's clone.** `art_path` is an absolute path the
    plugin reads in place. Never copy art into cliamp's own dirs (`~/.config/cliamp/...`).

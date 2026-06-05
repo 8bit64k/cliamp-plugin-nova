@@ -3,37 +3,69 @@
 > Transient rolling work-log. DURABLE design rules live in `AGENTS.md`.
 > Prior history archived in `CHECKPOINT.2026-05-31.md` and earlier.
 
-**Last commit:** `dcf5886` — fix UK→US spelling
+**Last commit:** `43f1e4c` — cleanup: code review fixes + rename bloom preset to whiteout
 **Branch:** master. **Repo:** github.com/8bit64k/cliamp-plugin-nova (PRIVATE)
 **Local dir:** /home/nick/builds/cliamp-plugin-nova/
-**Entry file:** nova.lua (repo root, ~1290 lines). Single Lua file, no require/helpers.
+**Entry file:** nova.lua (repo root, ~1295 lines). Single Lua file, no require/helpers.
 
-## June 3 — pedalboard rename session (4 commits: fa7d390 → dcf5886)
+## June 4 — symmetry bug, ceiling-bleed fix, code review (4 commits: 4ffd5aa → 43f1e4c)
 
-Full knob rename to guitar-pedal convention. Five commits, one session.
+Long debugging session. Nick reported the bloom wall looked asymmetric;
+took far too long to confirm because (a) the render harness still used OLD
+config keys after the June-3 renames so it silently rendered defaults, and
+(b) my mirror-symmetry test used wrong pairing (H-1-i vs geometric 2*ocy-oy)
+and manufactured false passes. Lesson logged in memory: pixel-analyze Nick's
+screenshots FIRST, verify the test itself before trusting green.
 
-### Round 1: gate + ceiling (fa7d390)
-- `dead_zone` → `gate` — noise gate threshold
-- New `ceiling` knob (0.01–1.0, default 1.0=off) — limiter brick wall
+### Bloom mirror symmetry — center row/column on ODD panes (4ffd5aa)
+Root cause: center-axis cells (dirx==0 or diry==0) sit ON the mirror axis,
+so they must self-mirror. At odd fill counts they added a single off-axis
+dot — same dot COUNT, wrong POSITION (exactly as Nick described). Only
+visible on odd-dimensioned panes (the common fullscreen case); even panes
+have no on-axis cell so it stayed hidden.
+Fix: (1) center-axis FILL_ORDERS rewritten to list dots in mirror-PAIRS
+(V-pairs diry=0, H-pairs dirx=0) and QUADS for dead center; (2) thicken()
+snaps the add count for center-axis cells — pairs (even) for single-centered,
+quads (mult-of-4) for dead center; off-axis cells unchanged. dkey encodes
+dirx/diry: dkey 4 = dead center, dkey in {1,3,5,7} = one axis centered.
+KNOWN edge case (accepted): the add-snap can leave a 1-cell gap on the
+outer ring along the center line at some heights — far milder than the
+whole-wall asymmetry, no clean fix without a trade-off, left as-is.
+New test scratchpad/test_mirror_symmetry.lua checks EXACT opposite-cell
+mirroring (the old test_center_fill only checked "leans toward center" and
+missed this) — passes 35/35 shape×pane combos.
 
-### Round 2: pipeline order fix (bd36052)
-- Swap: gate → gamma → ceiling → gate → knee → ceiling
-- Gamma/celling order now matches real mastering chain: EQ before limiter
-- Prevents clamped ceiling from leaking past via gamma < 1 lift
+### Ceiling-bleed escape — flare detector now ceiling-limited (f54ab66)
+Bug Nick chased through two prior reverts: with overdrive=0.90, ceiling=0.80
+the bleed still fired and escaped the cap. Root cause: the overdrive flare
+detector read raw smoothed[i], which ceiling never limits; ceiling only
+clamps the color path at the end, and bloom_bleed[] is a separate array that
+clamp never touches. Prior attempts moved bleed AFTER ceiling and tested
+effective[i] (carries sustained signal → fired constantly) — wrong lever.
+Correct fix at the SOURCE: clamp detector input s = min(smoothed[i], ceiling).
+If ceiling=0.80, overdrive=0.90 is unreachable → no flare, no bleed, no
+bloom_bleed. ceiling=1.0 (off) leaves the detector byte-identical.
 
-### Round 3: sustain, blend, knee (a0547e8)
-- `overdrive_decay` → `sustain` — flare tail length
-- `overdrive_bleed` → `blend` — dry/wet bleed mix
-- `gamma` → `knee` — response curve hard/soft
+### Code review cleanup + bloom preset → whiteout (43f1e4c)
+Opus code review of the rapid-rename debris:
+- Removed dead char_at() (old file-art path, never called)
+- Removed vestigial 'var' param from apply_num() + 10 call sites
+- Clamp attack/release/overdrive at config-read AND apply_num (was unclamped)
+- Aligned ragged user_set_* block
+- Fixed stale comments: file header, ceiling 'gamma'→'knee', preset list
+  (punchy→punch, "five"→8), phantom 'ring_of', "white-hot bleed bands 2-3"
+- Renamed `bloom` PRESET → `whiteout` (collided with the bloom feature
+  toggle). Feature toggle stays `bloom`. Invalid `bloom` preset → default.
+NOTE: art_lines is NOT dead (read at the row-extract loop + lazy-load
+sentinel) — checked before deleting.
 
-### Round 4: bloom (76b2c89)
-- `density` → `bloom` — glyph thickness toggle
-- `density_attack` → `bloom_attack`
-- `density_release` → `bloom_release`
-- Internal: dens[] → bloom[], dens_bleed → bloom_bleed
-
-### Round 5: UK→US spelling (dcf5886)
-- colour→color, behaviour→behavior
+### Also fixed earlier this session
+- Mirror-symmetric stipple base ⠡→⠤, and clean() strips TOML quotes (e5411cb):
+  inline TOML comment on `start = "black"` leaked quotes past clean(),
+  falling back to stipple with an asymmetric base. README TOML comments
+  moved to their own lines so copy-paste is safe.
+- clean() type guard + string.gsub() not v:gsub() (ed500de, 2248b2d):
+  gopher-lua panicked on v:gsub for non-string config values.
 
 ### Current pedalboard
 
@@ -46,13 +78,34 @@ Tilt                 — spectral EQ
 Bloom / Bloom Attack / Bloom Release — glyph thickness (second envelope)
 ```
 
-Pipeline: smoothing → flare → bleed → gate → knee → ceiling → bloom → color
+Pipeline: smoothing → flare(ceiling-limited) → bleed → gate → knee → ceiling → bloom → color
 
 ### Shimmer lane (vNext)
 
 Single-pipe limitation: bloom chases effective[] post-ceiling. True shimmer
 (density-full, color-compressed) needs pipeline split — bloom taps pre-ceiling.
 XOR mask shimmer also noted as an alternative texture approach.
+
+## June 3 — pedalboard rename session (5 commits: fa7d390 → dcf5886)
+
+Full knob rename to guitar-pedal convention.
+
+### Round 1: gate + ceiling (fa7d390)
+- `dead_zone` → `gate` — noise gate threshold
+- New `ceiling` knob (0.01–1.0, default 1.0=off) — limiter brick wall
+
+### Round 2: pipeline order fix (bd36052)
+- gate → knee → ceiling (limiter last, EQ-before-limiter mastering order)
+
+### Round 3: sustain, blend, knee (a0547e8)
+- `overdrive_decay` → `sustain`, `overdrive_bleed` → `blend`, `gamma` → `knee`
+
+### Round 4: bloom (76b2c89)
+- `density` → `bloom`, `density_attack/release` → `bloom_attack/release`
+- Internal: dens[] → bloom[], dens_bleed → bloom_bleed
+
+### Round 5: UK→US spelling (dcf5886)
+- colour→color, behaviour→behavior
 
 ## June 2 — DESIGN.md written (#4)
 
