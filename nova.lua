@@ -386,17 +386,8 @@ local PRESETS = {
     },
     crt = {
         name = "CRT Green Phosphor",
-        -- 11 stops spanning the full green range with wide gaps between adjacent stops.
-        -- 232 = near-black baseline; then jumps through the green ANSI block aggressively.
         glow      = { 232, 22, 28, 34, 40, 46, 48, 82, 118, 154, 190 },
         overdrive = { 46, 82, 118, 190 },
-    },
-    vantablack = {
-        name = "Vantablack (mono-ish high contrast)",
-        -- 11 stops across the full grayscale range with 3-5 index gaps.
-        -- 232 = baseline; 234-254 = visible grayscale; 255 = pure white.
-        glow      = { 232, 234, 238, 242, 246, 249, 251, 253, 254, 255, 231 },
-        overdrive = { 249, 253, 255, 231 },
     },
     whitehot = {
         name = "White Hot (high contrast)",
@@ -410,18 +401,6 @@ local PRESETS = {
         glow      = { 231, 249, 247, 245, 243, 241, 239, 237, 235, 233, 16 },
         overdrive = { 238, 235, 233, 16},
     },
-     redhot = {
-        name = "Red Hot (high contrast)",
-        -- 11 stops across the full red range with 3-5 index gaps.
-        glow      = { 185, 187, 224, 217, 211, 210, 204, 196, 197, 160, 9},
-        overdrive = { 196, 197, 160, 9},
-    },
-       orangehot = {
-        name = "Orange Hot (high contrast)",
-        -- 11 stops across the full orange range with 3-5 index gaps.
-        glow      = { 223, 222, 216, 215, 209, 208, 202, 172, 166, 130, 9},
-        overdrive = { 172, 166, 130, 9},
-    },
     aurora = {
         name = "Aurora (teal-cyan-green)",
         -- 11-stop cool palette: deep teal through cyan to bright green-yellow.
@@ -429,38 +408,13 @@ local PRESETS = {
         glow      = { 232, 23, 30, 36, 42, 48, 83, 119, 155, 191, 195 },
         overdrive = { 48, 87, 123, 195 },
     },
-    ember = {
-        name = "Ember (green → yellow → red heat map)",
-        -- 11-stop heat-map ramp with real yellows in the mid and true red
-        -- at the peak: dark green → yellow-green → pure yellow → orange
-        -- → true red → hot red. ANSI 256 indices.
-        glow      = { 232, 22, 28, 64, 106, 154, 226, 214, 202, 196, 197 },
-        -- Overdrive: red → magenta → white
-        overdrive = { 196, 197, 201, 230 },
-    },
     predator = {
-        name = "Predator (thermal vision heatmap)",
-        -- 11-stop ramp matching the iconic Predator thermal-vision palette.
-        -- Cold: deep indigo → royal blue → cyan (background/cool surfaces).
-        -- Warm: green → lime → olive → yellow-green → yellow (body heat onset).
-        -- Hot: dark orange → red-orange (core body temperature).
-        -- Peak: cream yellow-white (thermal overload). ANSI 256 indices.
-        -- 230
-        glow      = { 17, 21, 39, 46, 112, 142, 184, 220, 208, 196, 224 },
-        -- Overdrive: red-orange → crimson → magenta-red → cream white
-        overdrive = { 196, 160, 125, 224 },
-    },
-    flan = {
-        name = "Flan (cream → gold → rose gold)",
-        -- 11-stop ramp: cool cream → warm gold → hot rose gold.
-        -- Like caramel custard browning under heat. ANSI 256 indices.
-        glow      = { 232, 230, 229, 228, 226, 220, 214, 208, 209, 174, 167 },
-        -- Overdrive: coral → dusty rose → deep rose → salmon pink
-        overdrive = { 209, 174, 167, 210 },
-    },
-    
-}
+            name = "Predator (thermal vision heatmap)",
+            glow      = { 17, 21, 39, 46, 112, 142, 184, 220, 208, 196, 224 },
+            overdrive = { 196, 160, 125, 224 },
+        },
 
+    }
 -- ---------- Preset profiles (dynamics + behavior bundled for one-knob feel) ----
 -- Each profile sets defaults for the dynamics/config keys that shape how the
 -- wall MOVES and FEELS. The user's explicit TOML keys ALWAYS override. Keys not
@@ -495,7 +449,7 @@ local PRESET_PROFILES = {
         ring_blend = true,
     },
     retro = {
-        theme = "ember",  ring_shape = "circle",
+        theme = "crt",  ring_shape = "circle",
         attack = 0.6,  release = 0.15,
         overdrive = 0.82,  sustain = 0.78,  blend = false,
         bloom_attack = 0.7,  bloom_release = 0.2,
@@ -511,7 +465,7 @@ local PRESET_PROFILES = {
         ring_blend = true,
     },
     ghost = {
-        theme = "vantablack",  ring_shape = "circle",
+        theme = "aurora",  ring_shape = "circle",
         attack = 0.3,  release = 0.05,
         overdrive = 0.88,  sustain = 0.9,  blend = false,
         bloom_attack = 0.05,  bloom_release = 0.9,
@@ -519,7 +473,7 @@ local PRESET_PROFILES = {
         ring_blend = true,
     },
     tacutacu = {
-        theme = "flan",  ring_shape = "diamond",
+        theme = "predator",  ring_shape = "diamond",
         attack = 0.75,  release = 0.25,
         overdrive = 0.70,  sustain = 0.75,  blend = true,
         bloom_attack = 0.8,  bloom_release = 0.3,

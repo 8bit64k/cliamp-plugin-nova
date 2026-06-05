@@ -32,8 +32,7 @@ To update later: `cliamp plugins update nova`
 - **Concentric rings** — 10 bands of your EQ laid out in rings, bass at the
   center, treble at the edge. The wall breathes from the middle outward.
 - **Three ring shapes** — circle, diamond, and vertical wings.
-- **Eleven color themes** — from warm amber to green phosphor to thermal-vision
-  predator. Pick one or let presets choose for you.
+- **Six color themes** — amber, phosphor green, white-hot, black-hot, aurora, predator
 - **The wall thickens on the beat** — dots fill in toward the center as the
   music hits, then fade slowly. Kick drums leave a visible trail.
 - **Overdrive flare** — when the bass punches hard, the rings flash hot and the
@@ -54,8 +53,7 @@ tune it:
 [plugins.nova]
 # --- look ---
 theme = "amber"
-#   amber | crt | vantablack | whitehot | blackhot | redhot | orangehot
-#   aurora | ember | predator | flan
+#   amber | crt | whitehot | blackhot | aurora | predator
 ring_shape = "circle"
 #   circle | diamond | wings | cycle
 cycle_seconds = 20
