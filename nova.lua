@@ -167,7 +167,7 @@ if cfg_bloom_release < 0 then cfg_bloom_release = 0 elseif cfg_bloom_release > 1
 -- 0 = no retention = instant snap (old behavior); ~0.85 = long glowing tail.
 local cfg_sustain = tonumber(clean(p:config("sustain"))) or 0.82
 if cfg_sustain < 0 then cfg_sustain = 0 elseif cfg_sustain > 0.97 then cfg_sustain = 0.97 end
--- Blend: only when a bass ring punches WHITE-HOT does it warm the ring just
+-- Blend: only when a bass ring punches PEAK FLARE does it warm the ring just
 -- outside it (band1->band2, band2->band3). Modest flares stay in place; only a
 -- full slam blooms outward. Default on; toggle off for clean rings (e.g. CRT art).
 local cfg_blend = true

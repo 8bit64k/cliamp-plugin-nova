@@ -3,10 +3,38 @@
 > Transient rolling work-log. DURABLE design rules live in `AGENTS.md`.
 > Prior history archived in `CHECKPOINT.2026-05-31.md` and earlier.
 
-**Last commit:** `43f1e4c` — cleanup: code review fixes + rename bloom preset to whiteout
-**Branch:** master. **Repo:** github.com/8bit64k/cliamp-plugin-nova (PRIVATE)
+**Last commit:** (pending — release prep)
+**Branch:** master. **Repo:** github.com/8bit64k/cliamp-plugin-nova (PUBLIC)
 **Local dir:** /home/nick/builds/cliamp-plugin-nova/
-**Entry file:** nova.lua (repo root, ~1295 lines). Single Lua file, no require/helpers.
+**Entry file:** nova.lua (repo root, ~1302 lines). Single Lua file, no require/helpers.
+
+## June 5 — final push: public release prep
+
+Release readiness pass. Cleaned up for v0.1.0 public release.
+
+### Changes this session
+- Moved `crt_max.txt` + `crt_max_raw.txt` (untracked test art) to scratchpad/
+- Fixed stale "WHITE-HOT" comment → "PEAK FLARE" in nova.lua blend section
+- Added LICENSE (MIT, © 8bit64k)
+- Rewrote README.md for public release: removed dev warning, added `cliamp plugins install` instructions, updated status section
+- Updated AGENTS.md: private→public, added plugin manager install line
+- Updated docs/DESIGN.md: removed private-QA references, updated install section, visibility status
+- Syntax check: `luac -p nova.lua` passes
+
+### Still open
+- `breathe-experiment` branch (snake rotate indicator) — kept, not merged
+- Shimmer lane (pipeline split for density-full + color-compressed) — vNext
+- Responsive layout tiers — vNext
+- Truecolor mode — vNext
+
+### Release checklist
+- ✅ Syntax check passes
+- ✅ No stale config key references in code
+- ✅ README config block matches nova.lua config surface
+- ✅ AGENTS.md feature summary current
+- ✅ DESIGN.md public references updated
+- ✅ LICENSE added
+- ⬜ Make repo public, tag v0.1.0
 
 ## June 4 — symmetry bug, ceiling-bleed fix, code review (4 commits: 4ffd5aa → 43f1e4c)
 

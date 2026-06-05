@@ -1,65 +1,61 @@
 # cliamp-plugin-nova
 
-> ⚠️ **IN DEVELOPMENT — expect breakage.** This is a work-in-progress cliamp
-> visualizer plugin. The name `nova` is provisional, the render is unstable,
-> and the config schema may change without notice. Not released. No tags, no
-> versioning, no support. Here so 8bit64k can test against live cliamp from a
-> remote machine.
-
 A cliamp visualizer that renders a **braille wall** reacting to the 10-band EQ
 feed. The wall lights AND thickens with the music: each concentric ring (bass at
-the center, treble at the edge) recolors by its band level on an amber-to-hot
-ramp (shared with the sibling `tubeamp` plugin), and braille glyphs gain dots
-**toward the center** as they heat, so the wall gains matter on the peaks — not
-just brightness.
+the center, treble at the edge) recolors by its band level on a themed ANSI 256
+ramp, and braille glyphs gain dots **toward the center** as they heat — the wall
+gains matter on peaks, not just brightness.
 
 The wall is **generated procedurally** — no art file required. You can optionally
-point it at your own ASCII/braille art via `art_path`, but the default needs
-nothing but the plugin.
+point it at your own ASCII/braille art via `art_path`.
+
+Features:
+- **Procedural braille wall** (no art file needed) — `start = "black"` (empty) or `"stipple"` (faint resting texture)
+- **11 color themes** — amber, crt, vantablack, whitehot, blackhot, redhot, orangehot, aurora, ember, predator, flan
+- **7 ring shapes** — square, diamond, circle, squircle, wings, layers, compass (+ `cycle` to auto-rotate)
+- **Braille bloom** — glyphs thicken toward center as they heat (phosphor persistence)
+- **8 behaviour presets** — one-knob feel (default, punch, ethereal, retro, plasma, ghost, whiteout, tacutacu)
+- **Overdrive flare** — bass transients flash hot with a decay tail, spill into adjacent rings
+- **Bloom bleed** — overdrive thickens adjacent rings +1/+2 (mechanical bulge)
+- **Full dynamics** — gate, ceiling, knee, tilt, attack/release, sustain, blend
+- **Performance controls** — `render_rate` (frame-skip) and `max_cols`/`max_rows` (canvas cap)
+- **Debug footer** — shows preset + theme + bloom bleed indicator when `debug = true`
+
+Sibling to [`cliamp-plugin-tubeamp`](https://github.com/8bit64k/cliamp-plugin-tubeamp) —
+same ANSI 256 palette, same compressor-lane dynamics philosophy.
 
 ---
 
-## Install (manual — this repo is private)
+## Install
 
-cliamp's plugin manager (`cliamp plugins install`) only works against **public**
-repos, so during development you install by hand: clone the repo and copy the
-single Lua file into cliamp's plugins directory.
+### cliamp plugin manager (recommended)
 
 ```bash
-# 1. Clone (uses your 8bit64k GitHub credentials)
+cliamp plugins install 8bit64k/cliamp-plugin-nova
+```
+
+To pin a version:
+
+```bash
+cliamp plugins install 8bit64k/cliamp-plugin-nova@v0.1.0
+```
+
+### Manual install
+
+```bash
 git clone https://github.com/8bit64k/cliamp-plugin-nova.git
-cd cliamp-plugin-nova
-
-# 2. Copy the plugin into cliamp's plugins dir
-mkdir -p ~/.config/cliamp/plugins
-cp nova.lua ~/.config/cliamp/plugins/nova.lua
+cp cliamp-plugin-nova/nova.lua ~/.config/cliamp/plugins/nova.lua
 ```
 
-That's it — the wall is generated procedurally, so there is **no art file to
-copy or configure** for the default experience. (If you want to drive a custom
-art file instead, see `art_path` under Configure; the file stays in your clone
-and the plugin reads it in place — nothing gets copied into cliamp's dirs.)
-
-To **update** after I push changes:
-
-```bash
-cd cliamp-plugin-nova
-git pull
-cp nova.lua ~/.config/cliamp/plugins/nova.lua   # re-copy; cliamp doesn't hot-reload
-```
-
-Then restart cliamp and press `v` to cycle visualizers until you reach **nova**.
-
-> cliamp does **not** hot-reload plugins or config — re-copy the file and restart
-> cliamp after every change.
+To update: `git pull` + re-`cp`. cliamp does not hot-reload plugins — restart
+after every change.
 
 ---
 
 ## Configure
 
-A `[plugins.nova]` block is **optional** — with no config the plugin renders the
-default procedural wall (`start = "black"`, `fit = "contain"`). Add a block to
-tune it:
+A `[plugins.nova]` block is optional — with no config the plugin renders the
+default procedural wall (`start = "black"`, `fit = "contain"`).
 
 ```toml
 [plugins.nova]
@@ -129,51 +125,37 @@ render_rate = 1.0
 ```
 
 If a configured `art_path` can't be read, the plugin renders a visible
-placeholder message instead of crashing. With no `art_path`, it always has the
-generated wall to fall back on.
+placeholder message instead of crashing.
 
 ### Bigger pane / filling the screen
 
-The plugin only fills the pane cliamp hands it. cliamp gives visualizers **5 rows**
-in the normal layout — press **Shift+V** for the full-screen visualizer, which
-grows the pane to roughly `(terminal_height - 10) * 4/5` rows by your full
-terminal width. That's the path to a big canvas; it's a cliamp keybinding, not a
-plugin setting.
+cliamp gives visualizers **5 rows** in the normal layout — press **Shift+V** for
+the full-screen visualizer, which grows the pane to roughly
+`(terminal_height - 10) * 4/5` rows by your full terminal width.
 
 By default (`fit = "contain"`) the art is scaled to fit while preserving its
-aspect ratio, so a wide source gets letterboxed (empty rows top/bottom) in a
-tall pane. For the **braille wall** (the procedural default, or any texture with
-no shape to preserve) set `fit = "fill"` to stretch each axis independently and
-fill the entire pane edge to edge. Pair `fit = "fill"` with Shift+V for a
-full-screen reactive wall.
+aspect ratio. For the **braille wall** set `fit = "fill"` to stretch edge to
+edge. Pair with Shift+V for a full-screen reactive wall.
 
 ### Reviewing shapes: `ring_shape = "cycle"`
 
-Set `ring_shape = "cycle"` to auto-rotate through square → diamond → circle → squircle → wings → layers → compass every
-`cycle_seconds` (default 20). The active shape is labelled `[square]` / `[diamond]`
-/ `[circle]` in the bottom-right corner so you can tell them apart as it rotates.
-This needs **no restart between shapes** — cliamp doesn't hot-reload config, but
-the cycle runs off the wall clock while the plugin is live, so it keeps rotating
-within a single session. Use it to pick the shape you like, then set
-`ring_shape` to that fixed value (the label only shows in cycle mode).
-
-> **Note:** Keep inline `#` comments on their own line in the TOML config.
-> cliamp's parser may leak comment text into the config value, causing preset
-> lookups or numeric parsing to fail. The plugin strips these defensively, but
-> clean config is cleaner.
+Set `ring_shape = "cycle"` to auto-rotate through all 7 shapes every
+`cycle_seconds` (default 20). This needs no restart — the cycle runs off the
+wall clock while the plugin is live. Use it to pick the shape you like, then
+set `ring_shape` to that fixed value.
 
 ---
 
 ## Troubleshooting
 
-cliamp swallows plugin render errors silently — they do **not** appear in the UI.
-If `nova` shows a blank pane or stale frame, check the log:
+cliamp swallows plugin render errors silently — they do not appear in the UI.
+Check the log:
 
 ```bash
 tail -n 40 ~/.config/cliamp/plugins.log
 ```
 
-Look for `[nova] error: ...` lines.
+Look for `[nova] error:` lines.
 
 ---
 
@@ -181,10 +163,10 @@ Look for `[nova] error: ...` lines.
 
 | | |
 |---|---|
-| State | In development — not released |
-| Repo | `8bit64k/cliamp-plugin-nova` (private) |
+| State | v0.1.0 — stable |
+| Repo | [`8bit64k/cliamp-plugin-nova`](https://github.com/8bit64k/cliamp-plugin-nova) |
 | Entry file | `nova.lua` (repo root) |
 | Wall | procedural (no art file needed); `start = "black"` (default) \| `"stipple"` |
-| Sibling plugin | [`cliamp-plugin-tubeamp`](https://github.com/8bit64k/cliamp-plugin-tubeamp) (shipped, v1.2.0) |
+| Sibling | [`cliamp-plugin-tubeamp`](https://github.com/8bit64k/cliamp-plugin-tubeamp) (shipped, v1.2.0) |
 
-License: MIT © 8bit64k (added at release time).
+License: MIT © 8bit64k

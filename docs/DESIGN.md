@@ -44,8 +44,8 @@ It is the active visualizer sibling to `cliamp-plugin-tubeamp` (shipped v1.2.0)
 and was renamed from `cliamp-plugin-dance` on 2026-05-31 after a scope decision:
 nova is braille-wall only; ASCII portrait art will be a separate plugin.
 
-**Repo:** `8bit64k/cliamp-plugin-nova` (private during QA)
-**Install path:** `~/.config/cliamp/plugins/nova.lua`
+**Repo:** `8bit64k/cliamp-plugin-nova` (public)
+**Install:** `cliamp plugins install 8bit64k/cliamp-plugin-nova`
 **cliamp visualizer name:** `nova` (cycle to it with `v` in the player)
 
 ### Feature summary (v0.1)
@@ -783,18 +783,14 @@ is stripped on install, so the user-visible plugin name is `nova`.
 ### Install sources
 
 ```sh
-# Once the repo is public:
+# Recommended:
 cliamp plugins install 8bit64k/cliamp-plugin-nova
 cliamp plugins install 8bit64k/cliamp-plugin-nova@v0.1.0
 
-# During private QA (manual):
+# Manual (if the plugin manager doesn't work for your setup):
 git clone https://github.com/8bit64k/cliamp-plugin-nova.git
 cd cliamp-plugin-nova
 cp nova.lua ~/.config/cliamp/plugins/nova.lua
-# After pushing changes:
-git pull && cp nova.lua ~/.config/cliamp/plugins/nova.lua
-# Force-push recovery (8bit64k laptop):
-git fetch origin && git reset --hard origin/master
 ```
 
 cliamp does NOT hot-reload — re-copy and restart after every change.
@@ -807,11 +803,7 @@ cliamp does NOT hot-reload — re-copy and restart after every change.
 
 ### Visibility
 
-- Currently **private** during QA.
-- Flip to public when ready:
-  ```sh
-  gh repo edit 8bit64k/cliamp-plugin-nova --visibility public
-  ```
+- Public.
 
 ### Branch policy
 
@@ -943,4 +935,4 @@ Before declaring any change "done," verify:
 
 ---
 
-*Last reviewed: 2026-06-02. Version covered: nova 0.1.0.*
+*Last reviewed: 2026-06-05. Version covered: nova 0.1.0.*
