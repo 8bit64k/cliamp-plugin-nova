@@ -413,8 +413,8 @@ local PRESETS = {
             glow      = { 17, 21, 39, 46, 112, 142, 184, 220, 208, 196, 224 },
             overdrive = { 196, 160, 125, 224 },
         },
-    native = {
-        name = "Native (cliamp default spectrum)",
+    terminal = {
+        name = "Terminal (cliamp default spectrum)",
         glow      = { 232, 46, 46, 40, 226, 226, 220, 214, 202, 196, 9 },
         overdrive = { 196, 202, 208, 9 },
     },
@@ -424,7 +424,7 @@ local PRESETS = {
 -- Each profile sets defaults for the dynamics/config keys that shape how the
 -- wall MOVES and FEELS. The user's explicit TOML keys ALWAYS override. Keys not
 -- listed in a profile fall back to their standard defaults (the "default" profile).
--- preset = default | punch | ethereal | plasma | ghost
+-- preset = default | punch | ethereal | plasma | ghost | classic
 -- cycle_presets = true to auto-rotate through all of them on the cycle_seconds timer.
 local PRESET_PROFILES = {
     -- Presets bundle dynamics + theme + ring_shape into a single feel.
@@ -469,6 +469,14 @@ local PRESET_PROFILES = {
         gate = 0.00,  knee = 2.6,  tilt = 0.5,
         ring_blend = true,
     },
+    classic = {
+        theme = "terminal",  ring_shape = "wings",
+        attack = 0.85,  release = 1,
+        overdrive = 0.85,  sustain = 0.95,  blend = false,
+        bloom_attack = 1,  bloom_release = 0.85,
+        tilt = 0.3,
+        ring_blend = true,
+    },
 
 }
 
@@ -489,7 +497,7 @@ do
     end
 end
 
-local CYCLE_PRESET_NAMES = { "default", "punch", "ethereal", "plasma", "ghost" }
+local CYCLE_PRESET_NAMES = { "default", "punch", "ethereal", "plasma", "ghost", "classic" }
 
 -- Resolve the active profile for THIS frame. In fixed mode this is constant;
 -- in cycle mode it advances with wall-clock time (same cycle_t0 as ring_shape).
