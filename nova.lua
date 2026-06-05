@@ -976,20 +976,28 @@ function p:render(bands, frame, rows, cols)
     local BASE_RATE   = 0.05   -- baseline EMA: slow, so it tracks recent average
     local ONSET_MARGIN = 0.18  -- live must exceed baseline by this to be an onset
     local onset_fired = false  -- a bass transient this frame -> override frame-skip
+    -- The flare detector measures against the CEILING-LIMITED level, not the raw
+    -- smoothed signal. Ceiling is a hard cap on what the wall can express, so a
+    -- band can never behave as if it exceeded the cap: with ceiling=0.80 and
+    -- overdrive=0.90 the overdrive threshold is UNREACHABLE -> no flare, no bleed,
+    -- and (critically) no bloom_bleed, which is a separate array the final ceiling
+    -- clamp never touches. ceiling=1.0 (off) leaves the detector unchanged.
     for i = 1, 2 do
-        local onset = (smoothed[i] >= cfg_overdrive)
-                      and (smoothed[i] >= bass_base[i] + ONSET_MARGIN)
+        local s = smoothed[i]
+        if cfg_ceiling < 1.0 and s > cfg_ceiling then s = cfg_ceiling end
+        local onset = (s >= cfg_overdrive)
+                      and (s >= bass_base[i] + ONSET_MARGIN)
         if onset then onset_fired = true end
-        if onset and smoothed[i] > heat[i] then
-            heat[i] = smoothed[i]                 -- latch hot on the punch
+        if onset and s > heat[i] then
+            heat[i] = s                           -- latch hot on the punch
         else
             heat[i] = heat[i] * cfg_sustain      -- retain a fraction; tail cools
-            if heat[i] < smoothed[i] then heat[i] = smoothed[i] end
+            if heat[i] < s then heat[i] = s end
         end
         if heat[i] > effective[i] then effective[i] = heat[i] end
         -- advance the slow baseline AFTER the onset test (so the spike itself
         -- doesn't immediately raise the bar it has to clear).
-        bass_base[i] = bass_base[i] + (smoothed[i] - bass_base[i]) * BASE_RATE
+        bass_base[i] = bass_base[i] + (s - bass_base[i]) * BASE_RATE
     end
 
     -- Bleed: ONLY when a bass ring reaches PEAK FLARE (heat at the very top of
@@ -1056,8 +1064,10 @@ function p:render(bands, frame, rows, cols)
         end
     end
 
-    -- Ceiling: final hard clamp — nothing escapes past this. Last in the
-    -- gate→gamma→ceiling chain, same as a real limiter at mastering output.
+    -- Ceiling: final hard clamp on the COLOR path — nothing escapes past this.
+    -- Last in the gate→knee→ceiling chain, like a limiter at mastering output.
+    -- (The flare detector above is ALSO ceiling-limited so overdrive/bleed can
+    -- never fire above the cap; this clamp is the color path's final guarantee.)
     -- 1.0 = off (default).
     if cfg_ceiling < 1.0 then
         for i = 1, 10 do
