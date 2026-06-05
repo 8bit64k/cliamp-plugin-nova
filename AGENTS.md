@@ -68,6 +68,23 @@ SEPARATE plugin. Don't re-add portrait-preservation hedging here.
    older `test_center_fill.lua` only checks "leans toward center" and will NOT
    catch a symmetry break — do not trust it alone.
 
+   **Ceiling caps EVERYTHING, including bleed — INVARIANT (2026-06-04).** If
+   `overdrive > ceiling`, the overdrive threshold is unreachable, so no flare, no
+   color bleed, and no `bloom_bleed` (a separate array the final color-ceiling
+   clamp never touches). Enforced by clamping the flare DETECTOR input to the
+   ceiling (`s = min(smoothed, ceiling)`), NOT by reordering the pipeline — two
+   reverted fixes tried moving bleed after ceiling / testing effective[i] and
+   broke it (effective carries sustained signal → bleed fires constantly). VERIFY
+   any change to the flare/bleed/ceiling path with `scratchpad/test_ceiling_bleed.lua`
+   (asserts bleed never fires when od>ceil; proven to fail against the pre-fix code).
+
+   **TEST-FIRST for any audio-path fix (do not skip — this is not optional).**
+   Both the symmetry bug and the ceiling-bleed bug cost Nick live debugging time
+   because fixes shipped with no guard. Before pushing ANY change to the
+   fill/thicken/flare/bleed/ceiling logic: write or extend a scratchpad test that
+   FAILS against the bug and PASSES against the fix, and run it. A green test on
+   stale or absent coverage is worse than none.
+
    **Bug-hunt lesson (2026-06-04, do not repeat):** when Nick reports a visual
    defect, pixel-analyze his screenshot FIRST (`convert x.png -colorspace gray
    -depth 8 txt:-`). Do NOT argue from harness tests until you've (1) confirmed
