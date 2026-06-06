@@ -470,7 +470,7 @@ local PRESET_PROFILES = {
         ring_blend = true,
     },
     classic = {
-        theme = "terminal",  ring_shape = "wings",
+        theme = "aurora",  ring_shape = "circle",
         attack = 0.85,  release = 1,
         overdrive = 0.85,  sustain = 0.95,  blend = false,
         bloom_attack = 1,  bloom_release = 0.85,
