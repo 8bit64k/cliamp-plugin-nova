@@ -432,7 +432,7 @@ local PRESET_PROFILES = {
     ["default"] = {
         theme = "aurora",  ring_shape = "circle",
         attack = 0.55,  release = 0.18,
-        overdrive = 0.90,  sustain = 0.82,  blend = true,
+        overdrive = 0.78,  sustain = 0.82,  blend = true,
         bloom_attack = 0.6,  bloom_release = 0.15,
         gate = 0.0,  knee = 1.0,  tilt = 0.0,
         ring_blend = true,
@@ -448,7 +448,7 @@ local PRESET_PROFILES = {
     ethereal = {
         theme = "aurora",  ring_shape = "circle",
         attack = 0.3,  release = 0.08,
-        overdrive = 0.98,  sustain = 0.9,  blend = true,
+        overdrive = 0.85,  sustain = 0.9,  blend = true,
         bloom_attack = 0.4,  bloom_release = 0.05,
         gate = 0.0,  knee = 0.6,  tilt = 0.4,
         ring_blend = true,
@@ -456,7 +456,7 @@ local PRESET_PROFILES = {
     plasma = {
         theme = "aurora",  ring_shape = "circle",
         attack = 0.65,  release = 0.1,
-        overdrive = 0.75,  sustain = 0.88,  blend = true,
+        overdrive = 0.65,  sustain = 0.88,  blend = true,
         bloom_attack = 0.85,  bloom_release = 0.06,
         gate = 0.03,  knee = 0.9,  tilt = 0.2,
         ring_blend = true,
@@ -464,7 +464,7 @@ local PRESET_PROFILES = {
     ghost = {
         theme = "aurora",  ring_shape = "circle",
         attack = 0.3,  release = 0.05,
-        overdrive = 1,  sustain = 0.9,  blend = false,
+        overdrive = 0.88,  sustain = 0.9,  blend = false,
         bloom_attack = 0.05,  bloom_release = 0.9,
         gate = 0.00,  knee = 2.6,  tilt = 0.5,
         ring_blend = true,
@@ -472,7 +472,7 @@ local PRESET_PROFILES = {
     classic = {
         theme = "aurora",  ring_shape = "circle",
         attack = 0.85,  release = 1,
-        overdrive = 0.98,  sustain = 0.95,  blend = false,
+        overdrive = 0.85,  sustain = 0.95,  blend = false,
         bloom_attack = 1,  bloom_release = 0.85,
         tilt = 0.3,
         ring_blend = true,
