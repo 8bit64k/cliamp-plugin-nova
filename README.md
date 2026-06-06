@@ -1,7 +1,7 @@
 # nova
 
 <p align="center">
-  <img src="assets/nova-hero.gif" alt="nova visualizer cycling through color themes" width="400">
+  <img src="assets/nova-demo.gif" alt="nova visualizer demo" width="400">
 </p>
 
 A music visualizer for [cliamp](https://cliamp.stream) that turns your terminal
