@@ -51,11 +51,11 @@ if cfg_release < 0 then cfg_release = 0 elseif cfg_release > 1 then cfg_release 
 local cfg_overdrive  = tonumber(clean(p:config("overdrive"))) or 0.78
 if cfg_overdrive < 0 then cfg_overdrive = 0 elseif cfg_overdrive > 1 then cfg_overdrive = 1 end
 local cfg_tilt       = tonumber(clean(p:config("tilt"))) or 0.0
-local cfg_theme_name = clean(p:config("theme")) or "amber"
+local cfg_theme_name = clean(p:config("theme")) or "aurora"
 local cfg_ring_shape = clean(p:config("ring_shape")) or "circle"
 local cfg_cycle_secs = tonumber(clean(p:config("cycle_seconds"))) or 20
 if cfg_cycle_secs < 2 then cfg_cycle_secs = 2 end  -- guard against 0/typo thrash
-local cfg_fit        = clean(p:config("fit")) or "contain"
+local cfg_fit        = clean(p:config("fit")) or "fill"
 
 -- Debug: when true, show the active preset name via cliamp.message() on change.
 local cfg_debug = false
@@ -430,7 +430,7 @@ local PRESET_PROFILES = {
     -- Presets bundle dynamics + theme + ring_shape into a single feel.
     -- Keys not listed fall back to the "default" profile values.
     ["default"] = {
-        theme = "amber",  ring_shape = "circle",
+        theme = "aurora",  ring_shape = "circle",
         attack = 0.55,  release = 0.18,
         overdrive = 0.78,  sustain = 0.82,  blend = true,
         bloom_attack = 0.6,  bloom_release = 0.15,
@@ -438,7 +438,7 @@ local PRESET_PROFILES = {
         ring_blend = true,
     },
     punch = {
-        theme = "crt",  ring_shape = "diamond",
+        theme = "aurora",  ring_shape = "circle",
         attack = 1,  release = .25,
         overdrive = 1,  sustain = 0.9,  blend = false,
         bloom_attack = 1,  bloom_release = .85,
@@ -446,7 +446,7 @@ local PRESET_PROFILES = {
         ring_blend = true,
     },
     ethereal = {
-        theme = "aurora",  ring_shape = "diamond",
+        theme = "aurora",  ring_shape = "circle",
         attack = 0.3,  release = 0.08,
         overdrive = 0.85,  sustain = 0.9,  blend = true,
         bloom_attack = 0.4,  bloom_release = 0.05,
@@ -454,7 +454,7 @@ local PRESET_PROFILES = {
         ring_blend = true,
     },
     plasma = {
-        theme = "predator",  ring_shape = "circle",
+        theme = "aurora",  ring_shape = "circle",
         attack = 0.65,  release = 0.1,
         overdrive = 0.65,  sustain = 0.88,  blend = true,
         bloom_attack = 0.85,  bloom_release = 0.06,
@@ -514,7 +514,7 @@ local function active_profile()
 end
 
 -- Resolve active preset (fall back to amber on unknown name).
-local active_preset = PRESETS[cfg_theme_name] or PRESETS["amber"]
+local active_preset = PRESETS[cfg_theme_name] or PRESETS["aurora"]
 local glow_ramp      = active_preset.glow
 local overdrive_ramp = active_preset.overdrive
 local glow_n         = #glow_ramp       -- cached lengths (avoid # in hot path)
