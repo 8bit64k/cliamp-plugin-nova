@@ -290,7 +290,7 @@ ramp. Selected via `theme` config key; falls back to `aurora` on unknown names.
 | whitehot | Black → gray → bright white | Bright gray → pure white |
 | blackhot | White → gray → black (inverted) | Gray → black |
 | predator | Indigo → cyan → yellow → red (thermal) | Red → yellow |
-| terminal | Dark → green → yellow → red (cliamp spectrum) | Red → yellow |
+| terminal | Dark → green → yellow → red (cliamp spectrum) | Red → bright red |
 
 **terminal theme** is new in v0.1.0: faithful to cliamp's default spectrum
 gradient (ANSI 10/11/9 = green → yellow → red). Glow: `{232, 46, 46, 40, 226,
