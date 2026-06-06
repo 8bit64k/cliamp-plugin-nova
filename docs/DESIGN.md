@@ -21,7 +21,7 @@
 5. [Implementation walkthrough](#5-implementation-walkthrough)
 6. [Themes](#6-themes)
 7. [Ring shapes](#7-ring-shapes)
-8. [Behavior presets](#8-behavior-presets)
+8. [Visual Dynamics presets](#8-visual-dynamics-presets)
 9. [Configuration surface](#9-configuration-surface)
 10. [Audio signal chain](#10-audio-signal-chain)
 11. [Constraints & gotchas](#11-constraints--gotchas)
@@ -324,7 +324,7 @@ vNext shapes (square, squircle, layers, compass) preserved on `vnext-shapes` bra
 
 ---
 
-## 8. Behavior presets
+## 8. Visual Dynamics presets
 
 Six one-knob presets. Each bundles theme + ring_shape + all dynamics into a
 named feel. The profile overlay runs at the start of each `render()`. User-set
@@ -334,12 +334,12 @@ All presets use aurora + circle by default.
 
 | Preset | Feel | Key dynamics |
 |--------|------|-------------|
-| **default** | Balanced baseline | attack=0.55, release=0.18, od=0.78, sustain=0.82, blend=true, bloom_att=0.6, bloom_rel=0.15 |
-| **punch** | Snappy, percussive | attack=1, release=0.25, od=1, sustain=0.9, blend=false, bloom_att=1, bloom_rel=0.85, gate=0.2 |
-| **ethereal** | Dreamy, slow glow | attack=0.3, release=0.08, od=0.85, sustain=0.9, blend=true, bloom_att=0.4, bloom_rel=0.05, knee=0.6, tilt=0.4 |
-| **plasma** | Volatile, electric | attack=0.65, release=0.1, od=0.65, sustain=0.88, blend=true, bloom_att=0.85, bloom_rel=0.06, gate=0.03, knee=0.9, tilt=0.2 |
-| **ghost** | Thin, wispy, slow | attack=0.3, release=0.05, od=0.88, sustain=0.9, blend=false, bloom_att=0.05, bloom_rel=0.9, knee=2.6, tilt=0.5 |
-| **classic** | Big bloom, symmetric rings | attack=0.85, release=1, od=0.85, sustain=0.95, blend=false, bloom_att=1, bloom_rel=0.85, tilt=0.3, ring_blend=true |
+| **default** | Balanced baseline | attack=0.55, release=0.18, overdrive=0.78, sustain=0.82, blend=true, bloom_attack=0.6, bloom_release=0.15 |
+| **punch** | Snappy, percussive | attack=1, release=0.25, overdrive=1, sustain=0.9, blend=false, bloom_attack=1, bloom_release=0.85, gate=0.2 |
+| **ethereal** | Dreamy, slow glow | attack=0.3, release=0.08, overdrive=0.85, sustain=0.9, blend=true, bloom_attack=0.4, bloom_release=0.05, knee=0.6, tilt=0.4 |
+| **plasma** | Volatile, electric | attack=0.65, release=0.1, overdrive=0.65, sustain=0.88, blend=true, bloom_attack=0.85, bloom_release=0.06, gate=0.03, knee=0.9, tilt=0.2 |
+| **ghost** | Thin, wispy, slow | attack=0.3, release=0.05, overdrive=0.88, sustain=0.9, blend=false, bloom_attack=0.05, bloom_release=0.9, knee=2.6, tilt=0.5 |
+| **classic** | Big bloom, symmetric rings | attack=0.85, release=1, overdrive=0.85, sustain=0.95, blend=false, bloom_attack=1, bloom_release=0.85, tilt=0.3, ring_blend=true |
 
 `cycle_presets = true` rotates through all 6 on `cycle_seconds`.
 
