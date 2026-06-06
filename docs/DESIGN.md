@@ -23,7 +23,7 @@
 7. [Ring shapes](#7-ring-shapes)
 8. [Behavior presets](#8-behavior-presets)
 9. [Configuration surface](#9-configuration-surface)
-10. [Processing pipeline](#10-processing-pipeline)
+10. [Audio signal chain](#10-audio-signal-chain)
 11. [Constraints & gotchas](#11-constraints--gotchas)
 12. [Testing](#12-testing)
 13. [Known limitations & vNext](#13-known-limitations--vnext)
@@ -421,7 +421,7 @@ aurora + circle + fill with the `default` preset dynamics.
 
 ---
 
-## 10. Processing pipeline
+## 10. Audio signal chain
 
 The `effective[]` layer stack runs in a fixed order — same as a mastering chain.
 
