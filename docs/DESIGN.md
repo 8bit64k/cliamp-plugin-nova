@@ -1,108 +1,67 @@
 # DESIGN.md — cliamp-plugin-nova
 
-> Braille-wall visualizer for cliamp: a dense braille texture reacts to the 10-band EQ.
-> Each concentric ring recolors by band level on themed ANSI 256 ramps, and braille
-> glyphs thicken toward center as they heat — the wall gains matter on peaks, not just
-> brightness. Procedurally generated (no art file needed).
-> This document is the authoritative reference for the plugin's design, constraints,
-> and integration points. An agent dropping into this project should be able to read
-> this file and modify the plugin confidently without reading the upstream cliamp
-> source first.
+> Braille-wall visualizer for cliamp: a dense braille texture mapped into
+> concentric rings, colored by the 10-band EQ on themed ANSI 256 ramps, with
+> glyph bloom that thickens toward center as rings heat. Procedurally generated
+> — no art file required.
+>
+> v0.1.0. Single Lua file (~1232 lines). gopher-lua 5.1 sandbox.
+>
+> **Repo:** `8bit64k/cliamp-plugin-nova` (public)
+> **Install:** `cliamp plugins install 8bit64k/cliamp-plugin-nova`
 
 ---
 
 ## Table of contents
 
 1. [What this plugin is](#1-what-this-plugin-is)
-2. [Upstream project (cliamp) — what you need to know](#2-upstream-project-cliamp--what-you-need-to-know)
-3. [The cliamp plugin system, condensed](#3-the-cliamp-plugin-system-condensed)
-4. [Visualizer plugin API contract](#4-visualizer-plugin-api-contract)
-5. [Design goals & visual brief](#5-design-goals--visual-brief)
-6. [Implementation walkthrough](#6-implementation-walkthrough)
-7. [Color system (themes)](#7-color-system-themes)
-8. [State & per-frame timing](#8-state--per-frame-timing)
+2. [Upstream — what matters](#2-upstream--what-matters)
+3. [Visualizer API contract](#3-visualizer-api-contract)
+4. [Design goals](#4-design-goals)
+5. [Implementation walkthrough](#5-implementation-walkthrough)
+6. [Themes](#6-themes)
+7. [Ring shapes](#7-ring-shapes)
+8. [Behavior presets](#8-behavior-presets)
 9. [Configuration surface](#9-configuration-surface)
-10. [Constraints & sandbox boundaries](#10-constraints--sandbox-boundaries)
-11. [Testing & local verification](#11-testing--local-verification)
-12. [Installation & distribution](#12-installation--distribution)
-13. [Known limitations & ideas for v2](#13-known-limitations--ideas-for-v2)
+10. [Processing pipeline](#10-processing-pipeline)
+11. [Constraints & gotchas](#11-constraints--gotchas)
+12. [Testing](#12-testing)
+13. [Known limitations & vNext](#13-known-limitations--vnext)
 14. [File map](#14-file-map)
-15. [Agent handoff checklist](#15-agent-handoff-checklist)
 
 ---
 
 ## 1. What this plugin is
 
-`nova` is a custom visualizer plugin for cliamp that renders a **braille wall**
-reacting to the 10-band EQ feed. It is written in Lua (~1268 lines, single file),
-runs inside cliamp's sandboxed `gopher-lua` VM, and uses ANSI 256-color escape
-sequences to draw themed radial rings where bass = center and treble = edge. The
-wall is **generated procedurally** — no art file required. Config key `art_path`
-provides an optional override to drive a custom ASCII/braille file instead.
+`nova` is a visualizer plugin for cliamp. It generates a uniform braille wall
+at load time and maps it into 10 concentric rings centered on the pane. Each
+ring is driven by one EQ band — bass (32 Hz) at center, treble (16 kHz) at the
+edge. Every cell recolors by its ring's smoothed level and its braille glyph
+thickens (gains dots toward center) as the ring heats.
 
-It is the active visualizer sibling to `cliamp-plugin-tubeamp` (shipped v1.2.0)
-and was renamed from `cliamp-plugin-dance` on 2026-05-31 after a scope decision:
-nova is braille-wall only; ASCII portrait art will be a separate plugin.
+### Feature summary (v0.1.0)
 
-**Repo:** `8bit64k/cliamp-plugin-nova` (public)
-**Install:** `cliamp plugins install 8bit64k/cliamp-plugin-nova`
-**cliamp visualizer name:** `nova` (cycle to it with `v` in the player)
+| Feature | Surface |
+|---------|---------|
+| Ring shapes | 3 + cycle: circle, diamond, wings. `cycle` rotates all 3 |
+| Color themes | 7: amber, crt, whitehot, blackhot, aurora (default), predator, terminal |
+| Presets | 6: default, punch, ethereal, plasma, ghost, classic |
+| Bloom | Glyphs thicken toward center with own attack/release envelope |
+| Bloom bleed | Overdrive transients thicken +1/+2 adjacent rings |
+| Overdrive | Transient-onset flare on bass bands, latch-and-decay tail |
+| Pipeline | gate → knee → ceiling compressor lane + tilt EQ |
+| Performance | `render_rate` frame-skip, `max_cols`/`max_rows` canvas cap |
+| Procedural wall | `start = "black"` (empty) or `"stipple"` (faint texture). `art_path` override |
 
-### Feature summary (v0.1)
-
-- **Procedural braille wall** — `start = "black"` (empty canvas, dots bloom from
-  silence) or `"stipple"` (faint resting texture). `art_path` for custom files.
-- **9 color themes** — amber, crt, vantablack, whitehot, blackhot, redhot,
-  orangehot, aurora, ember, predator, flan. All 11-stop ANSI 256 glow + 4-stop
-  overdrive ramp. (redhot + orangehot added June 2 from laptop.)
-- **7 ring shapes** — square (Chebyshev), diamond (Manhattan), circle (Euclidean),
-  squircle (p=4 Minkowski), wings (vertical stripes), layers (horizontal strata),
-  compass (four-pointed star). `ring_shape = "cycle"` auto-rotates all 7.
-- **Braille bloom mutation** — glyphs gain dots toward center as they heat,
-  with a separate attack/release envelope (phosphor persistence). 9 directional
-  fill orders so dots always accrete toward center regardless of quadrant.
-- **Density bleed** — overdrive transients thicken adjacent rings +1 and +2
-  (mechanical bulge travels further than color heat), sharing the overdrive
-  decay clock so the two channels read as one percussive event.
-- **8 behavior presets** — default, punch, ethereal, retro, plasma, ghost, whiteout,
-  tacutacu. One-knob feel selection: each bundles dynamics + theme + ring_shape.
-  `cycle_presets = true` auto-rotates through all 8 for hands-free review.
-- **Performance controls** — `render_rate` (fraction of frames rendered, 0.25–1.0)
-  and `max_cols`/`max_rows` (canvas cap) for large fit=fill fullscreen panes.
-- **Debug footer** — shows preset + theme + bloom bleed indicator ("BLD") on the
-  bottom row when `debug = true`.
+**Defaults:** theme=aurora, ring_shape=circle, fit=fill, start=black.
 
 ---
 
-## 2. Upstream project (cliamp) — what you need to know
+## 2. Upstream — what matters
 
-### What cliamp is
-
-cliamp is a Bubbletea-based terminal music player inspired by Winamp. Written in
-Go. Plays local files, HTTP streams, podcasts, and content from many providers.
-
-**Repo:** https://github.com/bjarneo/cliamp
-**Site:** https://cliamp.stream
-**Built with:** Bubbletea (TUI), Lip Gloss (styling), Beep (audio), gopher-lua (plugin VM)
-
-### Local checkout
-
-The upstream is cloned at `~/builds/cliamp/` for reference. Read the following
-files when you need ground truth:
-
-| Path | What's in it |
-|------|--------------|
-| `~/builds/cliamp/docs/plugins.md` | User-facing plugin API reference — authoritative spec |
-| `~/builds/cliamp/luaplugin/visualizer.go` | Go-side visualizer plugin host — defines render contract |
-| `~/builds/cliamp/luaplugin/luaplugin.go` | Plugin manager: registration, lifecycle, VM-per-plugin isolation |
-| `~/builds/cliamp/luaplugin/sandbox.go` | What's removed/restricted in the Lua sandbox |
-| `~/builds/cliamp/ui/visualizer.go` | Visualizer driver that calls into Lua via `RenderVis` |
-| `~/builds/cliamp/ui/vis_*.go` | 30+ first-party reference visualizer implementations |
-| `~/builds/cliamp/ui/tick.go` | Frame cadence constants (`TickFast = 50ms`, `TickSlow = 200ms`) |
-
-### The 10-band EQ
-
-cliamp ships a 10-band parametric EQ with these center frequencies, in order:
+cliamp is a Bubbletea-based terminal music player (Go). It ticks visualizers at
+~20 FPS (50ms TickFast) while playing, 5 FPS (200ms TickSlow) when paused.
+The 10-band EQ is pre-smoothed and log-scaled; bands arrive normalized 0.0–1.0.
 
 | Index (Lua 1-based) | Frequency |
 |---------------------|-----------|
@@ -117,753 +76,445 @@ cliamp ships a 10-band parametric EQ with these center frequencies, in order:
 | 9 | 8 kHz |
 | 10 | 16 kHz |
 
-The same band layout is used for the spectrum visualizer feed — the `bands` table
-passed to `p:render(...)` is normalized FFT energy in those 10 buckets, range
-0.0 to 1.0 each. Bands are already log-magnitude scaled and pre-smoothed by
-cliamp's analysis driver. The plugin does its own additional smoothing pass on
-top for the asymmetric attack/release tube-like feel, and for bloom's separate
-envelope.
+The plugin does its own additional asymmetric smoothing on top for the
+attack/release tube-like feel, and bloom has its own separate envelope.
 
-### Audio analysis pipeline (relevant facts)
-
-- Bands are already log-magnitude scaled (`(10*log10(sum) + 10) / 50`, clamped
-  0..1) — the plugin sees a perceptually reasonable spectrum, not raw power.
-- `frame` counter is monotonic and resets on visualizer (re-)selection.
-- You do **not** need to do dB conversion, smoothing, or FFT in the plugin.
+Upstream checkout at `~/builds/cliamp/`. Ground truth files: `docs/plugins.md`,
+`luaplugin/visualizer.go`, `luaplugin/sandbox.go`, `ui/tick.go`.
 
 ---
 
-## 3. The cliamp plugin system, condensed
+## 3. Visualizer API contract
 
-### Plugin types
+```lua
+function p:render(bands, frame, rows, cols)
+    -- bands: table { [1]=0.0..1.0, ..., [10]=0.0..1.0 }
+    -- frame: monotonic counter, resets on visualizer (re-)selection
+    -- rows, cols: terminal pane dimensions
+    -- returns: multi-line string (\n-separated). ANSI escapes pass through.
+end
+```
 
-| Type | Purpose | Callback shape |
-|------|---------|----------------|
-| `hook` | Event-driven (track.change, playback.state, app.start, app.quit, track.scrobble) | `p:on(event, fn)` — async, 5s timeout |
-| `visualizer` | Per-frame rendering | `p:render(bands, frame, rows, cols)` — sync, 10ms budget |
+**Hard rules:**
+- Return MUST be a string. Non-string → silent frame reuse (previous frame).
+- 10ms budget per call. Render is serialized per plugin (host mutex).
+- ANSI 256-color escapes pass through Bubbletea unchanged.
+- `init(rows, cols)` optional, runs once on selection. `destroy()` on deselection.
+- gopher-lua = Lua 5.1: no bitwise operators (`>>`, `<<`, `|`, `&`), no `bit32`.
+  All bit work is arithmetic on powers of two.
 
-### Loading
+**Sandbox:** no `os.execute`, no `io.*`, no `dofile`. File reads from any path
+(1 MB cap). `~` not expanded in `cliamp.fs` paths — `expand_path()` handles it.
+`cliamp.message()` deadlocks inside `render()` — call only from `init()`.
 
-- Plugins live at `~/.config/cliamp/plugins/`.
-- Each `.lua` file is loaded into its own `gopher-lua` VM at startup.
-- A plugin is recognized only if it calls `plugin.register({...})`.
-- VMs are isolated — a crash in one cannot affect another or the player.
-- Render errors fall back to the previous frame silently.
+---
 
-### Registration shape
+## 4. Design goals
+
+1. **Concentric rings, bass at center.** Band 1 innermost, band 10 outermost.
+2. **Multiple ring shapes** via distance-metric dispatch. Circle, diamond, wings.
+   `cycle` rotates all three.
+3. **Color themes from the tubeamp family.** Same ANSI 256 convention, 11-stop
+   glow + 4-stop overdrive ramp per theme.
+4. **Braille bloom mutation.** Glyphs thicken toward center as rings heat. Dots
+   OR into base glyph, ending at solid ⣿ (U+28FF). Own attack/release envelope
+   for phosphor persistence.
+5. **Bloom bleed.** Overdrive transients thicken +1/+2 adjacent rings (bulge
+   travels further than color).
+6. **Transient-triggered overdrive.** Flare fires on bass ONSET (kick drum),
+   not sustained level. Slow baseline EMA + onset margin.
+7. **One-knob presets.** 6 curated feels bundle theme + shape + all dynamics.
+   Individual TOML keys override.
+8. **Procedural wall.** No file dependency. `art_path` optional override.
+
+**Non-goals:** ASCII portrait art (separate plugin), positional jitter, truecolor.
+
+---
+
+## 5. Implementation walkthrough
+
+Everything in `nova.lua`. Single file, no requires.
+
+### Registration
 
 ```lua
 local p = plugin.register({
-    name        = "nova",
-    type        = "visualizer",
-    version     = "0.1.0",
+    name = "nova", type = "visualizer", version = "0.1.0",
     description = "Braille wall visualizer — EQ-driven glow with presets, themes, and bloom mutation",
 })
 ```
 
-Callbacks: `p.render` (required), `p.init` (optional, called once on selection),
-`p.destroy` (optional, called on deselection).
+### Configuration
 
-### Frame cadence
+Every `p:config(key)` goes through `clean()` which strips trailing `#`-comments
+(cliamp's TOML parser leaks them) and surrounding quotes. Booleans parsed
+defensively: real bool first, then string `"true"`/`"false"`/`"on"`/`"off"` etc.
 
-- `TickFast = 50ms` (20 FPS) when playing and foreground.
-- `TickSlow = 200ms` (5 FPS) when paused or overlay open.
-- Render budget: 10ms wall time per call.
+User-set tracking: `user_set_attack = (p:config("attack") ~= nil)` etc. These
+flags let the preset profile overlay skip keys the user explicitly set.
 
----
+### Ring distance metrics
 
-## 4. Visualizer plugin API contract
-
-```lua
-function p:render(bands, frame, rows, cols)
-    --   bands : table { [1]=0.0..1.0, ..., [10]=0.0..1.0 } — 1-indexed, 10-band normalized spectrum
-    --   frame : monotonic counter, resets on visualizer (re-)selection
-    --   rows  : terminal rows available to the visualizer
-    --   cols  : terminal columns available to the visualizer
-    -- returns: multi-line string (newline-separated). ANSI escapes pass through.
-end
-```
-
-### Hard rules
-
-- Return value MUST be a string. `nil`, `false`, or non-string → silent frame reuse.
-- ANSI 256-color escapes pass through Bubbletea — full ANSI 256 is safe.
-- Render is serialized per-plugin (host mutex); state mutation needs no locks.
-- 10ms per call budget.
-- `init(rows, cols)` is optional; runs once on selection.
-- `destroy()` is optional; runs once on deselection.
-
-### Sandbox restrictions
-
-- No `os.execute`, no `io.*`, no `dofile`, no `loadfile`.
-- File reads from ANY path (1 MB cap). Writes restricted to `/tmp/`,
-  `~/.config/cliamp/`, `~/.local/share/cliamp/`, `~/Music/cliamp/`.
-- Network only via `cliamp.http` (5s timeout, 1MB body cap).
-- `os.time`, `os.date`, `os.clock`, `os.getenv` are kept — but `os.execute`,
-  `os.remove`, `os.rename`, `os.exit`, `os.setlocale`, `os.tmpname` are stripped.
-- **gopher-lua is Lua 5.1** — no bitwise operators (`>>`, `<<`, `|`, `&`) and no
-  `bit32`. All bit work must use plain arithmetic on powers of two. Local `lua`
-  may be 5.3+ and parse bitops fine; the host would silently fail to load them.
-  This is the single most dangerous invisible footgun.
-
----
-
-## 5. Design goals & visual brief
-
-### Brief (from user)
-
-Originally nicknamed "dance" — an ASCII/braille visualizer. Evolved into nova
-after the discovery that a uniform braille wall under concentric ring coloring
-+ bloom mutation reads as a genuine standalone visualization, not just "a
-picture reacting to EQ."
-
-### Concrete design goals
-
-1. **Concentric rings, bass at center** — band 1 (32 Hz) drives the innermost ring,
-   band 10 (16 kHz) the outermost. The wall is mapped into those rings so color
-   and bloom radiate from the center outward.
-2. **Multiple ring shapes** — square (default), diamond, circle, and four more.
-   Each is a pure distance metric in a dispatch table, so shape selection is a
-   one-line swap with zero downstream changes.
-3. **Color themes from the tubeamp family** — reuse the same ANSI 256 convention
-   so the plugin siblings feel consistent. 11-stop glow + 4-stop overdrive ramp
-   per theme.
-4. **Braille bloom mutation** — glyphs don't just recolor; they THICKEN. Dots
-   OR into the base glyph as level rises, ending at solid `⣿` (U+28FF). Dots fill
-   TOWARD CENTER (not always bottom-up) so the accretion reinforces the radial
-   structure. Separate attack/release envelope (phosphor persistence) so dots pop
-   fast and melt slow.
-5. **Density bleed** — an overdrive transient not only spills color into adjacent
-   rings (+1) but also thickens their glyphs (+1 and +2, because mechanical
-   deformation travels further than color heat). Shares the overdrive decay clock
-   so both channels read as one percussive event.
-6. **Transient-triggered overdrive** — flare fires on a bass ONSET (kick drum),
-   not on a sustained high level. Uses a slow baseline EMA + onset margin. The
-   flare latch-and-decays so it flashes and fades.
-7. **One-knob presets** — a user shouldn't need to tune 15 dynamics knobs. Eight
-   curated presets bundle theme + ring_shape + all dynamics into a single feel.
-   Individual TOML keys override preset values.
-8. **Procedural wall, no file dependency** — the default wall is generated on
-   load. No art file to copy or configure. `art_path` is an optional override.
-
-### Non-goals
-
-- ASCII portrait art — scoped out to a future separate plugin. Nova is braille-wall
-  only. Don't re-add portrait-preservation hedging.
-- Positional jitter / art translation — bloom mutation displaced this. Motion is
-  shelved.
-- Truecolor / 24-bit color — ANSI 256 only, matching the tubeamp family.
-- Per-frame spatial animation beyond bloom. The art canvas is fixed; only color
-  and glyph dots react.
-
-### Visual model
-
-```
-Pane center = bass (ring 1, band 1 = 32 Hz)
-│
-├── ring 1: 32 Hz  (innermost, hottest on bass)
-├── ring 2: 64 Hz
-├── ring 3: 125 Hz
-├── ...
-├── ring 8: 4 kHz
-├── ring 9: 8 kHz
-└── ring 10: 16 kHz (outermost, lights on treble/hi-hats)
-
-Ring boundaries are leveled by the selected distance metric.
-ring_blend = true (default) interpolates between adjacent rings for smooth gradients.
-ring_blend = false gives hard stepped ring boundaries.
-
-Density: dots fill TOWARD CENTER. Cell left of center fills rightward.
-Cell above center fills upward. Corners fill from the dot nearest center.
-Overdrive bloom bleed: bass transient thickens +1/+2 rings outward,
-reinforcing the radial bulge effect.
-```
-
----
-
-## 6. Implementation walkthrough
-
-Everything lives in **`nova.lua`** (single file, ~1268 lines). No modules, no
-requires, no helper files. Section-by-section:
-
-### Top of file: registration (lines 12–17)
-
-Standard visualizer registration. `version = "0.1.0"`.
-
-### Configuration pulls (lines 19–198)
-
-Every config value is read through `clean()` which strips trailing `#`-comments
-(crucial: cliamp's TOML parser leaks inline `#` comments into config values,
-breaking exact-string lookups and `tonumber`). Booleans are parsed defensively:
-`type(raw) == "boolean"` is checked first (the `p:config` call may already
-return a real bool), then string values (`"true"`, `"false"`, `"on"`, `"off"`,
-`"1"`, `"0"`, `"yes"`, `"no"`).
-
-User-override tracking is done alongside config reads: `user_set_attack =
-(p:config("attack") ~= nil)`. These flags let the preset profile overlay know
-which keys to not overwrite.
-
-Config defaults:
-- `start = "black"`, `color_mode = "glow"`, `theme = "amber"`, `ring_shape = "square"`
-- `attack = 0.55`, `release = 0.18` (same as tubeamp)
-- `overdrive = 0.78`, `sustain = 0.82`, `blend = true`
-- `bloom = true`, `bloom_attack = 0.6`, `bloom_release = 0.15`
-- `gate = 0.0`, `ceiling = 1.0`, `knee = 1.0`, `tilt = 0.0`
-- `cell_aspect = 0.5`, `ring_blend = true`, `fit = "contain"`
-- `max_cols = 0`, `max_rows = 0`, `render_rate = 1.0`
-
-### Ring distance metrics (lines 200–245)
-
-Seven pure distance-metric functions in a `DIST` table:
+Three pure distance-metric functions in a `DIST` table. The caller applies
+`cfg_cell_aspect` x-scaling (default 0.5) BEFORE calling `dist()`, so `dist()`
+is pure geometry with no aspect logic. The same `dist()` is used for both
+`max_d` normalization and per-cell band lookup — they CANNOT diverge.
 
 ```lua
 DIST = {
-    square   = function(adx, ady) return (adx > ady) and adx or ady end,  -- Chebyshev
-    diamond  = function(adx, ady) return adx + ady end,                    -- Manhattan
-    circle   = function(adx, ady) return math.sqrt(adx*adx + ady*ady) end, -- Euclidean
-    squircle = function(adx, ady) return (adx^4 + ady^4) ^ 0.25 end,       -- p=4 Minkowski
-    wings    = function(adx, _)   return adx end,                           -- X-only, vertical stripes
-    layers   = function(_, ady)   return ady end,                           -- Y-only, horizontal strata
-    compass  = function(adx, ady) return math.min(adx, ady) + 0.4 * math.abs(adx - ady) end,
+    circle  = function(adx, ady) return math.sqrt(adx*adx + ady*ady) end,
+    diamond = function(adx, ady) return adx + ady end,
+    wings   = function(adx, _)   return adx end,
 }
 ```
 
-The same `dist()` is used for both `max_d` normalization and per-cell band
-lookup — they CANNOT diverge. The caller applies `cfg_cell_aspect` x-scaling
-BEFORE calling `dist()`, so `dist()` is pure geometry with no aspect logic.
+`ring_shape = "cycle"` rotates through `{"circle", "diamond", "wings"}` every
+`cycle_seconds` (default 20) using `os.time()`. Anchored to load-time baseline.
 
-`ring_shape = "cycle"` rotates through all seven shapes every `cycle_seconds`
-(default 20) using `os.time()`. The cycle is anchored to a load-time baseline
-(`cycle_t0 = os.time()`) so it always starts on "square" on selection.
+### ANSI helpers
 
-### ANSI helpers (lines 247–263)
+`FG[256]` precomputed table — per-cell color changes are single table lookups.
+`fg256(n)` returns `FG[n]`. Hot math functions hoisted to locals: `floor`,
+`abs`, `sqrt`.
 
-`fg256(n)` uses a precomputed `FG[256]` table so the hot loop never rebuilds
-ANSI escape strings — `FG[color]` is a single table lookup.
+### Braille bloom mutation
 
-```lua
-FG = {}
-for n = 0, 255 do FG[n] = ESC .. "[38;5;" .. n .. "m" end
-local function fg256(n) return FG[n] or (ESC .. "[38;5;" .. n .. "m") end
+All bit math is plain arithmetic (gopher-lua 5.1 safe).
+
+- `braille_char(cp)` — encodes `0x2800 + mask` as 3-byte UTF-8 via div/mod,
+  memoized in `braille_cache[cp]`.
+- `set_bit(mask, bit)` — ORs a power-of-two bit using `floor(mask/bit) % 2`.
+- `thicken(base_cp, level, fill_order, dkey)` — computes `add = round(level*8)`
+  dots to OR into base. Memoized: `thicken_cache[dkey][base_cp][add]`. After
+  warmup this is pure table lookups, zero bit loops in hot path.
+
+**Toward-center fill:** 9 directional fill orders keyed by
+`FILL_ORDERS[dirx][diry]` where `dirx, diry ∈ {-1,0,1}`. Each order sorts the 8
+braille dots so the ones nearest center fill first. Center-axis cells (any dirx
+or diry == 0) list dots in mirror-PAIRS (or quads for dead center); `thicken()`
+snaps `add` to even/pairs or mult-of-4/quads via `dkey` parity check. This
+preserves the wall's mirror symmetry on odd-dimensioned panes.
+
+**INVARIANT:** the wall must be mirror-symmetric (V and H). Opposite cells
+across pane center must be exact dot-mirrors. Verify with
+`scratchpad/test_mirror_symmetry.lua`.
+
+### Procedural wall generation
+
+`generate_wall()` fills a fixed 35×188 source grid with the `start_cp` base
+glyph — uniform, zero decode cost, bloom base ready on every cell.
+`start = "black"` → U+2800 (empty), `"stipple"` → U+2824 (faint texture).
+
+File path: `load_art()` reads via `cliamp.fs.read()`. `expand_path()` handles
+`~`, `~/`, `$HOME`, `${HOME}`. Pre-extracts `art_cells[y][x]` (glyph strings)
+and `art_code[y][x]` (braille codepoint or nil). Lazy-load guard: `render()`
+calls load on first use if `art_cells` is nil — `init()` is an optimization.
+
+### Per-instance state
+
 ```
-
-`bg256(n)` is defined on-demand (not precomputed — background colors aren't used
-in the hot loop, only in the debug footer).
-
-Math functions are hoisted to locals: `floor`, `abs`, `sqrt` — saving two hash
-lookups per call in the per-cell hot loop.
-
-### Braille bloom mutation (lines 264–353)
-
-All bit math is plain arithmetic (gopher-lua = Lua 5.1 safe). No `|`, `>>`, `&`.
-
-- `braille_char(cp)` — encodes `0x2800 + mask` as 3-byte UTF-8 via div/mod, memoized.
-- `set_bit(mask, bit)` — ORs a power-of-two bit into mask, arithmetic only.
-- `thicken(base_cp, level, fill_order, dkey)` — computes `add = round(level*8)` dots
-  to OR into the base mask. Uses a 3-level cache: `thicken_cache[dkey][base_cp][add]`.
-  After warmup this is pure table lookups — zero bit loops, zero allocation in the
-  hot path. At most 9 dirs × 256 base glyphs × 9 add buckets = ~20K entries.
-
-The 9 toward-center fill orders are keyed by `FILL_ORDERS[dirx][diry]` where
-`dirx, diry ∈ {-1,0,1}`. Each order sorts the 8 braille dots so the ones nearest
-the center fill first. Verified visually with `scratchpad/viz_fill.lua`: every
-spatial position marches its dots toward center.
-
-### Color presets (lines 355–443)
-
-Nine themes in a `PRESETS` table. Each has `{glow = {11 ANSI 256 indices},
-overdrive = {4 ANSI 256 indices}, name = "..."}`.
-
-The config key `theme = "amber"` selects the preset. Unknown names fall back to
-amber. Theme swap at render-time (from preset profile overlay) rebinds
-`glow_ramp` and `overdrive_ramp` directly.
-
-Themes: amber, crt, vantablack, whitehot, blackhot, redhot, orangehot, aurora,
-ember, predator, flan. (redhot + orangehot added June 2 from laptop.)
-
-`glow_color(level, hot)` uses ROUND not floor for ramp indexing — `idx =
-floor(level * (n - 1) + 0.5) + 1`. This ensures the peak stop (e.g. white-hot at
-index 11) is reachable on real musical peaks, not just at exact `level == 1.0`.
-
-### Preset profiles (lines 445–552)
-
-Eight behavior profiles in `PRESET_PROFILES`. Each bundles theme, ring_shape,
-and all dynamics knobs into a single named feel:
-
-| Preset    | Theme     | Shape    | Feel |
-|-----------|-----------|----------|------|
-| default   | amber     | circle   | balanced baseline |
-| punch     | crt       | diamond  | snappy, percussive |
-| ethereal  | aurora    | diamond  | dreamy, slow glow |
-| retro     | ember     | square   | CRT-era grit, hard rings |
-| plasma    | predator  | circle   | volatile, electric |
-| ghost     | vantablack| square   | thin, wispy, slow |
-| whiteout  | whitehot  | diamond  | bright, fast, blooming |
-| tacutacu  | flan      | diamond  | punchy + warm flan tones |
-
-The profile overlay runs at the start of `render()`. For each key, it checks
-`user_set_*` — if the user explicitly set it in TOML, the overlay skips it. If
-not, the profile's value overwrites the `cfg_*` upvalue for that frame. This
-includes theme swap (rebinds glow_ramp/overdrive_ramp) and ring shape swap
-(updates cfg_ring_shape so `active_dist()` picks it up).
-
-`cycle_presets = true` rotates through all 8 presets on `cycle_seconds`, using
-the same `cycle_t0` baseline as the ring shape cycle (so both cycle modes start
-deterministically on selection).
-
-### Art loading (lines 574–744)
-
-Two paths:
-
-1. **Procedural generation** (`generate_wall()`) — fills a fixed 35×188 source
-   grid with the `start_cp` base glyph. `start = "black"` → U+2800 (empty braille).
-   `start = "stipple"` → U+2821 (faint resting texture). `art_code[y][x] = start_cp`
-   everywhere — uniform, zero decode cost, bloom mutation has its base ready.
-
-2. **File loading** (`load_art()`) — reads via `cliamp.fs.read()`, splits into
-   lines, pre-extracts `art_cells[y][x]` (UTF-8 glyph strings) and
-   `art_code[y][x]` (braille codepoint if U+2800..U+28FF, else nil).
-
-Path expansion: `expand_path()` handles `~`, `~/`, `$HOME`, `${HOME}` before
-passing to `cliamp.fs` (cliamp's Go sandbox does NOT expand shell tilde).
-
-Lazy-load robustness: `init()` calls `load_art()`, but `render()` also calls it
-lazily on first use if `art_cells` is nil — `init()` is an optimization, not a
-correctness dependency. The readiness sentinel is `art_cells` (set by BOTH the
-procedural generator AND the file loader — `art_lines` is only set by the file
-path and must not be the gate).
-
-### Per-instance state (lines 746–801)
-
-```lua
-smoothed  = {0,0,0,0,0,0,0,0,0,0}  -- asymmetric attack/release envelope
-heat      = {0, 0}                   -- overdrive flare latch-and-decay (bands 1-2)
-bass_base = {0, 0}                   -- slow baseline EMA for transient onset detection
-effective = {0,0,0,0,0,0,0,0,0,0}  -- the final level COLORS read (after all effects)
-dens      = {0,0,0,0,0,0,0,0,0,0}  -- bloom envelope (chases effective[] with its own attack/release)
-dens_bleed= {0,0,0,0,0,0,0,0,0,0}  -- bloom bleed boost (latch-and-decay at sustain)
-bleeding  = false                    -- set during effective[] build, read by debug footer
+smoothed[10]    — asymmetric attack/release envelope
+heat[2]         — overdrive flare latch-and-decay (bands 1-2)
+bass_base[2]    — slow baseline EMA for transient onset detection
+effective[10]   — the final level COLORS read (after all effects)
+bloom[10]       — bloom envelope (chases effective[] with own attack/release)
+bloom_bleed[10] — bloom bleed boost (latch-and-decay at sustain)
+bleeding        — set during effective[] build, read by debug footer
 ```
 
 Frame-skip state: `last_output`, `skip_counter`, `last_rows`, `last_cols`.
 
-### The render pipeline (lines 824–1268)
+### Render pipeline
 
 Each `render()` call:
 
-1. **Preset profile overlay** — apply profile values to any `cfg_*` key the user
-   didn't explicitly set. Theme swap rebinds color ramps. Ring shape swap updates
-   `cfg_ring_shape` for the active distance metric.
-
-2. **Spectral tilt + smoothing** — apply per-band treble boost (`cfg_tilt`),
-   then asymmetric attack/release: `smoothed[i] += (raw - smoothed[i]) * attack`
-   (fast rise) or `smoothed[i] -= (smoothed[i] - raw) * release` (slow fall).
-
-3. **Build effective[] layer stack**:
-   a. Copy `smoothed[]` → `effective[]`
-   b. Overdrive flare: transient-onset detection on bands 1-2. Fire when
-      `smoothed[i] >= cfg_overdrive AND smoothed[i] >= bass_base[i] + ONSET_MARGIN(0.18)`.
-      Latch `heat[i]` to the live level; otherwise `heat[i] *= cfg_sustain`.
-      `effective[i] = max(effective[i], heat[i])`.
-      Advance `bass_base[i]` AFTER the onset test (spike doesn't raise its own bar).
-   c. Color bleed: when `heat[i] >= FLARE_PEAK` (where `FLARE_PEAK = max(0.92,
-      cfg_overdrive)` — never below the overdrive floor), spill
-      `0.45 * over` into the ring just outside (`effective[i+1]`). Clamped to ≤1.
-   d. Density bleed: same `FLARE_PEAK` gate. Separate `dens_bleed[]` array
-      decays at `cfg_sustain` (same clock as color bleed). Latches on bass
-      transient: +1 ring gets full spill, +2 ring gets `spill * 0.5`. Applied
-      AFTER the bloom envelope (step 6 below) so bleed is independent of
-      `bloom_release`.
-   e. Gate: clamp `effective[i] < cfg_gate` → 0 (noise gate).
-   f. Knee curve: `effective[i] = effective[i] ^ cfg_knee` (skip already-dead bands).
-   g. Ceiling: final hard clamp `effective[i] > cfg_ceiling` → cfg_ceiling (limiter, last in chain).
-
-4. **Density envelope**: `dens[i]` chases `effective[i]` with its own attack/release
-   (`cfg_dens_attack`, `cfg_dens_release`). Density reads `dens[]`, not `effective[]`.
-
-5. **Apply bloom bleed boost**: `dens[i] += dens_bleed[i]`. Bleed decays at
-   `sustain`, not `bloom_release` — the two channels feel like one event.
-
+1. **Preset profile overlay** — apply profile values to `cfg_*` keys the user
+   didn't explicitly set. Theme swap rebinds `glow_ramp`/`overdrive_ramp`.
+   Ring shape swap updates `cfg_ring_shape`.
+2. **Spectral tilt + smoothing** — per-band treble boost (`cfg_tilt`), then
+   asymmetric attack/release on `smoothed[i]`.
+3. **Build effective[] layer stack** (see Section 10 for full order):
+   - Copy `smoothed[]` → `effective[]`
+   - Overdrive flare: transient-onset detection on bands 1-2 via baseline EMA
+     + onset margin. Latch `heat[i]`, else `heat[i] *= cfg_sustain`.
+     `effective[i] = max(effective[i], heat[i])`. Flare detector input clamped
+     to `cfg_ceiling` so ceiling below overdrive means no flare, ever.
+   - Color bleed: when `heat[i] >= FLARE_PEAK`, spill into ring +1. Clamped ≤1.
+     `FLARE_PEAK = max(0.92, cfg_overdrive)` — never below overdrive threshold.
+   - Bloom bleed: separate `bloom_bleed[]` array, same `FLARE_PEAK` gate.
+     Latches on bass transient: +1 ring gets full spill, +2 gets half.
+     Decays at `cfg_sustain` (shared clock with color bleed).
+   - Gate: clamp `effective[i] < cfg_gate` → 0.
+   - Knee: `effective[i] = effective[i] ^ cfg_knee` (skip dead bands).
+   - Ceiling: final hard clamp `effective[i] > cfg_ceiling` → cfg_ceiling.
+     **Must be last** — knee < 1 lifts clamped values past ceiling.
+4. **Bloom envelope** — `bloom[i]` chases `effective[i]` with its own
+   attack/release (`cfg_bloom_attack`, `cfg_bloom_release`).
+5. **Apply bloom bleed boost** — `bloom[i] += bloom_bleed[i]`. Added AFTER
+   the envelope so bleed decays at `sustain`, not `bloom_release`.
 6. **Lazy-load guard** — load art if `art_cells` is nil.
-
-7. **Frame-skip gate** — if `cfg_frame_skip > 0` and we have a cached frame and the
-   pane size hasn't changed and no bass transient fired this frame: reuse
-   `last_output`, return early. Audio state still advances (the envelope keeps
-   moving). A bass onset force-renders so flares are never dropped.
-
+7. **Frame-skip gate** — if `cfg_frame_skip > 0` and cached frame exists and
+   pane size unchanged and no bass onset: reuse `last_output`. Audio state
+   always advances. Onset force-renders so flares never drop.
 8. **Canvas cap** — clamp draw grid to `max_cols`/`max_rows` if set.
-
-9. **Fit art to canvas** — `contain` preserves aspect (pictures). `fill` stretches
-   each axis independently (textures/wall — the default for the procedural wall).
-
-10. **Ring geometry** — compute `max_d` from the corner of the output grid using
-    the active distance metric (resolved once per frame — cycle mode advances here).
-    `pos = dist(dx, dy) * 9 / max_d` gives the float ring position (0–9).
-
+9. **Fit art to canvas** — `fit = "fill"` stretches (default for the wall).
+   `fit = "contain"` preserves aspect.
+10. **Ring geometry** — compute `max_d` from corner of output grid using active
+    distance metric. `pos = dist(dx, dy) * 9 / max_d` gives float ring position.
 11. **Per-cell loop** (the hot path):
-    - Map output cell → nearest-neighbor source cell (`art_cells[sy][sx]`).
-    - Compute ring position, then `lvl` and `dlvl` via ring blend or snap:
-      - Blend: interpolate between `effective[lo]` and `effective[lo+1]` by
-        `frac = pos - floor(pos)`. Same for `dens[lo]`/`dens[lo+1]` → `dlvl`.
-      - Snap: `band = 1 + floor(pos + 0.5)`. `lvl = effective[band]`, `dlvl = dens[band]`.
-    - Color: `glow_color(lvl, lvl >= cfg_overdrive)` for glow mode;
-      `mono_color` for mono mode.
-    - Density: if `do_dens` and the cell is braille (`art_code[sy][sx]` is set):
-      `thicken(base_cp, dlvl, fill_order, dkey)` → thickened UTF-8 glyph.
-    - Emit color change (ANSI escape) only when `color != last_color` (color-run
-      optimization). Emit glyph. Track append index instead of `#parts`.
-    - End each row with `reset()`.
-
+    - Nearest-neighbor sample from `art_cells[sy][sx]`.
+    - Ring blend: interpolate `effective[lo]`/`effective[lo+1]` by `frac`.
+      Same for `bloom[lo]`/`bloom[lo+1]` → `dlvl`.
+      Ring snap: `band = 1 + floor(pos + 0.5)`, direct lookup.
+    - Color: `glow_color(lvl, lvl >= cfg_overdrive)`. `mono_color` for mono mode.
+    - Bloom: if `cfg_bloom` and cell is braille, `thicken(base_cp, dlvl, fill_order, dkey)`.
+    - Color-run optimization: emit ANSI only when `color != last_color`.
+    - Track append index instead of `#parts`. End each row with `reset()`.
 12. **Debug footer** — if `cfg_debug`, paint `[preset + theme + BLD]` centered on
-    the last output row using `fg256(244) + bg256(232)`. BLD only shows when
-    bloom bleed is active.
-
-13. **Cache** — stash `result`, `last_rows`, `last_cols` for frame-skip reuse.
-
+    last output row.
+13. **Cache** — stash result for frame-skip reuse.
 14. Return the assembled string.
 
 ---
 
-## 7. Color system (themes)
+## 6. Themes
 
-### Why ANSI 256
+Seven themes, ANSI 256 only. Each has an 11-stop glow ramp and 4-stop overdrive
+ramp. Selected via `theme` config key; falls back to `aurora` on unknown names.
 
-cliamp's first-party visualizers use Lip Gloss's `ANSIColor(n)` — ANSI 16/256
-throughout. ANSI 256 is universally supported. Truecolor support is a v2 idea.
+| Theme | Glow character | Overdrive character |
+|-------|---------------|---------------------|
+| **aurora** (default) | Dark → teal → cyan → green-yellow | Cyan → bright green |
+| amber | Dark → amber → bright yellow | Red → magenta-pink |
+| crt | Dark → green → bright green | Green → yellow-green |
+| whitehot | Black → gray → bright white | Bright gray → pure white |
+| blackhot | White → gray → black (inverted) | Gray → black |
+| predator | Indigo → cyan → yellow → red (thermal) | Red → yellow |
+| terminal | Dark → green → yellow → red (cliamp spectrum) | Red → yellow |
 
-### Theme architecture
+**terminal theme** is new in v0.1.0: faithful to cliamp's default spectrum
+gradient (ANSI 10/11/9 = green → yellow → red). Glow: `{232, 46, 46, 40, 226,
+226, 220, 214, 202, 196, 9}`. Overdrive: `{196, 202, 208, 9}`.
 
-All themes are in the `PRESETS` table with a single assignment point:
+Theme architecture: single assignment point. `glow_ramp` and `overdrive_ramp`
+are upvalues set from the active preset. Preset profile overlay rebinds them
+at render time on theme swap. `glow_color()` references the upvalues — it never
+knows where the numbers came from.
 
-```lua
-local active_preset = PRESETS[cfg_theme_name] or PRESETS["amber"]
-local glow_ramp      = active_preset.glow       -- 11 stops
-local overdrive_ramp = active_preset.overdrive   -- 4 stops
-```
-
-When the preset profile overlay swaps themes (at render time), it rebinds these
-upvalues directly. The `glow_color()` function references `glow_ramp`/
-`overdrive_ramp` — it never knows where the numbers came from. When cliamp
-eventually exposes `cliamp.player.theme_colors()`, you add a `from_cliamp_theme()`
-function that maps hex → nearest ANSI 256 → same `{glow, overdrive}` shape, and
-change ONE line at the assignment point.
-
-### Theme catalog
-
-| Theme | Glow ramp character | Overdrive ramp character |
-|-------|---------------------|--------------------------|
-| amber | 232→...→226 (dark→amber→bright yellow) | 160→196→197→198 (red→magenta-pink) |
-| crt | 232→...→190 (dark→green→bright green) | 46→82→118→190 |
-| vantablack | 232→...→231 (grayscale→pure white) | 249→253→255→231 |
-| whitehot | 0→...→231 (dark→white) | 251→254→255→231 |
-| blackhot | 231→...→16 (white→dark, inverted) | 238→235→233→16 |
-| redhot | 185→...→9 (dark→red→bright red) | 196→197→160→9 |
-| orangehot | 223→...→9 (dark→orange→bright red) | 172→166→130→9 |
-| aurora | 232→...→195 (dark→teal→cyan→green) | 48→87→123→195 |
-| ember | 232→...→197 (green→yellow→red heatmap) | 196→197→201→230 |
-| predator | 17→...→224 (indigo→cyan→yellow→red thermal) | 196→160→125→224 |
-| flan | 232→...→167 (cream→gold→rose gold) | 209→174→167→210 |
-
-All values are ANSI 256 indices. Glow ramps are 11 stops (matching tubeamp's
-canonical ramp length). Overdrive ramps are 4 stops.
+Ramp indexing uses ROUND not floor: `idx = floor(level * (n - 1) + 0.5) + 1`.
+Ensures the peak stop is reachable on real musical peaks, not just at exact 1.0.
 
 ---
 
-## 8. State & per-frame timing
+## 7. Ring shapes
 
-### Asymmetric smoothing
+Three shapes + cycle mode. Each is a pure distance metric — same caller, same
+normalization, same downstream color/bloom math.
 
-Same attack/release model as tubeamp: fast attack (0.55 default) so kick drums
-snap on immediately; slow release (0.18 default) so level fades gradually,
-giving the afterglow feel. Applied on top of cliamp's own pre-smoothing.
+| Shape | Metric | Visual |
+|-------|--------|--------|
+| **circle** (default) | Euclidean: `sqrt(dx² + dy²)` | Nested circles |
+| diamond | Manhattan: `|dx| + |dy|` | Nested diamonds |
+| wings | X-only: `|dx|` | Vertical stripes, symmetric |
+| cycle | Auto-rotates all 3 on `cycle_seconds` | Hands-free review |
 
-### Transient onset detection (not absolute level)
+`cell_aspect = 0.5` x-scaling applied BEFORE `dist()` so circles read round.
 
-cliamp's bands are pre-smoothed and bass bands (1-2) often peg near the top on
-real music. An `if level >= overdrive` gate would fire CONSTANTLY. Instead:
+vNext shapes (square, squircle, layers, compass) preserved on `vnext-shapes` branch.
 
-1. Maintain a slow baseline EMA per bass band: `base += (smoothed - base) * BASE_RATE`
-   (where `BASE_RATE = 0.05`).
-2. Fire when `smoothed >= base + ONSET_MARGIN` (0.18) AND `smoothed >= cfg_overdrive`.
-3. Advance the baseline AFTER the onset test so the spike doesn't raise its own bar.
+---
 
-Sustained-loud bass produces no event; only a genuine jump (a kick) does.
+## 8. Behavior presets
 
-### Overdrive decay tail
+Six one-knob presets. Each bundles theme + ring_shape + all dynamics into a
+named feel. The profile overlay runs at the start of each `render()`. User-set
+TOML keys survive the overlay (tracked via `user_set_*` flags).
 
-On fire: `heat[i] = smoothed[i]` (latch). Else: `heat[i] *= cfg_sustain`.
-`cfg_sustain` is the fraction RETAINED per frame: 0 = instant snap, ~0.85 =
-long glowing tail. `effective[i] = max(smoothed[i], heat[i])` so the tail
-never dims below the live level.
+All presets use aurora + circle by default.
 
-### FLARE_PEAK bleed gate
+| Preset | Feel | Key dynamics |
+|--------|------|-------------|
+| **default** | Balanced baseline | attack=0.55, release=0.18, od=0.78, sustain=0.82, blend=true, bloom_att=0.6, bloom_rel=0.15 |
+| **punch** | Snappy, percussive | attack=1, release=0.25, od=1, sustain=0.9, blend=false, bloom_att=1, bloom_rel=0.85, gate=0.2 |
+| **ethereal** | Dreamy, slow glow | attack=0.3, release=0.08, od=0.85, sustain=0.9, blend=true, bloom_att=0.4, bloom_rel=0.05, knee=0.6, tilt=0.4 |
+| **plasma** | Volatile, electric | attack=0.65, release=0.1, od=0.65, sustain=0.88, blend=true, bloom_att=0.85, bloom_rel=0.06, gate=0.03, knee=0.9, tilt=0.2 |
+| **ghost** | Thin, wispy, slow | attack=0.3, release=0.05, od=0.88, sustain=0.9, blend=false, bloom_att=0.05, bloom_rel=0.9, knee=2.6, tilt=0.5 |
+| **classic** | Big bloom, symmetric rings | attack=0.85, release=1, od=0.85, sustain=0.95, blend=false, bloom_att=1, bloom_rel=0.85, tilt=0.3, ring_blend=true |
 
-FLARE_PEAK is NOT a fixed constant. It's `max(0.92, cfg_overdrive)` so it can
-never fall below the overdrive threshold. A hardcoded `0.92` would break when
-the user sets `overdrive > 0.92` — bleed would fire below the overdrive floor,
-making no physical sense.
+`cycle_presets = true` rotates through all 6 on `cycle_seconds`.
 
-### effective[] layer pipeline (processing order matters)
-
-1. Apply tilt (per-band treble boost) on raw bands before smoothing
-2. Smooth bands (asymmetric attack/release) → `smoothed[]`
-3. Copy `smoothed[]` → `effective[]`
-4. Layer overdrive heat (transient-onset flare latch-and-decay on bass 1-2)
-5. Layer color bleed (spill from peak flare into adjacent ring +1)
-6. Layer bloom bleed latch + decay (`dens_bleed[]` — separate array, +1/+2 rings,
-   same `sustain` clock)
-7. Apply gate (clamp bands below `cfg_gate` to 0)
-8. Apply knee curve (`effective[i] = effective[i] ^ cfg_knee`)
-9. Apply ceiling (final clamp: bands above `cfg_ceiling` → cfg_ceiling)
-10. Advance bloom envelope (`dens[]` chases `effective[]` with own attack/release)
-11. Apply bloom bleed boost (`dens[] += dens_bleed[]` — added AFTER the envelope
-    so bleed decays at `sustain`, not `bloom_release`)
-
-Per-cell: color reads `effective[]` (via ring blend or snap), glyph bloom reads `dens[]`.
-
-### Frame-skip
-
-`render_rate` (0.25–1.0) maps to `cfg_frame_skip = round(1/rate) - 1`. The
-counter renders 1 frame, then reuses `last_output` for the next N frames. Audio
-state (smoothing, heat, baseline, bloom) ALWAYS advances — skipping only
-elides the expensive per-cell render loop. A bass transient (`onset_fired`)
-bypasses the skip so flares are never dropped. Pane resize also invalidates the
-cache (dimensions changed).
-
-### Canvas cap
-
-`max_cols` / `max_rows` clamp the DRAWN grid. Cost is linear in drawn cells, so
-this bounds per-frame work on huge panes. The art is then centered in the FULL
-pane (letterbox padding). With `fit=fill`, a cap makes the wall a centered block
-instead of true edge-to-edge — that's the deliberate cost/coverage trade. Use
-`render_rate` instead if edge-to-edge coverage matters.
+vNext presets (retro, whiteout, tacutacu) preserved on `vnext-themes` branch.
 
 ---
 
 ## 9. Configuration surface
 
-Lives in `~/.config/cliamp/config.toml`:
+Lives in `~/.config/cliamp/config.toml`. Entire block is optional.
 
 ```toml
-[plugins.nova]                    # entire block OPTIONAL
-start = "black"                   # "black" | "stipple" — procedural wall resting glyph
-# art_path = "/abs/path.txt"     # OPTIONAL file override (stays in your clone)
-color_mode = "glow"              # "glow" | "mono" | "passthrough"
-                                 #   passthrough: raw glyphs, NO color OR bloom
-ring_shape = "square"            # square | diamond | circle | squircle | wings | layers | compass | cycle
-cycle_seconds = 20               # seconds per shape/preset in cycle modes (min 2)
-fit = "contain"                  # "contain" | "fill"
-ring_blend = true                # smooth gradient between rings
-bloom = true                   # glyphs thicken toward center
-bloom_attack = 0.6             # 0–1, how fast dots FILL (high = snappy)
-bloom_release = 0.15           # 0–1, how fast dots SHED (low = lingering)
-theme = "amber"                  # amber | crt | vantablack | whitehot | blackhot | redhot | orangehot | aurora | ember | predator | flan
-preset = "default"               # default | punch | ethereal | retro | plasma | ghost | whiteout | tacutacu
-cycle_presets = false            # auto-rotate presets on cycle_seconds
-debug = false                    # show preset + theme + BLD on bottom row
-mono_color = 11                  # ANSI 256 index, used in color_mode="mono"
-attack = 0.55                    # smoothing attack (0–1)
-release = 0.18                   # smoothing release (0–1)
-overdrive = 0.78                 # 0–1, band level above which bass flares hot
-sustain = 0.82           # 0–0.97, fraction of heat RETAINED per frame (0=snap, 0.85=long tail)
-blend = true           # when bass punches hot, spill color + bloom into adjacent rings
-tilt = 0.0                       # 0–? — per-band boost toward treble (0=off; try 0.5)
-gate = 0.0                       # 0–0.5, noise gate: clamp bands below this to 0
-ceiling = 1.0                    # 0.01–1.0, limiter: clamp bands above this (1.0=off)
-knee = 1.0                      # 0.1–3.0, response curve (1.0=linear)
-cell_aspect = 0.5                # 0.2–2.0, terminal cell width/height ratio for round circles
+[plugins.nova]
 
-# --- performance (0 = off / unlimited) ---
-max_cols = 0                     # cap DRAWN width (0=unlimited)
-max_rows = 0                     # cap DRAWN height (0=unlimited)
-render_rate = 1.0                # 0.25–1.0, fraction of frames rendered (~20 FPS at 1.0)
+# --- look ---
+theme = "aurora"
+#   amber | crt | whitehot | blackhot | aurora | predator | terminal
+ring_shape = "circle"
+#   circle | diamond | wings | cycle
+cycle_seconds = 20
+#   seconds per shape/preset in cycle modes (min 2)
+ring_blend = true
+#   true = smooth gradient across rings | false = hard banded rings
+fit = "fill"
+#   "contain" = letterboxed | "fill" = stretch edge to edge
+
+# --- feel ---
+preset = "default"
+#   default | punch | ethereal | plasma | ghost | classic
+cycle_presets = false
+#   rotate through all presets automatically
+
+# --- bloom (glyph density) ---
+bloom = true
+#   false = color only, dots stay fixed
+bloom_attack = 0.6
+bloom_release = 0.15
+
+# --- dynamics (all 0–1 unless noted) ---
+attack = 0.55
+release = 0.18
+overdrive = 0.78
+sustain = 0.82
+#   0–0.97, fraction of heat retained per frame (0 = instant snap)
+blend = true
+#   overdrive color + bloom spill into adjacent rings
+tilt = 0.0
+#   per-band treble boost (try 0.3–0.5)
+gate = 0.0
+#   0–0.5, noise gate — silence below this level
+ceiling = 1.0
+#   0.01–1.0, limiter — clamp above this (1.0 = off)
+knee = 1.0
+#   0.1–3.0, response curve (<1 softer, >1 harder, 1.0 linear)
+
+# --- procedural wall ---
+start = "black"
+#   "black" = empty canvas, dots bloom from silence
+#   "stipple" = faint resting texture
+#   art_path = "/abs/path/to/file.txt"
+#   optional file override (stays in your clone)
+
+# --- advanced ---
+cell_aspect = 0.5
+color_mode = "glow"
+#   "glow" | "mono" | "passthrough" (no color, no bloom)
+mono_color = 11
+
+# --- performance ---
+max_cols = 0
+max_rows = 0
+#   cap drawn area (0 = unlimited)
+render_rate = 1.0
+#   0.25–1.0, fraction of frames rendered
 ```
 
-All keys are optional. With no config block at all, the plugin renders the default
-procedural wall (`start = "black"`, `circle` shape, `amber` theme, `default` preset).
-
-### Preset profile override semantics
-
-When `preset = "punch"`, every bundled key is set to the Punch profile's values
-AT THE START OF EACH RENDER. If the user ALSO sets `overdrive = 0.95` in their
-TOML, that explicit value WINS (the overlay skips user-set keys). Individual
-overrides survive preset cycling.
+All keys optional. With no config block, nova renders a procedural wall in
+aurora + circle + fill with the `default` preset dynamics.
 
 ---
 
-## 10. Constraints & sandbox boundaries
+## 10. Processing pipeline
 
-| Limit | Source | Why it matters here |
-|-------|--------|---------------------|
-| 10ms per `render()` call | `luaplugin/visualizer.go` | Hot loop is O(draw_h × draw_w) with cached table lookups. At normal pane sizes (5×80) this is trivial. At fullscreen fit=fill on a 4K terminal it tightens — use `render_rate` and `max_cols`/`max_rows` to cap cost. |
-| Return-string only | host | Every exit path must return a string. Non-string → silent frame reuse. |
-| gopher-lua = Lua 5.1, no bitops | sandbox | All bloom math uses arithmetic on powers of two. `luac -p` cannot catch bitops (local Lua accepts them, host rejects silently). |
-| No `os.execute`, no `io.*` | sandbox | Not needed. All state is in-memory. Art reads via `cliamp.fs`. |
-| `cliamp.message()` deadlocks in `render()` | gopher-lua UI mutex | Only call from `init()`. Debug footer uses inline ANSI labels on output rows instead. |
-| Render serialized per plugin | host mutex | State mutation needs no locks. |
-| ANSI 256 only | Bubbletea | Truecolor is a v2 idea. |
-| TOML `#`-comments leak into values | cliamp parser | Every `p:config(...)` goes through `clean()` which strips `%s*#.*$`. |
-| `~` not expanded in `cliamp.fs` paths | Go `os.ReadFile` | `expand_path()` handles `~`, `~/`, `$HOME`, `${HOME}` before `cliamp.fs` calls. |
-| `init(rows, cols)` may not fire | host timing | Art loads lazily on first `render()` if `art_cells` is nil. `init()` is an optimization. |
+The `effective[]` layer stack runs in a fixed order — same as a mastering chain:
+
+1. **Tilt** — per-band treble boost on raw bands (before smoothing)
+2. **Smooth** — asymmetric attack/release → `smoothed[]`
+3. **Copy** — `smoothed[]` → `effective[]`
+4. **Overdrive heat** — transient-onset flare latch-and-decay on bands 1-2
+5. **Color bleed** — peak flare spill into ring +1 (`cfg_blend`)
+6. **Bloom bleed** — separate `bloom_bleed[]` array, +1/+2 rings, same `sustain` clock
+7. **Gate** — clamp below `cfg_gate` to 0
+8. **Knee** — `effective[i] ^ cfg_knee` (EQ-stage, before limiter)
+9. **Ceiling** — final brick-wall clamp (MUST be last; knee < 1 lifts clamped values)
+10. **Bloom envelope** — `bloom[]` chases `effective[]` with own attack/release
+11. **Bloom bleed boost** — `bloom[] += bloom_bleed[]` (after envelope, so bleed
+    decays at `sustain` not `bloom_release`)
+
+Per-cell: color reads `effective[]` (ring blend or snap), bloom reads `bloom[]`.
+
+**Key invariants:**
+- Ceiling clamps the flare DETECTOR input (`s = min(smoothed[i], ceiling)`),
+  not just the output. This means `ceiling < overdrive` → no flare, no bleed,
+  no bloom_bleed — the overdrive threshold is unreachable.
+- Bleed gates on `heat[i]`, NOT `effective[i]`. `effective[]` carries sustained
+  signal and would fire bleed constantly.
+- `attack=0` kills both color AND bloom — both read from `effective[]` which
+  is built from `smoothed[]`. Use gate+ceiling compressor lane instead.
 
 ---
 
-## 11. Testing & local verification
+## 11. Constraints & gotchas
+
+| Constraint | Why it matters |
+|------------|---------------|
+| gopher-lua = Lua 5.1, no bitops | All bloom math is arithmetic. `luac -p` can't catch bitops (local Lua accepts them, host rejects silently) |
+| `init()` may not fire | Art loads lazily on first `render()` if `art_cells` is nil |
+| `cliamp.message()` deadlocks in `render()` | Only call from `init()`. Debug footer uses inline ANSI |
+| Return MUST be string | Non-string → silent frame reuse. Every exit path returns a string |
+| TOML `#`-comments leak into values | Every `p:config(...)` goes through `clean()` |
+| `~` not expanded in fs paths | `expand_path()` before `cliamp.fs` calls |
+| `v:gsub()` crashes on chained calls | Use `string.gsub(v, ...)` with type guard |
+| Ceiling/bleed interaction | See invariants above. `bloom_bleed[]` is separate array, bypasses output clamp |
+
+---
+
+## 12. Testing
 
 ### Syntax check
-
 ```sh
-lua nova.lua
+lua nova.lua   # errors on missing 'plugin' global = expected; watch for syntax errors
 ```
 
-Will error on missing `plugin` global — that's expected. Look for real syntax errors.
-
-### Standalone render harness
-
-The repo ships a harness at `scratchpad/render_harness.lua`. It stubs the plugin
-host (`plugin.register(...)`, `cliamp.fs`, `cliamp.message`), loads `nova.lua`,
-and pumps frames across varied scenes. Run:
-
+### Render harness
 ```sh
 lua scratchpad/render_harness.lua
+lua scratchpad/render_harness.lua | grep -c $'\x1b\['   # verify ANSI present
 ```
 
-Check ANSI output: `lua scratchpad/render_harness.lua | grep -c $'\x1b\['`
-
-### Band map probe
-
-Before eyeballing ANSI color, verify ring geometry with the numeric probes:
-
+### Band map probe (verify geometry before color)
 ```sh
 lua scratchpad/band_map_probe_allshapes.lua
 ```
 
-This dumps the per-cell band index (0–9) for every ring shape as a numeric
-grid — independent of color. Bass should be center, treble at edges, clean rings.
+### Mirror symmetry (run after any FILL_ORDERS or thicken change)
+```sh
+lua scratchpad/test_mirror_symmetry.lua
+```
 
-### In-host verification
+### Ceiling/bleed (run after any flare/bleed/ceiling change)
+```sh
+lua scratchpad/test_ceiling_bleed.lua
+```
 
+### In-host
 1. `cp nova.lua ~/.config/cliamp/plugins/nova.lua`
-2. Start cliamp on real audio.
-3. Press `v` until the cycle reaches `nova`.
-4. Check `~/.config/cliamp/plugins.log` for `[nova] error:` lines.
-5. QA checklist:
-   - Wall fills with color bottom-up (bass rings light first).
-   - On a kick drum, the center ring(s) flash bright and decay over ~1 second.
-   - Glyphs thicken (gain dots) toward center on peaks — not just recolor.
-   - Set `ring_shape = "cycle"` and watch all 7 shapes rotate.
-   - Set `cycle_presets = true` and watch presets rotate with theme changes.
-   - Set `debug = true` — footer shows preset name + theme + BLD indicator.
-   - On loud music, bass overdrive flares and bleeds into adjacent rings.
-   - Fullscreen mode (Shift+V): wall scales smoothly, no rendering glitches.
-   - Set `bloom = false` and confirm glyphs stay fixed (color only).
-   - Set `color_mode = "passthrough"` — raw braille wall, no color or bloom.
-
-### Deterministic stateful-effect testing
-
-For effects with per-frame state (overdrive decay, baseline EMA, bloom
-envelope, bloom bleed), the scratchpad probes verify transitions
-deterministically:
-
-```sh
-lua scratchpad/test_overdrive.lua     # flare/decay/bleed state machine
-lua scratchpad/test_center_fill.lua   # toward-center fill order correctness
-```
+2. Start cliamp, press `v` to cycle to `nova`
+3. Check `~/.config/cliamp/plugins.log` for `[nova] error:` lines
 
 ---
 
-## 12. Installation & distribution
-
-### cliamp's install convention
-
-cliamp's plugin manager recognizes repos named `cliamp-plugin-<name>` and
-installs the entry `<name>.lua` from the repo root. The `cliamp-plugin-` prefix
-is stripped on install, so the user-visible plugin name is `nova`.
-
-### Install sources
-
-```sh
-# Recommended:
-cliamp plugins install 8bit64k/cliamp-plugin-nova
-cliamp plugins install 8bit64k/cliamp-plugin-nova@v0.1.0
-
-# Manual (if the plugin manager doesn't work for your setup):
-git clone https://github.com/8bit64k/cliamp-plugin-nova.git
-cd cliamp-plugin-nova
-cp nova.lua ~/.config/cliamp/plugins/nova.lua
-```
-
-cliamp does NOT hot-reload — re-copy and restart after every change.
-
-### Versioning
-
-- `version` in `plugin.register({...})` is informational only.
-- Git tags (`v0.1.0`, etc.) for plugin manager pinning.
-- Bump the version string alongside any meaningful release tag.
-
-### Visibility
-
-- Public.
-
-### Branch policy
-
-- `master` is the default and only long-lived branch.
-- **Experimental visual features (breathing, bold, untested effects) must branch
-  off master.** Iterate on the branch, test live, merge only when solid. Force-push
-  on private repos is acceptable for clean history (8bit64k reconciles laptop with
-  `git fetch origin && git reset --hard origin/master`).
-
----
-
-## 13. Known limitations & ideas for v2
+## 13. Known limitations & vNext
 
 ### Limitations
+- **No truecolor.** ANSI 256 only. A `COLORTERM=truecolor` secondary path is a v2 idea.
+- **No responsive layout tiers.** Unlike tubeamp (FULL/COMPACT/MINI/HIDDEN),
+  nova renders at whatever pane size it gets.
+- **Smoothing not dt-aware.** Same per-tick rate at both TickFast and TickSlow.
+  In practice fine — visible motion during slow ticks is minimal.
+- **Single-pipe limitation.** `attack=0` kills bloom too (both read from
+  `effective[]`). Gate+ceiling compressor lane is the workaround.
 
-1. **No truecolor mode.** ANSI 256 only. Users on truecolor terminals see the
-   same 256-color ramps. A `COLORTERM=truecolor` detection + secondary 24-bit
-   ramp path would allow smoother gradients.
-
-2. **No responsive layout tiers.** Unlike tubeamp (FULL/COMPACT/MINI/HIDDEN),
-   nova renders at whatever size the pane is. At the default 5-row pane, the wall
-   is squashed but still renders. A MINI tier could render coarser rings and
-   simpler glyphs; a HIDDEN tier could return `""` below 3 rows.
-
-3. **No per-band peak hold markers.** Tubeamp has floating `●` markers; nova
-   doesn't. Density mutation fills a similar role (the visual punch), but peak
-   markers would add a second visual channel.
-
-4. **Smoothing is not dt-aware.** If cliamp's tick rate changes (TickSlow during
-   pauses), the smoother converges at the same per-tick rate regardless of
-   wall-clock dt. In practice this is fine — visible motion during slow ticks
-   is minimal.
-
-5. **No sub-cell glyph block fill.** Fractional vertical fill (like native bar
-   modes' `▁▂▃▄▅▆▇█`) is not used. Nova uses braille bloom mutation (OR-ing dots)
-   which is a different visual language — more "texture thickening" than
-   "level meter." Reconsider if users want more precise level reading.
-
-6. **`active_profile()` called twice per frame** — once for profile overlay and
-   once for debug label. Cost is negligible (~2 table lookups), but worth
-   consolidating in a cleanup pass.
-
-7. **Stale header comment** — line 3 says "v0.1 square rings" and describes the
-   original prototype. Update to match current feature set.
-
-### v2 ideas
-
-- **24-bit truecolor ramp** behind a `color_mode = "truecolor"` toggle, with
-  smooth gradient interpolation.
-- **Responsive layout tiers** — FULL / COMPACT / MINI / HIDDEN, matching tubeamp's
-  tiered approach. HIDDEN returns `""` below a minimum pane size.
-- **Peak hold markers** — a dot floating at the recent band maximum, decaying slowly.
-- **Braille wall art gallery** — ship multiple procedural wall textures
-  (uniform, twill, noise, lattice) as named presets or a `wall` config key.
-- **Native overdrive indicator** — currently bloom bleed is shown via the "BLD"
-  debug footer tag. A native indicator (the source ring's glyphs pulsing bold
-  during a flare) would provide the same information without chrome.
-- **More themes** — `military` (green phosphor), `nixie` (orange), `cathode`
-  (cyan-green oscilloscope), matching tubeamp's v2 theme ideas.
-- **Per-band custom labels** — overlay Hz values as faint numbers on the wall.
+### vNext branches
+- `vnext-shapes` — square, squircle, layers, compass shapes
+- `vnext-themes` — vantablack, redhot, orangehot, ember, flan themes + retro/whiteout/tacutacu presets
 
 ---
 
@@ -871,68 +522,21 @@ cliamp does NOT hot-reload — re-copy and restart after every change.
 
 ```
 cliamp-plugin-nova/
-├── .gitignore                  # *.swp, *.bak, scratchpad/ (gitignored)
-├── LICENSE                     # MIT, © 8bit64k (added at release)
-├── README.md                   # User-facing install + config
-├── nova.lua                    # The plugin itself (single file, ~1268 lines)
-├── AGENTS.md                   # Durable design principles + agent context
-├── CHECKPOINT.md               # Transient rolling work-log (current session state)
-├── CHECKPOINT.2026-05-31.md    # Archived checkpoint rollover
-├── CHECKPOINT.2026-05-30-01.md # Archived checkpoint rollover
-├── BRAINSTORM.md               # Original 8-approach design exploration
-├── crt.txt                     # Portrait art file (Ruby — not used by nova)
-├── ruby.txt                    # Portrait art file (not used by nova)
-├── ruby_ascii.txt              # Portrait art file (not used by nova)
+├── .gitignore              # AGENTS.md, CHECKPOINT*.md, scratchpad/
+├── LICENSE                 # MIT, © 8bit64k
+├── README.md               # User-facing install + config
+├── nova.lua                # The plugin (single file, ~1232 lines)
+├── AGENTS.md               # Durable design principles (gitignored, local)
 ├── docs/
-│   └── DESIGN.md               # This document
-└── scratchpad/                 # Gitignored — harnesses, probes, session artifacts
+│   └── DESIGN.md           # This document
+└── scratchpad/              # Gitignored — harnesses, probes, tests
     ├── render_harness.lua
     ├── band_map_probe_allshapes.lua
-    ├── test_overdrive.lua
-    ├── test_center_fill.lua
-    ├── test_cycle.lua
-    ├── test_blend.lua
-    ├── code-doc-review-2026-05-31.md
-    └── ... (session artifacts)
+    ├── test_mirror_symmetry.lua
+    ├── test_ceiling_bleed.lua
+    └── ...
 ```
 
-Repo root holds `nova.lua` because cliamp's plugin manager looks there. Don't
-move it into a subdirectory.
-
 ---
 
-## 15. Agent handoff checklist
-
-Before declaring any change "done," verify:
-
-- [ ] `lua nova.lua` parses (will error on `plugin` global — expected; look for real syntax errors)
-- [ ] No Lua 5.3+ syntax used (no `>>`, `<<`, `|`, `&`, `bit32`) — gopher-lua 5.1
-- [ ] Standalone render harness (`scratchpad/render_harness.lua`) pumps 5+ scenes without errors
-- [ ] ANSI escape count non-zero in harness output
-- [ ] All render paths return a string (no bare `return`, no nil returns)
-- [ ] `cliamp.message()` NOT called inside `render()` — only from `init()`
-- [ ] Plugin installs into `~/.config/cliamp/plugins/nova.lua` and shows in cliamp's visualizer cycle
-- [ ] `~/.config/cliamp/plugins.log` has no `[nova] error` entries after a fresh playback session
-- [ ] Wall lights and thickens correctly: bass center, treble edge, rings concentric
-- [ ] All 7 ring shapes render correctly (use `band_map_probe_allshapes.lua`)
-- [ ] All 9 themes produce distinct, recognizable color output
-- [ ] Overdrive flare fires on bass transients, decays with tail, bleeds into adjacent rings
-- [ ] Density bleed (+1/+2 rings) visible in debug BLD footer
-- [ ] Preset profiles override correctly; user-set keys survive preset overlay
-- [ ] `cycle_presets` and `ring_shape = "cycle"` rotate on wall clock
-- [ ] Frame-skip (`render_rate`) caches and reuses output; onset overrides work
-- [ ] Canvas cap (`max_cols`/`max_rows`) bounds drawn grid
-- [ ] Procedural wall loads with no `art_path` (`start = "black"` and `"stipple"`)
-- [ ] File art path loads correctly; `~`/`$HOME` expansion works
-- [ ] No debug scaffolding left in output (footer indicators removed when done)
-- [ ] README.md reflects current config keys (no drift between README and `nova.lua`)
-- [ ] AGENTS.md feature summary matches current state
-- [ ] DESIGN.md reflects current behavior (this document)
-- [ ] Commits authored as 8bit64k
-- [ ] `version` bumped in `plugin.register({...})` for user-visible changes
-- [ ] CHECKPOINT.md updated with session summary, commit hash, decisions
-- [ ] Experimental/tenuous visual work done on a branch, not master
-
----
-
-*Last reviewed: 2026-06-05. Version covered: nova 0.1.0.*
+*Last reviewed: 2026-06-05. Version: nova 0.1.0.*
