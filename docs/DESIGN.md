@@ -233,7 +233,7 @@ Each `render()` call:
    Ring shape swap updates `cfg_ring_shape`.
 2. **Spectral tilt + smoothing** — per-band treble boost (`cfg_tilt`), then
    asymmetric attack/release on `smoothed[i]`.
-3. **Build effective[] layer stack** (see Section 10 for full order):
+3. **Build effective[] layer stack** (see [Audio signal chain](#10-audio-signal-chain)):
    - Copy `smoothed[]` → `effective[]`
    - Overdrive flare: transient-onset detection on bands 1-2 via baseline EMA
      + onset margin. Latch `heat[i]`, else `heat[i] *= cfg_sustain`.
