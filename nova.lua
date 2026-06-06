@@ -382,24 +382,24 @@ local PRESETS = {
         name = "Amber (tubeamp family)",
         -- Original 11-stop amber ramp from tubeamp. Rich distinct stops — kept verbatim.
         glow      = { 232, 234, 52, 94, 130, 166, 202, 208, 214, 220, 226 },
-        overdrive = { 160, 196, 197, 198 },
+        overdrive = { 160, 196, 123, 195 },
     },
     crt = {
         name = "CRT Green Phosphor",
         glow      = { 232, 22, 28, 34, 40, 46, 48, 82, 118, 154, 190 },
-        overdrive = { 46, 82, 118, 190 },
+        overdrive = { 46, 82, 123, 195 },
     },
     whitehot = {
         name = "White Hot (high contrast)",
         -- 11 stops across the full white range with 3-5 index gaps.
         glow      = { 0, 232, 235, 238, 241, 244, 247, 251, 254, 255, 231 },
-        overdrive = { 251, 254, 255, 231 },
+        overdrive = { 251, 254, 123, 195 },
     },
     blackhot = {
         name = "Black Hot (high contrast)",
         -- 11 stops across the full black range with 3-5 index gaps.
         glow      = { 231, 249, 247, 245, 243, 241, 239, 237, 235, 233, 16 },
-        overdrive = { 238, 235, 233, 16},
+        overdrive = { 238, 235, 123, 195 },
     },
     aurora = {
         name = "Aurora (teal-cyan-green)",
@@ -411,12 +411,12 @@ local PRESETS = {
     predator = {
             name = "Predator (thermal vision heatmap)",
             glow      = { 17, 21, 39, 46, 112, 142, 184, 220, 208, 196, 224 },
-            overdrive = { 196, 160, 125, 224 },
+            overdrive = { 196, 160, 123, 195 },
         },
     terminal = {
         name = "Terminal (cliamp default spectrum)",
         glow      = { 232, 46, 46, 40, 226, 226, 220, 214, 202, 196, 9 },
-        overdrive = { 196, 202, 208, 9 },
+        overdrive = { 196, 202, 123, 195 },
     },
 
 }
