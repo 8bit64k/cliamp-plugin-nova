@@ -1,5 +1,9 @@
 # nova
 
+<p align="center">
+  <img src="assets/nova-hero.gif" alt="nova visualizer cycling through color themes" width="400">
+</p>
+
 A music visualizer for [cliamp](https://cliamp.stream) that turns your terminal
 into a living wall of light.
 
@@ -23,37 +27,43 @@ cliamp plugins install 8bit64k/cliamp-plugin-nova
 
 Restart cliamp, press `v` to cycle visualizers until nova appears.
 
-To update later: `cliamp plugins update nova`
+---
+
+## Color Themes
+
+Seven themes, each an 11-stop ANSI 256 glow ramp with a 4-stop overdrive ramp.
+
+| [aurora](assets/aurora-theme-colors.png) | [amber](assets/amber-theme-colors.png) | [crt](assets/crt-theme-colors.png) | [whitehot](assets/whitehot-theme-colors.png) |
+|:---:|:---:|:---:|:---:|
+| <img src="assets/aurora-theme-colors.png" width="180"> | <img src="assets/amber-theme-colors.png" width="180"> | <img src="assets/crt-theme-colors.png" width="180"> | <img src="assets/whitehot-theme-colors.png" width="180"> |
+| Teal → cyan → green | Amber → gold → yellow | Green phosphor | Black → pure white |
+
+| [blackhot](assets/blackhot-theme-colors.png) | [predator](assets/predator-theme-colors.png) | [terminal](assets/terminal-theme-colors.png) | |
+|:---:|:---:|:---:|:---:|
+| <img src="assets/blackhot-theme-colors.png" width="180"> | <img src="assets/predator-theme-colors.png" width="180"> | <img src="assets/terminal-theme-colors.png" width="180"> | |
+| White → black (inverted) | Thermal: blue → yellow → red | cliamp spectrum: green → yellow → red | |
 
 ---
 
-## What you'll see
+## Ring Shapes
 
-- **Concentric rings** — 10 EQ bands laid out in rings, bass at center, treble
-  at the edge. The wall breathes from the middle outward.
-- **Three ring shapes** — circle, diamond, and vertical wings. Set
-  `ring_shape = "cycle"` to rotate through all three hands-free.
-- **Seven color themes** — amber (tubeamp family), CRT green phosphor,
-  white-hot, black-hot, aurora (the default teal-cyan-green), predator thermal
-  vision, and terminal (cliamp's native green→yellow→red spectrum).
-- **The wall thickens on the beat** — braille dots fill in toward center as the
-  music hits, then fade slowly. Kick drums leave a visible trail.
-- **Overdrive flare** — when the bass punches hard, the rings flash hot and the
-  heat spills outward into adjacent rings. You'll see it on a good kick drum.
-- **Six one-knob presets** — `punch` is snappy and percussive, `ethereal` is
-  dreamy and slow, `ghost` is thin and wispy, `plasma` is volatile and
-  electric, `classic` has big bloom and symmetric rings. Pick a feel and go.
-  Set `cycle_presets = true` to rotate through them hands-free.
-- **Compressor lane** — gate + ceiling knobs form a narrow "shimmer band" for
-  subtle density-only animation with barely any color shift.
+Three shapes, each a pure distance metric. `ring_shape = "cycle"` auto-rotates
+through all three.
+
+<p align="center">
+  <img src="assets/aurora-theme-colors.png" width="220" alt="circle">
+  <img src="assets/aurora-diamond-theme-colors.png" width="220" alt="diamond">
+  <img src="assets/aurora-wings-theme-colors.png" width="220" alt="wings">
+  <br><em>circle &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; diamond &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; wings</em>
+</p>
 
 ---
 
 ## Quick config
 
-Everything is optional. With no config at all, nova renders a clean wall in
-aurora with smooth ring blending and dot bloom. Add a `[plugins.nova]` block to
-`~/.config/cliamp/config.toml` to tune it:
+Everything is optional. With no config at all, nova renders in aurora + circle
+with smooth ring blending and dot bloom. Add a `[plugins.nova]` block to
+`~/.config/cliamp/config.toml`:
 
 ```toml
 [plugins.nova]
@@ -64,103 +74,52 @@ theme = "aurora"
 ring_shape = "circle"
 #   circle | diamond | wings | cycle
 ring_blend = true
-#   true = smooth gradient across rings | false = hard banded rings
 
 # --- feel ---
 preset = "default"
 #   default | punch | ethereal | plasma | ghost | classic
 cycle_presets = false
-#   rotate through all presets automatically
 
 # --- bloom (glyph density) ---
 bloom = true
-#   false = color only, dots stay fixed
 
 # --- dynamics ---
 attack = 0.55
 release = 0.18
 overdrive = 0.78
 sustain = 0.82
-#   0–0.97, fraction of heat retained per frame
 blend = true
-#   overdrive color + bloom spill into adjacent rings
 gate = 0.0
-#   0–0.5, noise gate — silence below this level
 ceiling = 1.0
-#   0.01–1.0, limiter — clamp above this (1.0 = off)
 
 # --- performance ---
 render_rate = 1.0
-#   0.25–1.0, fraction of frames rendered (lower = less CPU)
 ```
 
-The full config surface with every knob, range, and default is documented in
-[docs/DESIGN.md](docs/DESIGN.md).
+The full config surface with every knob, the Visual Dynamics preset table, and
+the audio signal chain is documented in [docs/DESIGN.md](docs/DESIGN.md).
 
----
-
-## Color Themes
-
-| Theme | Character |
-|-------|-----------|
-| **aurora** (default) | Teal through cyan to bright green |
-| amber | Dark amber to bright yellow, red overdrive |
-| crt | Green phosphor, yellow-green overdrive |
-| whitehot | Black to pure white, high contrast |
-| blackhot | White to black, inverted thermal |
-| predator | Thermal vision: indigo→cyan→yellow→red |
-| terminal | cliamp's native green→yellow→red spectrum |
-
-Each theme has an 11-stop glow ramp and 4-stop overdrive ramp. See
-[docs/DESIGN.md](docs/DESIGN.md) for the full ANSI 256 palette.
-
----
-
-## Visual Dynamics presets
-
-| Preset | Feel |
-|--------|------|
-| **default** | Balanced baseline — smooth, responsive |
-| **punch** | Snappy attack, percussive, hard gate |
-| **ethereal** | Dreamy, slow glow, soft knee, treble-tilted |
-| **plasma** | Volatile, electric, tight bloom |
-| **ghost** | Thin, wispy, slow bloom shed, hard knee |
-| **classic** | Big bloom, symmetric rings, long sustain |
-
-All presets use aurora + circle. Individual TOML keys override preset values.
-Full knob values per preset in [docs/DESIGN.md](docs/DESIGN.md#8-visual-dynamics-presets).
+All theme + shape screenshots: [assets/](assets/)
 
 ---
 
 ## Tips
 
-- Press **Shift+V** in cliamp for fullscreen — nova really shines when it fills
-  the terminal.
-- Set `ring_shape = "cycle"` to preview every shape without touching config.
-- Set `cycle_presets = true` to try all six feels hands-free.
-- If the outer rings feel dead on treble-heavy music, try `tilt = 0.3`.
-- For subtle density animation with barely any color, try
-  `gate = 0.03, ceiling = 0.20` — the compressor lane.
+- Press **Shift+V** in cliamp for fullscreen — nova shines when it fills the terminal.
+- Set `ring_shape = "cycle"` to preview all three shapes hands-free.
+- Set `cycle_presets = true` to rotate through all six presets.
+- For subtle density animation with barely any color, try `gate = 0.03, ceiling = 0.20`.
 - For a CRT-era hard-edged look: `preset = "ghost"` with `ring_blend = false`.
-- For screenshots: play pink noise or a multisine tone that hits all bands.
 
 ---
 
 ## Troubleshooting
 
-If nova shows a blank pane, check the log:
+If nova shows a blank pane:
 
 ```bash
 tail -n 40 ~/.config/cliamp/plugins.log
 ```
-
----
-
-## More
-
-The full design document — implementation walkthrough, audio signal chain,
-performance controls, testing, and constraints — lives at
-[docs/DESIGN.md](docs/DESIGN.md).
 
 ---
 
