@@ -19,7 +19,7 @@
 3. [Visualizer API contract](#3-visualizer-api-contract)
 4. [Design goals](#4-design-goals)
 5. [Implementation walkthrough](#5-implementation-walkthrough)
-6. [Themes](#6-themes)
+6. [Color Themes](#6-color-themes)
 7. [Ring shapes](#7-ring-shapes)
 8. [Visual Dynamics presets](#8-visual-dynamics-presets)
 9. [Configuration surface](#9-configuration-surface)
@@ -277,7 +277,7 @@ Each `render()` call:
 
 ---
 
-## 6. Themes
+## 6. Color Themes
 
 Seven themes, ANSI 256 only. Each has an 11-stop glow ramp and 4-stop overdrive
 ramp. Selected via `theme` config key; falls back to `aurora` on unknown names.
