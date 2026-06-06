@@ -1176,7 +1176,6 @@ function p:render(bands, frame, rows, cols)
                 local color
                 if is_mono then
                     color = cfg_mono_color
-                    if lvl < 0.12 and ch ~= " " then color = 236 end
                 else
                     color = glow_color(lvl, lvl >= cfg_overdrive)
                 end
