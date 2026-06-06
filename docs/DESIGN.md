@@ -289,7 +289,7 @@ ramp. Selected via `theme` config key; falls back to `aurora` on unknown names.
 | crt | Dark → green → bright green | Green → yellow-green |
 | whitehot | Black → gray → bright white | Bright gray → pure white |
 | blackhot | White → gray → black (inverted) | Gray → black |
-| predator | Indigo → cyan → yellow → red (thermal) | Red → yellow |
+| predator | Indigo → cyan → yellow → red (thermal) | Red → cream |
 | terminal | Dark → green → yellow → red (cliamp spectrum) | Red → bright red |
 
 **terminal theme** is new in v0.1.0: faithful to cliamp's default spectrum
