@@ -423,7 +423,34 @@ aurora + circle + fill with the `default` preset dynamics.
 
 ## 10. Processing pipeline
 
-The `effective[]` layer stack runs in a fixed order — same as a mastering chain:
+The `effective[]` layer stack runs in a fixed order — same as a mastering chain.
+
+```
+raw bands
+    │
+    ▼
+  TILT ─── per-band treble boost
+    │
+    ▼
+  SMOOTH ─ asymmetric attack/release → smoothed[]
+    │
+    ▼
+  effective[] ◄── copy smoothed[]
+    │
+    ├─► HEAT ─────── transient onset, latch+decay
+    ├─► COLOR BLEED ─ +1 ring, cfg_blend gated
+    ├─► BLOOM BLEED ─ +1/+2 rings, same sustain clock
+    ├─► GATE ─────── clamp below threshold → 0
+    ├─► KNEE ─────── response curve ^cfg_knee
+    └─► CEILING ──── brick-wall cap (LAST)
+         │
+         ├──► effective[] ──► COLOR (per-cell ring blend/snap)
+         │
+         └──► bloom[] chase ──► + bloom_bleed ──► BLOOM (glyph thicken)
+              (own attack/release)
+```
+
+Steps in order:
 
 1. **Tilt** — per-band treble boost on raw bands (before smoothing)
 2. **Smooth** — asymmetric attack/release → `smoothed[]`
