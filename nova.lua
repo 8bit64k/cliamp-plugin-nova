@@ -532,8 +532,34 @@ local PRESETS = {
         },
     terminal = {
         name = "Terminal (cliamp default spectrum)",
-        glow      = { 232, 46, 46, 40, 226, 226, 220, 214, 202, 196, 9 },
-        overdrive = { 196, 202, 123, 195 },
+        -- 21-stop RGB ramp: faithful green→yellow→red, smoothed for continuous gradient.
+        glow_rgb = {
+            {8,8,8},        -- near-black
+            {0,95,0},       -- dark green
+            {0,175,0},      -- medium green
+            {0,235,0},      -- bright green
+            {0,255,0},      -- pure green
+            {0,255,64},     -- green-lime
+            {0,255,128},    -- spring green
+            {64,255,64},    -- light green
+            {128,255,0},    -- chartreuse
+            {191,255,0},    -- yellow-green
+            {235,255,0},    -- near-yellow
+            {255,255,0},    -- pure yellow
+            {255,235,0},    -- warm yellow
+            {255,215,0},    -- gold
+            {255,191,0},    -- amber
+            {255,159,0},    -- orange-yellow
+            {255,127,0},    -- orange
+            {255,95,0},     -- deep orange
+            {255,63,0},     -- red-orange
+            {255,31,0},     -- near-red
+            {255,0,0},      -- pure red
+        },
+        overdrive_rgb = {
+            {255,31,0}, {255,0,0},          -- last 2 glow stops
+            {0,255,255}, {255,255,255},     -- nova signature
+        },
     },
     hackerman = {
         name = "Hackerman (matrix green spectrum)",
