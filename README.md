@@ -31,30 +31,23 @@ Restart cliamp, press `v` to cycle visualizers until nova appears.
 
 ## Color Themes
 
-Seven themes, each an 11-stop ANSI 256 glow ramp with a 4-stop overdrive ramp.
+Four themes, each a 15-stop RGB glow ramp with a 4-stop overdrive ramp.
+Truecolor-native with ANSI 256 fallback.
 
 | [aurora](assets/aurora-theme-colors.png) | [amber](assets/amber-theme-colors.png) | [crt](assets/crt-theme-colors.png) | [whitehot](assets/whitehot-theme-colors.png) |
 |:---:|:---:|:---:|:---:|
 | <img src="assets/aurora-theme-colors.png" width="180"> | <img src="assets/amber-theme-colors.png" width="180"> | <img src="assets/crt-theme-colors.png" width="180"> | <img src="assets/whitehot-theme-colors.png" width="180"> |
 | Teal → cyan → green | Amber → gold → yellow | Green phosphor | Black → pure white |
 
-| [blackhot](assets/blackhot-theme-colors.png) | [predator](assets/predator-theme-colors.png) | [terminal](assets/terminal-theme-colors.png) | |
-|:---:|:---:|:---:|:---:|
-| <img src="assets/blackhot-theme-colors.png" width="180"> | <img src="assets/predator-theme-colors.png" width="180"> | <img src="assets/terminal-theme-colors.png" width="180"> | |
-| White → black (inverted) | Thermal: blue → yellow → red | cliamp spectrum: green → yellow → red | |
-
 ---
 
-## Ring Shapes
+## Ring Shape
 
-Three shapes, each a pure distance metric. `ring_shape = "cycle"` auto-rotates
-through all three.
+Nova uses a single radial distance metric: **circle** (Euclidean). Bass lives at
+the center, treble at the edges.
 
 <p align="center">
   <img src="assets/aurora-theme-colors.png" width="220" alt="circle">
-  <img src="assets/aurora-diamond-theme-colors.png" width="220" alt="diamond">
-  <img src="assets/aurora-wings-theme-colors.png" width="220" alt="wings">
-  <br><em>circle &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; diamond &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; wings</em>
 </p>
 
 ---
@@ -70,9 +63,8 @@ with smooth ring blending and dot bloom. Add a `[plugins.nova]` block to
 
 # --- look ---
 theme = "aurora"
-#   amber | crt | whitehot | blackhot | aurora | predator | terminal
+#   amber | crt | whitehot | aurora
 ring_shape = "circle"
-#   circle | diamond | wings | cycle
 ring_blend = true
 
 # --- feel ---
@@ -106,7 +98,6 @@ All theme + shape screenshots: [assets/](assets/)
 ## Tips
 
 - Press **Shift+V** in cliamp for fullscreen — nova shines when it fills the terminal.
-- Set `ring_shape = "cycle"` to preview all three shapes hands-free.
 - Set `cycle_presets = true` to rotate through all six presets.
 - For subtle density animation with barely any color, try `gate = 0.03, ceiling = 0.20`.
 - For a CRT-era hard-edged look: `preset = "ghost"` with `ring_blend = false`.

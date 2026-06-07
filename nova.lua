@@ -229,13 +229,11 @@ end
 -- normalization and the per-cell band lookup -- they can never diverge.
 local DIST = {
     circle   = function(adx, ady) return math.sqrt(adx * adx + ady * ady) end,
-    diamond  = function(adx, ady) return adx * 0.25 + ady * 1.25 end,
-    wings    = function(adx, _)   return adx end,
 }
 
 -- ring_shape = "cycle" auto-rotates through all shapes every cycle_seconds
 -- for hands-free review. Anchored to load-time so it always starts on "circle".
-local CYCLE_ORDER = { "circle", "diamond", "wings" }
+local CYCLE_ORDER = { "circle" }
 local cycle_mode  = (cfg_ring_shape == "cycle")
 local cycle_t0    = os.time()
 
