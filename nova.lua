@@ -227,7 +227,7 @@ local user_set_ring_shape     = (p:config("ring_shape") ~= nil)
 -- normalization and the per-cell band lookup -- they can never diverge.
 local DIST = {
     circle   = function(adx, ady) return math.sqrt(adx * adx + ady * ady) end,
-    diamond  = function(adx, ady) return adx * 2 + ady end,
+    diamond  = function(adx, ady) return adx * 0.5 + ady end,
     wings    = function(adx, _)   return adx end,
 }
 
