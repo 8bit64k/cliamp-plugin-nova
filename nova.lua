@@ -479,6 +479,16 @@ local PRESET_PROFILES = {
         tilt = 0.3,
         ring_blend = true,
     },
+    demo = {
+        theme = "aurora",  ring_shape = "circle",
+        attack = 0.55,  release = 0.18,
+        overdrive = 0.90,  sustain = 0.82,  blend = true,
+        bloom_attack = 0.6,  bloom_release = 0.15,
+        gate = 0.0,  knee = 1.0,  tilt = 0.0,
+        ring_blend = true,
+        bloom = false,  start = "black",
+        cycle_presets = true,  debug = true,
+    },
 
 }
 
@@ -499,7 +509,7 @@ do
     end
 end
 
-local CYCLE_PRESET_NAMES = { "default", "punch", "ethereal", "plasma", "ghost", "classic" }
+local CYCLE_PRESET_NAMES = { "default", "punch", "ethereal", "plasma", "ghost", "classic", "demo" }
 
 -- Resolve the active profile for THIS frame. In fixed mode this is constant;
 -- in cycle mode it advances with wall-clock time (same cycle_t0 as ring_shape).
