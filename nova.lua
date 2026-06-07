@@ -509,7 +509,7 @@ do
     end
 end
 
-local CYCLE_PRESET_NAMES = { "default", "punch", "ethereal", "plasma", "ghost", "classic", "demo" }
+local CYCLE_PRESET_NAMES = { "default", "punch", "ethereal", "plasma", "ghost", "classic" }
 
 -- Resolve the active profile for THIS frame. In fixed mode this is constant;
 -- in cycle mode it advances with wall-clock time (same cycle_t0 as ring_shape).
