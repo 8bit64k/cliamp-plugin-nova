@@ -43,8 +43,8 @@ thickens (gains dots toward center) as the ring heats.
 
 | Feature | Surface |
 |---------|---------|
-| Ring shapes | 3 + cycle: circle, diamond, wings. `cycle` rotates all 3 |
-| Color themes | 7: amber, crt, whitehot, blackhot, aurora (default), predator, terminal |
+| Ring shape | Circle (Euclidean radial distance) |
+| Color themes | 4: amber, crt, whitehot, aurora (default) |
 | Presets | 6: default, punch, ethereal, plasma, ghost, classic |
 | Bloom | Glyphs thicken toward center with own attack/release envelope |
 | Bloom bleed | Overdrive transients thicken +1/+2 adjacent rings |
@@ -112,10 +112,10 @@ end
 ## 4. Design goals
 
 1. **Concentric rings, bass at center.** Band 1 innermost, band 10 outermost.
-2. **Multiple ring shapes** via distance-metric dispatch. Circle, diamond, wings.
-   `cycle` rotates all three.
-3. **Color themes from the tubeamp family.** Same ANSI 256 convention, 11-stop
-   glow + 4-stop overdrive ramp per theme.
+2. **Radial ring shape** via Euclidean distance from pane center. Bass maps to
+   the innermost ring, treble to the outermost.
+3. **Color themes from the tubeamp family.** 15-stop RGB-native glow + 4-stop
+   overdrive ramp per theme, truecolor with ANSI fallback.
 4. **Braille bloom mutation.** Glyphs thicken toward center as rings heat. Dots
    OR into base glyph, ending at solid ⣿ (U+28FF). Own attack/release envelope
    for phosphor persistence.
@@ -163,13 +163,9 @@ is pure geometry with no aspect logic. The same `dist()` is used for both
 ```lua
 DIST = {
     circle  = function(adx, ady) return math.sqrt(adx*adx + ady*ady) end,
-    diamond = function(adx, ady) return adx + ady end,
-    wings   = function(adx, _)   return adx end,
 }
 ```
 
-`ring_shape = "cycle"` rotates through `{"circle", "diamond", "wings"}` every
-`cycle_seconds` (default 20) using `os.time()`. Anchored to load-time baseline.
 
 ### ANSI helpers
 
@@ -288,13 +284,8 @@ ramp. Selected via `theme` config key; falls back to `aurora` on unknown names.
 | amber | Dark → amber → bright yellow | Red → magenta-pink |
 | crt | Dark → green → bright green | Green → yellow-green |
 | whitehot | Black → gray → bright white | Bright gray → pure white |
-| blackhot | White → gray → black (inverted) | Gray → black |
-| predator | Indigo → cyan → yellow → red (thermal) | Red → cream |
-| terminal | Dark → green → yellow → red (cliamp spectrum) | Red → bright red |
 
-**terminal theme** is new in v0.1.0: faithful to cliamp's default spectrum
-gradient (ANSI 10/11/9 = green → yellow → red). Glow: `{232, 46, 46, 40, 226,
-226, 220, 214, 202, 196, 9}`. Overdrive: `{196, 202, 208, 9}`.
+All themes are 15-stop RGB ramps, truecolor-native with ANSI 256 fallback.
 
 Theme architecture: single assignment point. `glow_ramp` and `overdrive_ramp`
 are upvalues set from the active preset. Preset profile overlay rebinds them
@@ -306,21 +297,17 @@ Ensures the peak stop is reachable on real musical peaks, not just at exact 1.0.
 
 ---
 
-## 7. Ring shapes
+## 7. Ring shape
 
-Three shapes + cycle mode. Each is a pure distance metric — same caller, same
-normalization, same downstream color/bloom math.
+Circle (Euclidean radial distance). Bass at center, treble at edge.
 
 | Shape | Metric | Visual |
 |-------|--------|--------|
 | **circle** (default) | Euclidean: `sqrt(dx² + dy²)` | Nested circles |
-| diamond | Manhattan: `|dx| + |dy|` | Nested diamonds |
-| wings | X-only: `|dx|` | Vertical stripes, symmetric |
-| cycle | Auto-rotates all 3 on `cycle_seconds` | Hands-free review |
 
 `cell_aspect = 0.5` x-scaling applied BEFORE `dist()` so circles read round.
 
-vNext shapes (square, squircle, layers, compass) preserved on `vnext-shapes` branch.
+Additional shapes (diamond, wings) preserved on `vnext-shapes` branch.
 
 ---
 
@@ -356,9 +343,8 @@ Lives in `~/.config/cliamp/config.toml`. Entire block is optional.
 
 # --- look ---
 theme = "aurora"
-#   amber | crt | whitehot | blackhot | aurora | predator | terminal
+#   amber | crt | whitehot | aurora
 ring_shape = "circle"
-#   circle | diamond | wings | cycle
 cycle_seconds = 20
 #   seconds per shape/preset in cycle modes (min 2)
 ring_blend = true
