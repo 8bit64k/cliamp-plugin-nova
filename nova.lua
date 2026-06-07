@@ -198,23 +198,21 @@ do
     end
 end
 
--- Track whether the user EXPLICITLY set each preset-controlled key.
--- true = user set it (cfg_* holds their value); false/nil = use preset profile.
-local user_set_attack         = (p:config("attack") ~= nil)
-local user_set_release        = (p:config("release") ~= nil)
-local user_set_overdrive      = (p:config("overdrive") ~= nil)
-local user_set_tilt           = (p:config("tilt") ~= nil)
-local user_set_gate           = (p:config("gate") ~= nil)
-local user_set_ceiling        = (p:config("ceiling") ~= nil)
-local user_set_knee           = (p:config("knee") ~= nil)
-local user_set_bloom_attack   = (p:config("bloom_attack") ~= nil)
-local user_set_bloom_release  = (p:config("bloom_release") ~= nil)
-local user_set_sustain        = (p:config("sustain") ~= nil)
-local user_set_blend          = (p:config("blend") ~= nil)
-local user_set_ring_blend     = (p:config("ring_blend") ~= nil)
-local user_set_bloom          = (p:config("bloom") ~= nil)
-local user_set_theme          = (p:config("theme") ~= nil)
-local user_set_ring_shape     = (p:config("ring_shape") ~= nil)
+-- Track whether the user EXPLICITLY set each preset-controllable key.
+-- true = user set it (cfg_* holds their value); false/nil = use preset.
+-- user_set is a table keyed by config name so new knobs auto-register.
+local user_set = {}
+-- Ordered list of every config key presets are allowed to control.
+-- Adding a knob = add it here + an entry in ASSIGN below.
+local PRESET_KEYS = {
+    "attack", "release", "overdrive", "tilt", "gate", "ceiling", "knee",
+    "bloom_attack", "bloom_release", "sustain",
+    "blend", "ring_blend", "bloom",
+    "theme", "ring_shape", "fit", "start", "color_mode",
+}
+for _, key in ipairs(PRESET_KEYS) do
+    user_set[key] = (p:config(key) ~= nil)
+end
 
 -- ---------- Ring distance metric --------------------------------------------
 -- Rings are level sets of a distance-from-center metric on the OUTPUT grid.
@@ -771,87 +769,74 @@ function p:render(bands, frame, rows, cols)
     -- Called every frame (not just on preset change) — cost is negligible.
     do
         local prof, _ = active_profile()
-        local function apply_num(key, user_set)
-            if not user_set then
-                local v = prof[key]
-                if v ~= nil then
-                    -- Re-apply clamping (same ranges as the config reads) so a
-                    -- preset value is bounded exactly like a user-supplied one.
-                    if key == "attack" or key == "release" or key == "overdrive"
-                       or key == "bloom_attack" or key == "bloom_release" then
-                        if v < 0 then v = 0 elseif v > 1 then v = 1 end
-                    elseif key == "gate" then
-                        if v < 0 then v = 0 elseif v > 0.5 then v = 0.5 end
-                    elseif key == "ceiling" then
-                        if v < 0.01 then v = 0.01 elseif v > 1.0 then v = 1.0 end
-                    elseif key == "knee" then
-                        if v < 0.1 then v = 0.1 elseif v > 3.0 then v = 3.0 end
-                    elseif key == "sustain" then
-                        if v < 0 then v = 0 elseif v > 0.97 then v = 0.97 end
-                    end
-                    -- Assign to the upvalue (non-local assignment in Lua
-                    -- rebinds the module-level variable for this frame)
-                    if key == "attack" then cfg_attack = v
-                    elseif key == "release" then cfg_release = v
-                    elseif key == "overdrive" then cfg_overdrive = v
-                    elseif key == "tilt" then cfg_tilt = v
-                    elseif key == "gate" then cfg_gate = v
-                    elseif key == "ceiling" then cfg_ceiling = v
-                    elseif key == "knee" then cfg_knee = v
-                    elseif key == "bloom_attack" then cfg_bloom_attack = v
-                    elseif key == "bloom_release" then cfg_bloom_release = v
-                    elseif key == "sustain" then cfg_sustain = v
-                    end
-                end
-            end
-        end
-        local function apply_bool(key, user_set)
-            if not user_set then
-                local v = prof[key]
-                if v ~= nil then
-                    if key == "blend" then cfg_blend = v
-                    elseif key == "ring_blend" then cfg_ring_blend = v
-                    elseif key == "bloom" then cfg_bloom = v
-                    end
-                end
-            end
-        end
-        apply_num("attack", user_set_attack)
-        apply_num("release", user_set_release)
-        apply_num("overdrive", user_set_overdrive)
-        apply_num("tilt", user_set_tilt)
-        apply_num("gate", user_set_gate)
-        apply_num("ceiling", user_set_ceiling)
-        apply_num("knee", user_set_knee)
-        apply_num("bloom_attack", user_set_bloom_attack)
-        apply_num("bloom_release", user_set_bloom_release)
-        apply_num("sustain", user_set_sustain)
-        apply_bool("blend", user_set_blend)
-        apply_bool("ring_blend", user_set_ring_blend)
-        apply_bool("bloom", user_set_bloom)
 
-        -- Theme swap: if profile specifies a theme the user didn't set,
-        -- resolve the color ramp and swap glow_ramp / overdrive_ramp.
-        if not user_set_theme then
-            local t = prof["theme"]
-            if t then
-                local theme_preset = PRESETS[t]
-                if theme_preset then
-                    cfg_theme_name = t
-                    glow_ramp      = theme_preset.glow
-                    overdrive_ramp = theme_preset.overdrive
-                    glow_n         = #glow_ramp
-                    overdrive_n    = #overdrive_ramp
+        -- Generic preset application.  VALIDATE clamps/converts the value
+        -- to the same form the config reader produces; assign() binds it to
+        -- the right cfg_* upvalue.  Adding a knob = add one VALIDATE entry
+        -- and one elseif branch in assign().
+        local VALIDATE = {
+            -- 0..1 numerics
+            attack       = function(v) if v<0 then return 0 elseif v>1 then return 1 end return v end,
+            release      = function(v) if v<0 then return 0 elseif v>1 then return 1 end return v end,
+            overdrive    = function(v) if v<0 then return 0 elseif v>1 then return 1 end return v end,
+            tilt         = function(v) if v<0 then return 0 elseif v>1 then return 1 end return v end,
+            bloom_attack = function(v) if v<0 then return 0 elseif v>1 then return 1 end return v end,
+            bloom_release= function(v) if v<0 then return 0 elseif v>1 then return 1 end return v end,
+            -- specialty numerics
+            gate         = function(v) if v<0 then return 0 elseif v>0.5 then return 0.5 end return v end,
+            ceiling      = function(v) if v<0.01 then return 0.01 elseif v>1.0 then return 1.0 end return v end,
+            knee         = function(v) if v<0.1 then return 0.1 elseif v>3.0 then return 3.0 end return v end,
+            sustain      = function(v) if v<0 then return 0 elseif v>0.97 then return 0.97 end return v end,
+            -- booleans (preset values are already Lua booleans)
+            blend        = function(v) return v end,
+            ring_blend   = function(v) return v end,
+            bloom        = function(v) return v end,
+            -- strings
+            theme        = function(v) return v end,
+            ring_shape   = function(v) return v end,
+            fit          = function(v) return v end,
+            start        = function(v) return v end,
+            color_mode   = function(v) return v end,
+        }
+
+        local function assign(key, v)
+            if key == "theme" then
+                local tp = PRESETS[v]
+                if tp then
+                    cfg_theme_name = v
+                    glow_ramp, overdrive_ramp = tp.glow, tp.overdrive
+                    glow_n, overdrive_n = #glow_ramp, #overdrive_ramp
                 end
+            elseif key == "ring_shape" then
+                if DIST[v] then cfg_ring_shape = v end
+            elseif key == "fit" then
+                cfg_fit = v
+            elseif key == "start" then
+                cfg_start = v
+                start_cp = START_GLYPH[v] or START_GLYPH["stipple"]
+            elseif key == "color_mode" then
+                cfg_color_mode = v
+            -- numerics
+            elseif key == "attack" then cfg_attack = v
+            elseif key == "release" then cfg_release = v
+            elseif key == "overdrive" then cfg_overdrive = v
+            elseif key == "tilt" then cfg_tilt = v
+            elseif key == "gate" then cfg_gate = v
+            elseif key == "ceiling" then cfg_ceiling = v
+            elseif key == "knee" then cfg_knee = v
+            elseif key == "bloom_attack" then cfg_bloom_attack = v
+            elseif key == "bloom_release" then cfg_bloom_release = v
+            elseif key == "sustain" then cfg_sustain = v
+            -- booleans
+            elseif key == "blend" then cfg_blend = v
+            elseif key == "ring_blend" then cfg_ring_blend = v
+            elseif key == "bloom" then cfg_bloom = v
             end
         end
-        -- Ring shape swap: if profile specifies a shape the user didn't set,
-        -- update cfg_ring_shape so active_dist() picks it up next frame.
-        -- Round trip through the DIST table to validate.
-        if not user_set_ring_shape then
-            local s = prof["ring_shape"]
-            if s and DIST[s] then
-                cfg_ring_shape = s
+
+        for key, v in pairs(prof) do
+            if not user_set[key] and VALIDATE[key] then
+                assign(key, VALIDATE[key](v))
             end
         end
     end
