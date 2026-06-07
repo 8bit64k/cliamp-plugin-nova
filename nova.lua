@@ -262,13 +262,128 @@ local abs   = math.abs
 local sqrt  = math.sqrt
 
 local ESC = string.char(27)
--- Precompute all 256 SGR foreground escapes once, so the hot loop never rebuilds
--- the "\27[38;5;Nm" string via concatenation (which allocated per color change).
+
+-- ---------- Truecolor detection ---------------------------------------------
+-- Auto-detect terminal truecolor support (COLORTERM env var).
+-- Config flag "truecolor" (boolean) overrides: false = force ANSI 256.
+local cfg_truecolor
+do
+    local raw = p:config("truecolor")
+    if type(raw) == "boolean" then
+        cfg_truecolor = raw
+    else
+        local ct = os.getenv("COLORTERM") or ""
+        cfg_truecolor = (ct == "truecolor" or ct == "24bit")
+    end
+end
+
+-- ---------- ANSI 256 → RGB lookup -------------------------------------------
+-- Standard 16 system colors + 6×6×6 cube + 24 grayscale steps.
+-- Used for: (1) populating FG[] with truecolor escapes, (2) ANSI fallback
+-- when truecolor is off but a theme defines glow_rgb.
+local ANSI_RGB = {}
+do
+    -- Standard 16 colors
+    local std = {
+        {0,0,0}, {128,0,0}, {0,128,0}, {128,128,0},
+        {0,0,128}, {128,0,128}, {0,128,128}, {192,192,192},
+        {128,128,128}, {255,0,0}, {0,255,0}, {255,255,0},
+        {0,0,255}, {255,0,255}, {0,255,255}, {255,255,255},
+    }
+    for i = 0, 15 do ANSI_RGB[i] = std[i + 1] end
+    -- 6×6×6 color cube (16–231)
+    for i = 16, 231 do
+        local n = i - 16
+        local r = math.floor(n / 36)
+        local g = math.floor((n % 36) / 6)
+        local b = n % 6
+        ANSI_RGB[i] = { r == 0 and 0 or r * 40 + 55,
+                        g == 0 and 0 or g * 40 + 55,
+                        b == 0 and 0 or b * 40 + 55 }
+    end
+    -- Grayscale (232–255)
+    for i = 232, 255 do
+        local g = (i - 232) * 10 + 8
+        ANSI_RGB[i] = { g, g, g }
+    end
+end
+
+-- Map an arbitrary RGB to the nearest ANSI 256 index (Euclidean distance).
+-- Used for ANSI fallback when truecolor is off and a theme defines glow_rgb.
+local function rgb_to_ansi256(r, g, b)
+    local best, best_dist = 0, 1/0
+    for i = 0, 255 do
+        local cr, cg, cb = ANSI_RGB[i][1], ANSI_RGB[i][2], ANSI_RGB[i][3]
+        local d = (r-cr)*(r-cr) + (g-cg)*(g-cg) + (b-cb)*(b-cb)
+        if d < best_dist then best, best_dist = i, d end
+    end
+    return best
+end
+
+-- ---------- FG escape table (dual-mode: ANSI 256 or truecolor) ---------------
+-- FG[n] holds the SGR foreground escape for color index n.
+-- ANSI 256 mode: FG[0..255] = "\27[38;5;Nm" (precomputed as before).
+-- Truecolor mode: FG[0..255] = "\27[38;2;R;G;Bm" mapped from ANSI_RGB.
+-- Palette indices 256+ are populated dynamically by resolve_theme().
 local FG = {}
-for n = 0, 255 do FG[n] = ESC .. "[38;5;" .. n .. "m" end
+if cfg_truecolor then
+    for n = 0, 255 do
+        local r, g, b = ANSI_RGB[n][1], ANSI_RGB[n][2], ANSI_RGB[n][3]
+        FG[n] = ESC .. "[38;2;" .. r .. ";" .. g .. ";" .. b .. "m"
+    end
+else
+    for n = 0, 255 do FG[n] = ESC .. "[38;5;" .. n .. "m" end
+end
 local function fg256(n) return FG[n] or (ESC .. "[38;5;" .. n .. "m") end
 local function bg256(n) return ESC .. "[48;5;" .. n .. "m" end
 local function reset()  return ESC .. "[0m" end
+
+-- ---------- RGB palette system (for glow_rgb / overdrive_rgb themes) --------
+-- RGB-native themes define stops as {r,g,b} tables. At load time we allocate
+-- virtual color indices (starting at 256, above the ANSI 256 range), populate
+-- FG[] with truecolor escapes, and build integer ramps from those indices.
+-- glow_color() still returns an integer → FG lookup unchanged in hot path.
+-- When truecolor is off, glow_rgb stops are mapped to nearest ANSI 256 and
+-- stored as regular indices — no palette allocation needed.
+local palette = {}     -- color_index → {r, g, b} (only used in truecolor mode)
+local next_color = 256
+
+-- Resolve a theme preset into integer ramps. Returns glow_ramp, overdrive_ramp,
+-- glow_n, overdrive_n — exactly the shape the rest of the code expects.
+-- In truecolor mode with a glow_rgb theme: allocates palette indices 256+.
+-- Otherwise: uses the preset's glow/overdrive ANSI 256 arrays directly.
+local function resolve_theme(tp)
+    if cfg_truecolor and tp.glow_rgb then
+        local gr, odr = {}, {}
+        for _, rgb in ipairs(tp.glow_rgb) do
+            local c = next_color
+            next_color = next_color + 1
+            palette[c] = rgb
+            FG[c] = ESC .. "[38;2;" .. rgb[1] .. ";" .. rgb[2] .. ";" .. rgb[3] .. "m"
+            gr[#gr + 1] = c
+        end
+        for _, rgb in ipairs(tp.overdrive_rgb) do
+            local c = next_color
+            next_color = next_color + 1
+            palette[c] = rgb
+            FG[c] = ESC .. "[38;2;" .. rgb[1] .. ";" .. rgb[2] .. ";" .. rgb[3] .. "m"
+            odr[#odr + 1] = c
+        end
+        return gr, odr, #gr, #odr
+    elseif tp.glow_rgb then
+        -- Truecolor off but theme defines glow_rgb → map to nearest ANSI 256
+        local gr, odr = {}, {}
+        for _, rgb in ipairs(tp.glow_rgb) do
+            gr[#gr + 1] = rgb_to_ansi256(rgb[1], rgb[2], rgb[3])
+        end
+        for _, rgb in ipairs(tp.overdrive_rgb) do
+            odr[#odr + 1] = rgb_to_ansi256(rgb[1], rgb[2], rgb[3])
+        end
+        return gr, odr, #gr, #odr
+    else
+        return tp.glow, tp.overdrive, #tp.glow, #tp.overdrive
+    end
+end
 
 -- ---------- Braille bloom mutation ----------------------------------------
 -- A braille glyph is U+2800 + an 8-bit dot mask. "Toward full" = OR additional
@@ -420,6 +535,24 @@ local PRESETS = {
         glow      = { 232, 46, 46, 40, 226, 226, 220, 214, 202, 196, 9 },
         overdrive = { 196, 202, 123, 195 },
     },
+    hackerman = {
+        name = "Hackerman (matrix green spectrum)",
+        -- 21-stop RGB ramp: green(#4fe88f) → yellow(#50f7d4) → red(#50f872).
+        -- Truecolor mode: rendered as native 24-bit. ANSI fallback auto-computed.
+        glow_rgb = {
+            {79,232,143}, {79,233,149}, {79,235,156}, {79,236,163},
+            {79,238,170}, {79,239,177}, {79,241,184}, {79,242,191},
+            {79,244,198}, {79,245,205}, {80,247,212}, {80,247,202},
+            {80,247,192}, {80,247,182}, {80,247,172}, {80,247,163},
+            {80,247,153}, {80,247,143}, {80,247,133}, {80,247,123},
+            {80,248,114},
+        },
+        -- Overdrive: last 2 glow stops + nova signature cyan (123) + white (195)
+        overdrive_rgb = {
+            {80,247,123}, {80,248,114},
+            {0,255,255}, {255,255,255},
+        },
+    },
 
 }
 -- ---------- Preset profiles (dynamics + behavior bundled for one-knob feel) ----
@@ -520,12 +653,9 @@ local function active_profile()
            (PRESET_PROFILES[cfg_preset_name] and cfg_preset_name or "default")
 end
 
--- Resolve active preset (fall back to amber on unknown name).
+-- Resolve active preset (fall back to aurora on unknown name).
 local active_preset = PRESETS[cfg_theme_name] or PRESETS["aurora"]
-local glow_ramp      = active_preset.glow
-local overdrive_ramp = active_preset.overdrive
-local glow_n         = #glow_ramp       -- cached lengths (avoid # in hot path)
-local overdrive_n    = #overdrive_ramp
+local glow_ramp, overdrive_ramp, glow_n, overdrive_n = resolve_theme(active_preset)
 
 local function glow_color(level, hot)
     local ramp, n
@@ -827,8 +957,7 @@ function p:render(bands, frame, rows, cols)
                 local tp = PRESETS[v]
                 if tp then
                     cfg_theme_name = v
-                    glow_ramp, overdrive_ramp = tp.glow, tp.overdrive
-                    glow_n, overdrive_n = #glow_ramp, #overdrive_ramp
+                    glow_ramp, overdrive_ramp, glow_n, overdrive_n = resolve_theme(tp)
                 end
             elseif key == "ring_shape" then
                 if v == "cycle" then
