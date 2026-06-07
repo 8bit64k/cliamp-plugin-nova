@@ -212,6 +212,7 @@ local user_set_bloom_release  = (p:config("bloom_release") ~= nil)
 local user_set_sustain        = (p:config("sustain") ~= nil)
 local user_set_blend          = (p:config("blend") ~= nil)
 local user_set_ring_blend     = (p:config("ring_blend") ~= nil)
+local user_set_bloom          = (p:config("bloom") ~= nil)
 local user_set_theme          = (p:config("theme") ~= nil)
 local user_set_ring_shape     = (p:config("ring_shape") ~= nil)
 
@@ -810,6 +811,7 @@ function p:render(bands, frame, rows, cols)
                 if v ~= nil then
                     if key == "blend" then cfg_blend = v
                     elseif key == "ring_blend" then cfg_ring_blend = v
+                    elseif key == "bloom" then cfg_bloom = v
                     end
                 end
             end
@@ -826,6 +828,7 @@ function p:render(bands, frame, rows, cols)
         apply_num("sustain", user_set_sustain)
         apply_bool("blend", user_set_blend)
         apply_bool("ring_blend", user_set_ring_blend)
+        apply_bool("bloom", user_set_bloom)
 
         -- Theme swap: if profile specifies a theme the user didn't set,
         -- resolve the color ramp and swap glow_ramp / overdrive_ramp.
