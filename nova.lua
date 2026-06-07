@@ -209,6 +209,9 @@ local PRESET_KEYS = {
     "bloom_attack", "bloom_release", "sustain",
     "blend", "ring_blend", "bloom",
     "theme", "ring_shape", "fit", "start", "color_mode",
+    "mono_color", "cycle_seconds", "cell_aspect",
+    "max_cols", "max_rows", "render_rate",
+    "cycle_presets", "debug",
 }
 for _, key in ipairs(PRESET_KEYS) do
     user_set[key] = (p:config(key) ~= nil)
@@ -797,6 +800,15 @@ function p:render(bands, frame, rows, cols)
             fit          = function(v) return v end,
             start        = function(v) return v end,
             color_mode   = function(v) return v end,
+            -- additional knobs (all preset-controllable now)
+            mono_color   = function(v) if v<0 then return 0 elseif v>255 then return 255 end return v end,
+            cycle_seconds= function(v) if v<2 then return 2 end return v end,
+            cell_aspect  = function(v) if v<0.2 then return 0.2 elseif v>2.0 then return 2.0 end return v end,
+            max_cols     = function(v) if v<0 then return 0 end return v end,
+            max_rows     = function(v) if v<0 then return 0 end return v end,
+            render_rate  = function(v) if v<0.25 then return 0.25 elseif v>1.0 then return 1.0 end return v end,
+            cycle_presets= function(v) return v end,
+            debug        = function(v) return v end,
         }
 
         local function assign(key, v)
@@ -831,6 +843,20 @@ function p:render(bands, frame, rows, cols)
             elseif key == "blend" then cfg_blend = v
             elseif key == "ring_blend" then cfg_ring_blend = v
             elseif key == "bloom" then cfg_bloom = v
+            -- additional knobs
+            elseif key == "mono_color" then cfg_mono_color = v
+            elseif key == "cycle_seconds" then cfg_cycle_secs = v
+            elseif key == "cell_aspect" then cfg_cell_aspect = v
+            elseif key == "max_cols" then cfg_max_cols = v
+            elseif key == "max_rows" then cfg_max_rows = v
+            elseif key == "render_rate" then
+                cfg_render_rate = v
+                cfg_frame_skip = math.floor(1 / v + 0.5) - 1
+                if cfg_frame_skip < 0 then cfg_frame_skip = 0 end
+            elseif key == "cycle_presets" then
+                cycle_presets = v
+                cycle_t0 = os.time()
+            elseif key == "debug" then cfg_debug = v
             end
         end
 
