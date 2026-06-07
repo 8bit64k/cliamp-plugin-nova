@@ -432,7 +432,7 @@ local PRESET_PROFILES = {
     -- Presets bundle dynamics + theme + ring_shape into a single feel.
     -- Keys not listed fall back to the "default" profile values.
     ["default"] = {
-        theme = "aurora",  ring_shape = "circle",
+        -- theme = "aurora",  ring_shape = "circle",
         attack = 0.55,  release = 0.18,
         overdrive = 0.92,  sustain = 0.82,  blend = true,
         bloom_attack = 0.6,  bloom_release = 0.25,
@@ -440,7 +440,7 @@ local PRESET_PROFILES = {
         ring_blend = true,
     },
     punch = {
-        theme = "aurora",  ring_shape = "circle",
+        -- theme = "aurora",  ring_shape = "circle",
         attack = 1,  release = .25,
         overdrive = .96,  sustain = 0.9,  blend = true,
         bloom_attack = 1,  bloom_release = .95,
@@ -448,7 +448,7 @@ local PRESET_PROFILES = {
         ring_blend = true,
     },
     ethereal = {
-        theme = "aurora",  ring_shape = "circle",
+        -- theme = "aurora",  ring_shape = "circle",
         attack = 0.3,  release = 0.08,
         overdrive = 0.97,  sustain = 0.9,  blend = false,
         bloom_attack = 0.4,  bloom_release = 0.05,
@@ -456,7 +456,7 @@ local PRESET_PROFILES = {
         ring_blend = true,
     },
     plasma = {
-        theme = "aurora",  ring_shape = "circle",
+        -- theme = "aurora",  ring_shape = "circle",
         attack = 0.65,  release = 0.1,
         overdrive = 0.90,  sustain = 0.88,  blend = true,
         bloom_attack = 0.45,  bloom_release = 0.23,
@@ -464,7 +464,7 @@ local PRESET_PROFILES = {
         ring_blend = true,
     },
     ghost = {
-        theme = "aurora",  ring_shape = "circle",
+        -- theme = "aurora",  ring_shape = "circle",
         attack = 0.3,  release = 0.05,
         overdrive = 0.98,  sustain = 0.9,  blend = false,
         bloom_attack = 0.05,  bloom_release = 0.9,
@@ -472,7 +472,7 @@ local PRESET_PROFILES = {
         ring_blend = true,
     },
     classic = {
-        theme = "aurora",  ring_shape = "circle",
+        -- theme = "aurora",  ring_shape = "circle",
         attack = 0.85,  release = 1,
         overdrive = 0.95,  sustain = 0.95,  blend = false,
         bloom_attack = 1,  bloom_release = 0.85,
@@ -480,14 +480,9 @@ local PRESET_PROFILES = {
         ring_blend = true,
     },
     demo = {
-        theme = "aurora",  ring_shape = "circle",
-        attack = 0.55,  release = 0.18,
-        overdrive = 0.90,  sustain = 0.82,  blend = true,
-        bloom_attack = 0.6,  bloom_release = 0.15,
-        gate = 0.0,  knee = 1.0,  tilt = 0.0,
-        ring_blend = true,
-        bloom = false,  start = "black",
-        cycle_presets = true,  debug = true,
+        cycle_presets = true,  cycle_seconds = 7, debug = true,
+        theme = "amber",  ring_shape = "circle",
+        bloom = true,  start = "black",
     },
 
 }
