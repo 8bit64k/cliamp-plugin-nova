@@ -1140,7 +1140,7 @@ function p:render(bands, frame, rows, cols)
         -- doesn't immediately raise the bar it has to clear).
         bass_base[i] = bass_base[i] + (s - bass_base[i]) * BASE_RATE
     end
-    in_overdrive = (heat[1] > smoothed[1]) or (heat[2] > smoothed[2])
+    in_overdrive = onset_fired or (heat[1] > smoothed[1]) or (heat[2] > smoothed[2])
 
     -- Bleed: ONLY when a bass ring reaches PEAK FLARE (heat at the very top of
     -- the overdrive ramp) does it warm the ring just outside it (1->2, 2->3).
