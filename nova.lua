@@ -836,7 +836,13 @@ function p:render(bands, frame, rows, cols)
                     glow_n, overdrive_n = #glow_ramp, #overdrive_ramp
                 end
             elseif key == "ring_shape" then
-                if DIST[v] then cfg_ring_shape = v end
+                if v == "cycle" then
+                    cfg_ring_shape = "cycle"
+                    cycle_mode = true
+                elseif DIST[v] then
+                    cfg_ring_shape = v
+                    cycle_mode = false
+                end
             elseif key == "fit" then
                 cfg_fit = v
             elseif key == "start" then
