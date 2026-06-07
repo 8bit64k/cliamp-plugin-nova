@@ -585,8 +585,14 @@ local GEN_W, GEN_H = 188, 35
 local function generate_wall()
     art_lines, load_error = nil, nil
     art_w, art_h = GEN_W, GEN_H
-    local glyph = braille_char(start_cp)
-    local is_braille = (start_cp >= 0x2800 and start_cp <= 0x28FF)
+    -- When bloom is off, an empty base gives a blank wall. Override to full
+    -- braille (⣿) so the wall is always visible regardless of start.
+    local cp = start_cp
+    if not cfg_bloom and cp == 0x2800 then
+        cp = 0x28FF
+    end
+    local glyph = braille_char(cp)
+    local is_braille = (cp >= 0x2800 and cp <= 0x28FF)
     art_cells = {}
     art_code  = {}
     for y = 1, art_h do
@@ -594,7 +600,7 @@ local function generate_wall()
         local crow = {}
         for x = 1, art_w do
             row[x] = glyph
-            if is_braille then crow[x] = start_cp end
+            if is_braille then crow[x] = cp end
         end
         art_cells[y] = row
         art_code[y]  = crow
