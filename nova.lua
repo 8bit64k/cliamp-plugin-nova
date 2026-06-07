@@ -211,7 +211,7 @@ local PRESET_KEYS = {
     "theme", "ring_shape", "fit", "start", "color_mode",
     "mono_color", "cycle_seconds", "cell_aspect",
     "max_cols", "max_rows", "render_rate",
-    "cycle_presets", "debug",
+    "cycle_presets", "cycle_themes", "debug",
 }
 for _, key in ipairs(PRESET_KEYS) do
     user_set[key] = (p:config(key) ~= nil)
@@ -616,7 +616,7 @@ local PRESET_PROFILES = {
         ring_blend = true,
     },
     demo = {
-        cycle_presets = true,  cycle_seconds = 7, debug = true,
+        cycle_presets = true, cycle_themes = true, cycle_seconds = 7, debug = true,
         theme = "amber",  ring_shape = "circle",
         bloom = true,  start = "black",
     },
@@ -640,7 +640,21 @@ do
     end
 end
 
+-- cycle_themes: auto-rotate color themes independently of presets.
+-- Same timer (cycle_t0 + cycle_seconds) so both axes stay in sync.
+local cycle_themes = false
+do
+    local raw = p:config("cycle_themes")
+    if type(raw) == "boolean" then
+        cycle_themes = raw
+    elseif raw ~= nil then
+        local v = clean(tostring(raw)):lower():gsub("%s+", "")
+        if v == "true" or v == "on" or v == "1" or v == "yes" then cycle_themes = true end
+    end
+end
+
 local CYCLE_PRESET_NAMES = { "default", "punch", "ethereal", "plasma", "ghost", "classic" }
+local CYCLE_THEME_NAMES  = { "amber", "crt", "whitehot", "aurora" }
 
 -- Resolve the active profile for THIS frame. In fixed mode this is constant;
 -- in cycle mode it advances with wall-clock time (same cycle_t0 as ring_shape).
@@ -949,6 +963,7 @@ function p:render(bands, frame, rows, cols)
             max_rows     = function(v) if v<0 then return 0 end return v end,
             render_rate  = function(v) if v<0.25 then return 0.25 elseif v>1.0 then return 1.0 end return v end,
             cycle_presets= function(v) return v end,
+            cycle_themes = function(v) return v end,
             debug        = function(v) return v end,
         }
 
@@ -1002,6 +1017,9 @@ function p:render(bands, frame, rows, cols)
             elseif key == "cycle_presets" then
                 cycle_presets = v
                 cycle_t0 = os.time()
+            elseif key == "cycle_themes" then
+                cycle_themes = v
+                cycle_t0 = os.time()
             elseif key == "debug" then cfg_debug = v
             end
         end
@@ -1010,6 +1028,20 @@ function p:render(bands, frame, rows, cols)
             if not user_set[key] and VALIDATE[key] then
                 assign(key, VALIDATE[key](v))
             end
+        end
+    end
+
+    -- cycle_themes: independently rotate the color theme on the same timer.
+    -- Runs after profile overlay so it can override a profile's theme choice.
+    if cycle_themes and not user_set["theme"] then
+        local elapsed = os.time() - cycle_t0
+        if elapsed < 0 then elapsed = 0 end
+        local idx = (math.floor(elapsed / cfg_cycle_secs) % #CYCLE_THEME_NAMES) + 1
+        local tname = CYCLE_THEME_NAMES[idx]
+        local tp = PRESETS[tname]
+        if tp then
+            cfg_theme_name = tname
+            glow_ramp, overdrive_ramp, glow_n, overdrive_n = resolve_theme(tp)
         end
     end
 
