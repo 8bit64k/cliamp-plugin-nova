@@ -489,82 +489,116 @@ local function thicken(base_cp, level, fill_order, dkey)
 end
 
 -- ---------- Color presets (single swap point for upstream theme integration) ---
--- Each preset: { glow = {11 ANSI 256 colors}, overdrive = {4 colors} }.
+-- All themes now use 21-stop RGB ramps (glow_rgb / overdrive_rgb). Truecolor
+-- mode renders native 24-bit; ANSI fallback auto-maps to nearest 256 color.
+-- Ramp length is arbitrary — glow_color() adapts to any n >= 2.
 -- When cliamp exposes theme_colors(), add a from_cliamp_theme() function that
--- returns the same shape, then set active = from_cliamp_theme(name) here.
--- Until then, config key "theme" picks from this table.
+-- builds a dynamic glow_rgb ramp from the hex anchor colors.
 
 local PRESETS = {
     amber = {
         name = "Amber (tubeamp family)",
-        -- Original 11-stop amber ramp from tubeamp. Rich distinct stops — kept verbatim.
-        glow      = { 232, 234, 52, 94, 130, 166, 202, 208, 214, 220, 226 },
-        overdrive = { 160, 196, 123, 195 },
+        glow_rgb = {
+            {8,8,8}, {18,18,18}, {28,28,28},
+            {61,14,14}, {95,0,0},
+            {115,47,0}, {135,95,0}, {155,95,0}, {175,95,0}, {195,95,0},
+            {215,95,0}, {235,95,0}, {255,95,0}, {255,115,0}, {255,135,0},
+            {255,155,0}, {255,175,0}, {255,195,0}, {255,215,0}, {255,235,0},
+            {255,255,0},
+        },
+        overdrive_rgb = {
+            {255,235,0}, {255,255,0},
+            {0,255,255}, {255,255,255},
+        },
     },
     crt = {
         name = "CRT Green Phosphor",
-        glow      = { 232, 22, 28, 34, 40, 46, 48, 82, 118, 154, 190 },
-        overdrive = { 46, 82, 123, 195 },
+        glow_rgb = {
+            {8,8,8},
+            {4,51,4}, {0,95,0}, {0,115,0}, {0,135,0}, {0,155,0},
+            {0,175,0}, {0,195,0}, {0,215,0}, {0,235,0}, {0,255,0},
+            {0,255,67}, {0,255,135}, {47,255,67}, {95,255,0}, {115,255,0},
+            {135,255,0}, {155,255,0}, {175,255,0}, {195,255,0}, {215,255,0},
+        },
+        overdrive_rgb = {
+            {195,255,0}, {215,255,0},
+            {0,255,255}, {255,255,255},
+        },
     },
     whitehot = {
         name = "White Hot (high contrast)",
-        -- 11 stops across the full white range with 3-5 index gaps.
-        glow      = { 0, 232, 235, 238, 241, 244, 247, 251, 254, 255, 231 },
-        overdrive = { 251, 254, 123, 195 },
+        glow_rgb = {
+            {0,0,0}, {4,4,4}, {8,8,8},
+            {23,23,23}, {38,38,38}, {53,53,53}, {68,68,68}, {83,83,83},
+            {98,98,98}, {113,113,113}, {128,128,128}, {143,143,143},
+            {158,158,158}, {178,178,178}, {198,198,198}, {213,213,213},
+            {228,228,228}, {233,233,233}, {238,238,238}, {246,246,246},
+            {255,255,255},
+        },
+        overdrive_rgb = {
+            {246,246,246}, {255,255,255},
+            {0,255,255}, {255,255,255},
+        },
     },
     blackhot = {
         name = "Black Hot (high contrast)",
-        -- 11 stops across the full black range with 3-5 index gaps.
-        glow      = { 246, 245, 243, 240, 238, 237, 236, 234, 233, 232, 17 },
-        overdrive = { 234, 233, 232, 17},
+        glow_rgb = {
+            {148,148,148}, {143,143,143}, {138,138,138}, {128,128,128},
+            {118,118,118}, {103,103,103}, {88,88,88}, {78,78,78},
+            {68,68,68}, {63,63,63}, {58,58,58}, {53,53,53}, {48,48,48},
+            {38,38,38}, {28,28,28}, {23,23,23}, {18,18,18}, {13,13,13},
+            {8,8,8}, {4,4,51}, {0,0,95},
+        },
+        overdrive_rgb = {
+            {4,4,51}, {0,0,95},
+            {0,255,255}, {255,255,255},
+        },
     },
     aurora = {
         name = "Aurora (teal-cyan-green)",
-        -- 11-stop cool palette: deep teal through cyan to bright green-yellow.
-        -- Every adjacent pair is visibly distinct — no monochrome blending.
-        glow      = { 232, 23, 30, 36, 42, 48, 83, 119, 155, 191, 195 },
-        overdrive = { 48, 87, 123, 195 },
-    },
-    predator = {
-            name = "Predator (thermal vision heatmap)",
-            glow      = { 17, 21, 39, 46, 112, 142, 184, 220, 208, 196, 224 },
-            overdrive = { 196, 160, 123, 195 },
-        },
-    terminal = {
-        name = "Terminal (cliamp default spectrum)",
-        -- 21-stop RGB ramp: faithful green→yellow→red, smoothed for continuous gradient.
         glow_rgb = {
-            {8,8,8},        -- near-black
-            {0,95,0},       -- dark green
-            {0,175,0},      -- medium green
-            {0,235,0},      -- bright green
-            {0,255,0},      -- pure green
-            {0,255,64},     -- green-lime
-            {0,255,128},    -- spring green
-            {64,255,64},    -- light green
-            {128,255,0},    -- chartreuse
-            {191,255,0},    -- yellow-green
-            {235,255,0},    -- near-yellow
-            {255,255,0},    -- pure yellow
-            {255,235,0},    -- warm yellow
-            {255,215,0},    -- gold
-            {255,191,0},    -- amber
-            {255,159,0},    -- orange-yellow
-            {255,127,0},    -- orange
-            {255,95,0},     -- deep orange
-            {255,63,0},     -- red-orange
-            {255,31,0},     -- near-red
-            {255,0,0},      -- pure red
+            {8,8,8},
+            {4,51,51}, {0,95,95}, {0,115,115}, {0,135,135}, {0,155,135},
+            {0,175,135}, {0,195,135}, {0,215,135}, {0,235,135}, {0,255,135},
+            {47,255,115}, {95,255,95}, {115,255,95}, {135,255,95},
+            {155,255,95}, {175,255,95}, {195,255,95}, {215,255,95},
+            {215,255,175}, {215,255,255},
         },
         overdrive_rgb = {
-            {255,31,0}, {255,0,0},          -- last 2 glow stops
-            {0,255,255}, {255,255,255},     -- nova signature
+            {215,255,175}, {215,255,255},
+            {0,255,255}, {255,255,255},
+        },
+    },
+    predator = {
+        name = "Predator (thermal vision heatmap)",
+        glow_rgb = {
+            {0,0,95}, {0,0,175}, {0,0,255}, {0,87,255}, {0,175,255},
+            {0,215,127}, {0,255,0}, {67,235,0}, {135,215,0}, {155,195,0},
+            {175,175,0}, {195,195,0}, {215,215,0}, {235,215,0},
+            {255,215,0}, {255,175,0}, {255,135,0}, {255,67,0},
+            {255,0,0}, {255,107,107}, {255,215,215},
+        },
+        overdrive_rgb = {
+            {255,107,107}, {255,215,215},
+            {0,255,255}, {255,255,255},
+        },
+    },
+    terminal = {
+        name = "Terminal (cliamp default spectrum)",
+        glow_rgb = {
+            {8,8,8}, {0,95,0}, {0,175,0}, {0,235,0}, {0,255,0},
+            {0,255,64}, {0,255,128}, {64,255,64}, {128,255,0},
+            {191,255,0}, {235,255,0}, {255,255,0}, {255,235,0},
+            {255,215,0}, {255,191,0}, {255,159,0}, {255,127,0},
+            {255,95,0}, {255,63,0}, {255,31,0}, {255,0,0},
+        },
+        overdrive_rgb = {
+            {255,31,0}, {255,0,0},
+            {0,255,255}, {255,255,255},
         },
     },
     hackerman = {
         name = "Hackerman (matrix green spectrum)",
-        -- 21-stop RGB ramp: green(#4fe88f) → yellow(#50f7d4) → red(#50f872).
-        -- Truecolor mode: rendered as native 24-bit. ANSI fallback auto-computed.
         glow_rgb = {
             {79,232,143}, {79,233,149}, {79,235,156}, {79,236,163},
             {79,238,170}, {79,239,177}, {79,241,184}, {79,242,191},
@@ -573,7 +607,6 @@ local PRESETS = {
             {80,247,153}, {80,247,143}, {80,247,133}, {80,247,123},
             {80,248,114},
         },
-        -- Overdrive: last 2 glow stops + nova signature cyan (123) + white (195)
         overdrive_rgb = {
             {80,247,123}, {80,248,114},
             {0,255,255}, {255,255,255},
