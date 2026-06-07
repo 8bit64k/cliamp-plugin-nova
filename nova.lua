@@ -1160,12 +1160,22 @@ function p:render(bands, frame, rows, cols)
                 local lvl, dlvl
                 if do_blend then
                     local lo = floor(pos)
-                    if lo > 8 then lo = 8 end
-                    local frac = pos - lo
-                    local a = effective[lo + 1]; local b = effective[lo + 2]
-                    lvl = a + (b - a) * frac
-                    local da = bloom[lo + 1]; local db = bloom[lo + 2]
-                    dlvl = da + (db - da) * frac
+                    if lo < 0 then lo = 0 elseif lo > 9 then lo = 9 end
+                    local frac = pos - lo  -- 0..1
+                    local blo = (lo > 0) and effective[lo] or effective[1]
+                    local bmid = effective[lo + 1]
+                    local bhi  = (lo < 9) and effective[lo + 2] or effective[10]
+                    local dlo = (lo > 0) and bloom[lo] or bloom[1]
+                    local dmid = bloom[lo + 1]
+                    local dhi  = (lo < 9) and bloom[lo + 2] or bloom[10]
+                    local wlo, wmid, whi
+                    if frac < 0.5 then
+                        wlo = 0.5 - frac;  wmid = 0.5 + frac;  whi = 0
+                    else
+                        wlo = 0;  wmid = 1.5 - frac;  whi = frac - 0.5
+                    end
+                    lvl  = blo * wlo + bmid * wmid + bhi * whi
+                    dlvl = dlo * wlo + dmid * wmid + dhi * whi
                 else
                     local band = 1 + floor(pos + 0.5)
                     if band < 1 then band = 1 elseif band > 10 then band = 10 end
