@@ -198,6 +198,9 @@ do
     end
 end
 
+local cfg_blend_width = tonumber(clean(p:config("blend_width"))) or 2
+if cfg_blend_width < 1 then cfg_blend_width = 1 elseif cfg_blend_width > 2 then cfg_blend_width = 2 end
+
 -- Track whether the user EXPLICITLY set each preset-controlled key.
 -- true = user set it (cfg_* holds their value); false/nil = use preset profile.
 local user_set_attack         = (p:config("attack") ~= nil)
@@ -1158,10 +1161,23 @@ function p:render(bands, frame, rows, cols)
                 if pos < 0 then pos = 0 elseif pos > 9 then pos = 9 end
 
                 local lvl, dlvl
-                if do_blend then
+                if not do_blend then
+                    local band = 1 + floor(pos + 0.5)
+                    if band < 1 then band = 1 elseif band > 10 then band = 10 end
+                    lvl = effective[band]
+                    dlvl = bloom[band]
+                elseif cfg_blend_width == 1 then
+                    local lo = floor(pos)
+                    if lo > 8 then lo = 8 end
+                    local frac = pos - lo
+                    local a = effective[lo + 1]; local b = effective[lo + 2]
+                    lvl = a + (b - a) * frac
+                    local da = bloom[lo + 1]; local db = bloom[lo + 2]
+                    dlvl = da + (db - da) * frac
+                else
                     local lo = floor(pos)
                     if lo < 0 then lo = 0 elseif lo > 9 then lo = 9 end
-                    local frac = pos - lo  -- 0..1
+                    local frac = pos - lo
                     local blo = (lo > 0) and effective[lo] or effective[1]
                     local bmid = effective[lo + 1]
                     local bhi  = (lo < 9) and effective[lo + 2] or effective[10]
@@ -1176,11 +1192,6 @@ function p:render(bands, frame, rows, cols)
                     end
                     lvl  = blo * wlo + bmid * wmid + bhi * whi
                     dlvl = dlo * wlo + dmid * wmid + dhi * whi
-                else
-                    local band = 1 + floor(pos + 0.5)
-                    if band < 1 then band = 1 elseif band > 10 then band = 10 end
-                    lvl = effective[band]
-                    dlvl = bloom[band]
                 end
 
                 local color
