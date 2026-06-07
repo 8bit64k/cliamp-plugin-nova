@@ -912,14 +912,10 @@ local effective = {0,0,0,0,0,0,0,0,0,0}
 -- This is the level bloom mutation reads (NOT effective[] directly).
 local bloom      = {0,0,0,0,0,0,0,0,0,0}
 -- Bloom bleed: per-ring boost from overdrive bleed to adjacent rings.
--- Latches on a bass transient peak and decays at cfg_sustain, same clock
+-- Bloom bleed is a separate per-band array that stores the spillover heat
 -- as the color bleed so the two channels read as one percussive event.
 -- Set during the effective[] build phase, applied after the bloom envelope.
 local bloom_bleed = {0,0,0,0,0,0,0,0,0,0}
--- Bleed active this frame (set during effective[] build, read by debug footer).
-local bleeding = false
--- Overdrive flare active this frame (set during flare computation).
-local in_overdrive = false
 
 -- Frame-skip state: cache the last rendered string and a frame counter so we can
 -- cheaply reuse output on skipped frames. onset_fired flags a bass transient this
@@ -935,8 +931,6 @@ function p:init(rows, cols)
     heat[1], heat[2] = 0, 0
     bass_base[1], bass_base[2] = 0, 0
     for i = 1, 10 do bloom_bleed[i] = 0 end
-    bleeding = false
-    in_overdrive = false
     last_output = nil
     skip_counter = 0
     last_shown_preset = nil
@@ -1140,7 +1134,6 @@ function p:render(bands, frame, rows, cols)
         -- doesn't immediately raise the bar it has to clear).
         bass_base[i] = bass_base[i] + (s - bass_base[i]) * BASE_RATE
     end
-    in_overdrive = onset_fired or (heat[1] > smoothed[1]) or (heat[2] > smoothed[2])
 
     -- Bleed: ONLY when a bass ring reaches PEAK FLARE (heat at the very top of
     -- the overdrive ramp) does it warm the ring just outside it (1->2, 2->3).
@@ -1178,14 +1171,9 @@ function p:render(bands, frame, rows, cols)
                 end
             end
         end
-        bleeding = false
-        for i = 1, 10 do
-            if bloom_bleed[i] > 0.01 then bleeding = true; break end
-        end
     else
         -- When bleed is off, clear any residual bloom bleed and decay.
         for i = 1, 10 do bloom_bleed[i] = 0 end
-        bleeding = false
     end
 
     -- Gate: clamp bands below cfg_gate to 0. Runs after the full effective[]
@@ -1435,12 +1423,9 @@ function p:render(bands, frame, rows, cols)
 
     for _ = #out + 1, rows do out[#out + 1] = "" end
 
-    -- Debug footer: show preset + theme + overdrive + bleed on the last row.
-    -- Safe here (no API calls) — just paints into the output string.
+    -- Debug footer: show preset + theme on the last row.
     if cfg_debug and rows > 0 and last_shown_preset then
-        local od  = in_overdrive and " OD" or ""
-        local bld = bleeding and " BLD" or ""
-        local label = " [" .. last_shown_preset .. " + " .. cfg_theme_name .. od .. bld .. "] "
+        local label = " [" .. last_shown_preset .. " + " .. cfg_theme_name .. "] "
         local lc = visible_cols(label)
         local pad = math.floor((cols - lc) / 2)
         if pad < 0 then pad = 0 end
