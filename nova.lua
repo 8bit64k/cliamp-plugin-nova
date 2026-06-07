@@ -280,7 +280,7 @@ end
 -- ---------- ANSI 256 → RGB lookup -------------------------------------------
 -- Standard 16 system colors + 6×6×6 cube + 24 grayscale steps.
 -- Used for: (1) populating FG[] with truecolor escapes, (2) ANSI fallback
--- when truecolor is off but a theme defines glow_rgb.
+-- when truecolor is off but a theme defines glow.
 local ANSI_RGB = {}
 do
     -- Standard 16 colors
@@ -309,7 +309,7 @@ do
 end
 
 -- Map an arbitrary RGB to the nearest ANSI 256 index (Euclidean distance).
--- Used for ANSI fallback when truecolor is off and a theme defines glow_rgb.
+-- Used for ANSI fallback when truecolor is off and a theme defines glow.
 local function rgb_to_ansi256(r, g, b)
     local best, best_dist = 0, 1/0
     for i = 0, 255 do
@@ -338,31 +338,27 @@ local function fg256(n) return FG[n] or (ESC .. "[38;5;" .. n .. "m") end
 local function bg256(n) return ESC .. "[48;5;" .. n .. "m" end
 local function reset()  return ESC .. "[0m" end
 
--- ---------- RGB palette system (for glow_rgb / overdrive_rgb themes) --------
--- RGB-native themes define stops as {r,g,b} tables. At load time we allocate
--- virtual color indices (starting at 256, above the ANSI 256 range), populate
--- FG[] with truecolor escapes, and build integer ramps from those indices.
--- glow_color() still returns an integer → FG lookup unchanged in hot path.
--- When truecolor is off, glow_rgb stops are mapped to nearest ANSI 256 and
--- stored as regular indices — no palette allocation needed.
-local palette = {}     -- color_index → {r, g, b} (only used in truecolor mode)
+-- ---------- Theme resolver (RGB-native, truecolor or ANSI fallback) ----------
+-- All themes define glow/overdrive as {r,g,b} tables. In truecolor mode we
+-- allocate virtual color indices (256+), populate FG[] with 24-bit escapes,
+-- and build integer ramps from those indices. When truecolor is off, RGB
+-- stops are mapped to nearest ANSI 256 via rgb_to_ansi256() — no palette
+-- allocation needed. glow_color() always returns an integer → hot path unchanged.
+local palette = {}
 local next_color = 256
 
--- Resolve a theme preset into integer ramps. Returns glow_ramp, overdrive_ramp,
--- glow_n, overdrive_n — exactly the shape the rest of the code expects.
--- In truecolor mode with a glow_rgb theme: allocates palette indices 256+.
--- Otherwise: uses the preset's glow/overdrive ANSI 256 arrays directly.
+-- Resolve a theme into {glow_ramp, overdrive_ramp, glow_n, overdrive_n}.
 local function resolve_theme(tp)
-    if cfg_truecolor and tp.glow_rgb then
+    if cfg_truecolor then
         local gr, odr = {}, {}
-        for _, rgb in ipairs(tp.glow_rgb) do
+        for _, rgb in ipairs(tp.glow) do
             local c = next_color
             next_color = next_color + 1
             palette[c] = rgb
             FG[c] = ESC .. "[38;2;" .. rgb[1] .. ";" .. rgb[2] .. ";" .. rgb[3] .. "m"
             gr[#gr + 1] = c
         end
-        for _, rgb in ipairs(tp.overdrive_rgb) do
+        for _, rgb in ipairs(tp.overdrive) do
             local c = next_color
             next_color = next_color + 1
             palette[c] = rgb
@@ -370,18 +366,16 @@ local function resolve_theme(tp)
             odr[#odr + 1] = c
         end
         return gr, odr, #gr, #odr
-    elseif tp.glow_rgb then
-        -- Truecolor off but theme defines glow_rgb → map to nearest ANSI 256
+    else
+        -- Truecolor off → map RGB stops to nearest ANSI 256
         local gr, odr = {}, {}
-        for _, rgb in ipairs(tp.glow_rgb) do
+        for _, rgb in ipairs(tp.glow) do
             gr[#gr + 1] = rgb_to_ansi256(rgb[1], rgb[2], rgb[3])
         end
-        for _, rgb in ipairs(tp.overdrive_rgb) do
+        for _, rgb in ipairs(tp.overdrive) do
             odr[#odr + 1] = rgb_to_ansi256(rgb[1], rgb[2], rgb[3])
         end
         return gr, odr, #gr, #odr
-    else
-        return tp.glow, tp.overdrive, #tp.glow, #tp.overdrive
     end
 end
 
@@ -489,18 +483,18 @@ local function thicken(base_cp, level, fill_order, dkey)
 end
 
 -- ---------- Color presets (single swap point for upstream theme integration) ---
--- All themes now use 15-stop RGB ramps (glow_rgb / overdrive_rgb). Truecolor
+-- All themes now use 15-stop RGB ramps (glow / overdrive). Truecolor
 -- mode renders native 24-bit; ANSI fallback auto-maps to nearest 256 color.
 -- Ramp length is arbitrary — glow_color() adapts to any n >= 2.
 -- When cliamp exposes theme_colors(), add a from_cliamp_theme() function that
--- builds a dynamic glow_rgb ramp from the hex anchor colors.
+-- builds a dynamic glow ramp from the hex anchor colors.
 
 local PRESETS = {
     amber = {
         name = "Amber (tubeamp family)",
         -- 15-stop skewed: subsampled from 21-stop power-curve (pos = (i/20)^0.7).
         -- Dark-end detail preserved; bright-end snap coarsened proportionally.
-        glow_rgb = {
+        glow = {
             {8,8,8}, {35,13,13},
             {147,61,0}, {184,95,0},
             {227,95,0}, {246,95,0},
@@ -509,14 +503,14 @@ local PRESETS = {
             {255,177,0}, {255,191,0},
             {255,233,0}, {255,255,0},
         },
-        overdrive_rgb = {
+        overdrive = {
             {255,233,0}, {255,255,0},
             {0,255,255}, {255,255,255},
         },
     },
     crt = {
         name = "CRT Green Phosphor",
-        glow_rgb = {
+        glow = {
             {8,8,8},
             {4,51,4},
             {0,115,0}, {0,135,0},
@@ -526,14 +520,14 @@ local PRESETS = {
             {135,255,0}, {155,255,0},
             {195,255,0}, {215,255,0},
         },
-        overdrive_rgb = {
+        overdrive = {
             {195,255,0}, {215,255,0},
             {0,255,255}, {255,255,255},
         },
     },
     whitehot = {
         name = "White Hot (high contrast)",
-        glow_rgb = {
+        glow = {
             {0,0,0}, {4,4,4},
             {23,23,23}, {38,38,38},
             {68,68,68}, {83,83,83},
@@ -542,14 +536,14 @@ local PRESETS = {
             {228,228,228}, {233,233,233},
             {246,246,246}, {255,255,255},
         },
-        overdrive_rgb = {
+        overdrive = {
             {246,246,246}, {255,255,255},
             {0,255,255}, {255,255,255},
         },
     },
     blackhot = {
         name = "Black Hot (high contrast)",
-        glow_rgb = {
+        glow = {
             {148,148,148}, {143,143,143},
             {128,128,128}, {118,118,118},
             {88,88,88}, {78,78,78},
@@ -558,14 +552,14 @@ local PRESETS = {
             {18,18,18}, {13,13,13},
             {4,4,51}, {0,0,95},
         },
-        overdrive_rgb = {
+        overdrive = {
             {4,4,51}, {0,0,95},
             {0,255,255}, {255,255,255},
         },
     },
     aurora = {
         name = "Aurora (teal-cyan-green)",
-        glow_rgb = {
+        glow = {
             {8,8,8},
             {4,51,51},
             {0,115,115}, {0,135,135},
@@ -575,14 +569,14 @@ local PRESETS = {
             {175,255,95}, {195,255,95},
             {215,255,175}, {215,255,255},
         },
-        overdrive_rgb = {
+        overdrive = {
             {215,255,175}, {215,255,255},
             {0,255,255}, {255,255,255},
         },
     },
     predator = {
         name = "Predator (thermal vision heatmap)",
-        glow_rgb = {
+        glow = {
             {0,0,95}, {0,0,175},
             {0,87,255}, {0,175,255},
             {0,255,0}, {67,235,0},
@@ -591,14 +585,14 @@ local PRESETS = {
             {255,135,0}, {255,67,0},
             {255,107,107}, {255,215,215},
         },
-        overdrive_rgb = {
+        overdrive = {
             {255,107,107}, {255,215,215},
             {0,255,255}, {255,255,255},
         },
     },
     terminal = {
         name = "Terminal (cliamp default spectrum)",
-        glow_rgb = {
+        glow = {
             {8,8,8}, {0,95,0},
             {0,235,0}, {0,255,0},
             {0,255,128}, {64,255,64},
@@ -607,14 +601,14 @@ local PRESETS = {
             {255,127,0}, {255,95,0},
             {255,31,0}, {255,0,0},
         },
-        overdrive_rgb = {
+        overdrive = {
             {255,31,0}, {255,0,0},
             {0,255,255}, {255,255,255},
         },
     },
     hackerman = {
         name = "Hackerman (matrix green spectrum)",
-        glow_rgb = {
+        glow = {
             {79,232,143}, {79,233,149},
             {79,236,163}, {79,238,170},
             {79,241,184}, {79,242,191},
@@ -623,7 +617,7 @@ local PRESETS = {
             {80,247,153}, {80,247,143},
             {80,247,123}, {80,248,114},
         },
-        overdrive_rgb = {
+        overdrive = {
             {80,247,123}, {80,248,114},
             {0,255,255}, {255,255,255},
         },
