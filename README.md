@@ -31,13 +31,21 @@ Restart cliamp, press `v` to cycle visualizers until nova appears.
 
 ## Color Themes
 
-Four themes, each a 15-stop RGB glow ramp with a 4-stop overdrive ramp.
-Truecolor-native with ANSI 256 fallback.
+Six themes — five named for stars across the temperature spectrum, plus aurora.
+Each is a 15-stop RGB glow ramp with a 4-stop overdrive ramp. Truecolor-native,
+ANSI 256 fallback.
 
-| [aurora](assets/aurora-theme-colors.png) | [amber](assets/amber-theme-colors.png) | [crt](assets/crt-theme-colors.png) | [whitehot](assets/whitehot-theme-colors.png) |
-|:---:|:---:|:---:|:---:|
-| <img src="assets/aurora-theme-colors.png" width="180"> | <img src="assets/amber-theme-colors.png" width="180"> | <img src="assets/crt-theme-colors.png" width="180"> | <img src="assets/whitehot-theme-colors.png" width="180"> |
-| Teal → cyan → green | Amber → gold → yellow | Green phosphor | Black → pure white |
+| Theme | Star | Color |
+|-------|------|-------|
+| sol | Sol (G2, 5,800K) | Amber → gold → yellow |
+| sirius | Sirius (A1, 9,900K) | Black → gray → pure white |
+| rigel | Rigel (B8, 12,000K) | Navy → electric blue → blue-white |
+| antares | Antares (M1, 3,500K) | Crimson → neon red → pink → white |
+| aurora | — (default) | Teal → cyan → green |
+| crt | — (easter egg) | Green phosphor |
+
+Set `cycle_themes = true` to rotate through sol → sirius → rigel → antares → aurora.
+CRT is available by name but excluded from the cycle.
 
 ---
 
@@ -63,14 +71,15 @@ with smooth ring blending and dot bloom. Add a `[plugins.nova]` block to
 
 # --- look ---
 theme = "aurora"
-#   amber | crt | whitehot | aurora
+#   sol | sirius | rigel | antares | aurora | crt
 ring_shape = "circle"
 ring_blend = true
 
 # --- feel ---
-preset = "default"
-#   default | punch | ethereal | plasma | ghost | classic
+preset = "reference"
+#   reference | transient | nebula | plasma | afterglow | analog
 cycle_presets = false
+cycle_themes = false
 
 # --- bloom (glyph density) ---
 bloom = true
@@ -99,8 +108,9 @@ All theme + shape screenshots: [assets/](assets/)
 
 - Press **Shift+V** in cliamp for fullscreen — nova shines when it fills the terminal.
 - Set `cycle_presets = true` to rotate through all six presets.
+- Set `cycle_themes = true` to rotate through all five themes.
 - For subtle density animation with barely any color, try `gate = 0.03, ceiling = 0.20`.
-- For a CRT-era hard-edged look: `preset = "ghost"` with `ring_blend = false`.
+- For a CRT-era hard-edged look: `preset = "afterglow"` with `ring_blend = false`.
 
 ---
 

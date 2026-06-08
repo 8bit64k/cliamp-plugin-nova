@@ -44,9 +44,9 @@ thickens (gains dots toward center) as the ring heats.
 | Feature | Surface |
 |---------|---------|
 | Ring shape | Circle (Euclidean radial distance) |
-| Color themes | 4: amber, crt, whitehot, aurora (default) |
-| Presets | 6: default, punch, ethereal, plasma, ghost, classic |
-| Bloom | Glyphs thicken toward center with own attack/release envelope |
+| Color themes | 6: sol, sirius, rigel, antares, aurora (default), crt (easter egg) |
+| Presets | 6: reference, transient, nebula, plasma, afterglow, analog |
+| Cycle | `cycle_presets` rotates presets, `cycle_themes` rotates themes — independent axes |
 | Bloom bleed | Overdrive transients thicken +1/+2 adjacent rings |
 | Overdrive | Transient-onset flare on bass bands, latch-and-decay tail |
 | Pipeline | gate → knee → ceiling compressor lane + tilt EQ |
@@ -275,15 +275,19 @@ Each `render()` call:
 
 ## 6. Color Themes
 
-Seven themes, ANSI 256 only. Each has an 11-stop glow ramp and 4-stop overdrive
-ramp. Selected via `theme` config key; falls back to `aurora` on unknown names.
+Six themes (five stellar + aurora), 15-stop RGB ramp + 4-stop overdrive each.
+Truecolor-native with ANSI 256 fallback. Selected via `theme` config key;
+falls back to `aurora` on unknown names. `cycle_themes = true` rotates
+sol → sirius → rigel → antares → aurora; crt is excluded from the cycle.
 
-| Theme | Glow character | Overdrive character |
-|-------|---------------|---------------------|
-| **aurora** (default) | Dark → teal → cyan → green-yellow | Cyan → bright green |
-| amber | Dark → amber → bright yellow | Red → magenta-pink |
-| crt | Dark → green → bright green | Green → yellow-green |
-| whitehot | Black → gray → bright white | Bright gray → pure white |
+| Theme | Star | Color |
+|-------|------|-------|
+| **aurora** (default) | — | Dark → teal → cyan → green |
+| sol | Sol (G2, 5,800K) | Dark → amber → gold → yellow |
+| sirius | Sirius (A1, 9,900K) | Black → gray → pure white |
+| rigel | Rigel (B8, 12,000K) | Navy → electric blue → blue-white |
+| antares | Antares (M1, 3,500K) | Crimson → neon red → pink → white |
+| crt | — (easter egg) | Dark → green → bright green |
 
 All themes are 15-stop RGB ramps, truecolor-native with ANSI 256 fallback.
 
@@ -315,20 +319,19 @@ Additional shapes (diamond, wings) preserved on `vnext-shapes` branch.
 
 Six one-knob presets. Each bundles theme + ring_shape + all dynamics into a
 named feel. The profile overlay runs at the start of each `render()`. User-set
-TOML keys survive the overlay (tracked via `user_set_*` flags).
+TOML keys survive the overlay. All presets use aurora + circle unless overridden.
 
-All presets use aurora + circle by default.
-
-| Preset | Feel | Key dynamics |
-|--------|------|-------------|
-| **default** | Balanced baseline | attack=0.55, release=0.18, overdrive=0.78, sustain=0.82, blend=true, bloom_attack=0.6, bloom_release=0.15 |
-| **punch** | Snappy, percussive | attack=1, release=0.25, overdrive=1, sustain=0.9, blend=false, bloom_attack=1, bloom_release=0.85, gate=0.2 |
-| **ethereal** | Dreamy, slow glow | attack=0.3, release=0.08, overdrive=0.85, sustain=0.9, blend=true, bloom_attack=0.4, bloom_release=0.05, knee=0.6, tilt=0.4 |
-| **plasma** | Volatile, electric | attack=0.65, release=0.1, overdrive=0.65, sustain=0.88, blend=true, bloom_attack=0.85, bloom_release=0.06, gate=0.03, knee=0.9, tilt=0.2 |
-| **ghost** | Thin, wispy, slow | attack=0.3, release=0.05, overdrive=0.88, sustain=0.9, blend=false, bloom_attack=0.05, bloom_release=0.9, knee=2.6, tilt=0.5 |
-| **classic** | Big bloom, symmetric rings | attack=0.85, release=1, overdrive=0.85, sustain=0.95, blend=false, bloom_attack=1, bloom_release=0.85, tilt=0.3, ring_blend=true |
+| Preset | Feel |
+|--------|------|
+| **reference** | Balanced baseline — the standard everything is measured against |
+| **transient** | Snappy and percussive — max attack, max bloom, kick-driven |
+| **nebula** | Diffuse and billowy — treble-biased, fast shimmer |
+| **plasma** | Energetic and sustained — the set-and-forget all-rounder |
+| **afterglow** | Slow phosphor persistence — slow to wake, slow to fade |
+| **analog** | Hard-banded rings — old-school EQ visualizer look |
 
 `cycle_presets = true` rotates through all 6 on `cycle_seconds`.
+`cycle_themes = true` independently rotates color themes.
 
 vNext presets (retro, whiteout, tacutacu) preserved on `vnext-themes` branch.
 
@@ -343,20 +346,22 @@ Lives in `~/.config/cliamp/config.toml`. Entire block is optional.
 
 # --- look ---
 theme = "aurora"
-#   amber | crt | whitehot | aurora
+#   sol | sirius | rigel | antares | aurora | crt
 ring_shape = "circle"
 cycle_seconds = 20
-#   seconds per shape/preset in cycle modes (min 2)
+#   seconds per preset/theme in cycle modes (min 2)
 ring_blend = true
 #   true = smooth gradient across rings | false = hard banded rings
 fit = "fill"
 #   "contain" = letterboxed | "fill" = stretch edge to edge
 
 # --- feel ---
-preset = "default"
-#   default | punch | ethereal | plasma | ghost | classic
+preset = "reference"
+#   reference | transient | nebula | plasma | afterglow | analog
 cycle_presets = false
 #   rotate through all presets automatically
+cycle_themes = false
+#   rotate through all themes automatically (sol→sirius→rigel→antares→aurora)
 
 # --- bloom (glyph density) ---
 bloom = true
