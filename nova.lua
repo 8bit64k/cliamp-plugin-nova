@@ -914,6 +914,20 @@ local last_rows = 0
 local last_cols = 0
 local last_shown_preset = nil
 
+-- Ring geometry cache: precomputed per-cell values to avoid sqrt/distance math
+-- in the hot render loop. Rebuilt when draw_w, draw_h, cell_aspect, or ring_shape
+-- changes. ring_cache[oy] = {lo={}, frac={}, band={}, fo={}, dk={}}
+local ring_cache = nil
+local ring_cache_w = 0
+local ring_cache_h = 0
+local ring_cache_aspect = 0
+local ring_cache_shape = ""
+
+-- Source column map: sx_map[ox] = source column for output column ox.
+-- Rebuilt when draw_w changes.
+local sx_map = nil
+local sx_map_w = 0
+
 function p:init(rows, cols)
     for i = 1, 10 do smoothed[i] = 0; effective[i] = 0; bloom[i] = 0 end
     heat[1], heat[2] = 0, 0
@@ -922,6 +936,8 @@ function p:init(rows, cols)
     last_output = nil
     skip_counter = 0
     last_shown_preset = nil
+    ring_cache = nil
+    sx_map = nil
     load_art()
     -- Debug: show active preset once on visualizer selection. Safe here
     -- (outside the render loop); cliamp.message blocks if called in render().
@@ -1316,7 +1332,7 @@ function p:render(bands, frame, rows, cols)
     -- read as circles, not eggs. Band 1 (bass) = center, 10 = edge.
     -- Resolve the metric ONCE per frame (in cycle mode it advances with the
     -- wall clock; resolving once keeps the whole frame on a single shape).
-    local dist = active_dist()
+    local dist, shape_name = active_dist()
     local ocx = (draw_w + 1) / 2
     local ocy = (draw_h + 1) / 2
     local max_d = 0
@@ -1340,6 +1356,60 @@ function p:render(bands, frame, rows, cols)
     local do_bloom  = cfg_bloom
     local do_blend = cfg_ring_blend
 
+    -- Rebuild ring geometry cache if pane dimensions, aspect, or shape changed.
+    -- This eliminates sqrt/distance math from the per-cell hot loop.
+    if ring_cache == nil or ring_cache_w ~= draw_w or ring_cache_h ~= draw_h
+       or ring_cache_aspect ~= cfg_cell_aspect or ring_cache_shape ~= shape_name then
+        local cell_aspect = cfg_cell_aspect
+        ring_cache = {}
+        for oy = 1, draw_h do
+            local dy = abs(oy - ocy)
+            local diry = (oy < ocy) and -1 or ((oy > ocy) and 1 or 0)
+            local fill_row = FILL_ORDERS[-1][diry]
+            local fill_mid = FILL_ORDERS[0][diry]
+            local fill_rgt = FILL_ORDERS[1][diry]
+            local row = { lo = {}, frac = {}, band = {}, fo = {}, dk = {} }
+            for ox = 1, draw_w do
+                local dx = abs(ox - ocx) * cell_aspect
+                local pos = dist(dx, dy) * nine_over_maxd
+                if pos < 0 then pos = 0 elseif pos > 9 then pos = 9 end
+                local lo = floor(pos)
+                if lo > 8 then lo = 8 end
+                row.lo[ox] = lo
+                row.frac[ox] = pos - lo
+                row.band[ox] = 1 + floor(pos + 0.5)
+                if row.band[ox] < 1 then row.band[ox] = 1
+                elseif row.band[ox] > 10 then row.band[ox] = 10 end
+                if ox < ocx then
+                    row.fo[ox] = fill_row
+                    row.dk[ox] = 0 * 3 + (diry + 1)
+                elseif ox > ocx then
+                    row.fo[ox] = fill_rgt
+                    row.dk[ox] = 2 * 3 + (diry + 1)
+                else
+                    row.fo[ox] = fill_mid
+                    row.dk[ox] = 1 * 3 + (diry + 1)
+                end
+            end
+            ring_cache[oy] = row
+        end
+        ring_cache_w = draw_w
+        ring_cache_h = draw_h
+        ring_cache_aspect = cfg_cell_aspect
+        ring_cache_shape = shape_name
+    end
+
+    -- Rebuild source column map when draw_w changes.
+    if sx_map == nil or sx_map_w ~= draw_w then
+        sx_map = {}
+        for ox = 1, draw_w do
+            local sx = floor((ox - 0.5) * inv_dw) + 1
+            if sx < 1 then sx = 1 elseif sx > art_w then sx = art_w end
+            sx_map[ox] = sx
+        end
+        sx_map_w = draw_w
+    end
+
     local out = {}
     for _ = 1, top_pad do out[#out + 1] = "" end
 
@@ -1350,44 +1420,26 @@ function p:render(bands, frame, rows, cols)
         local srow  = art_cells[sy]
         local scode = art_code[sy]
 
-        -- vertical distance is constant across this row -> hoist out of x-loop
-        local dy = abs(oy - ocy)
-        -- vertical direction toward center (sign of offset): -1 above, +1 below,
-        -- 0 on the center line. Bloom fills toward center, so pick the row's
-        -- fill-order sub-table once here; the per-cell dirx selects within it.
-        local diry = (oy < ocy) and -1 or ((oy > ocy) and 1 or 0)
-        local fill_row = FILL_ORDERS[-1][diry]   -- left-of-center orders (default)
-        local fill_mid = FILL_ORDERS[0][diry]
-        local fill_rgt = FILL_ORDERS[1][diry]
+        -- Precomputed ring geometry for this row (avoids sqrt/distance per cell).
+        local rd = ring_cache[oy]
 
         local parts = { pad_str }
         local np = 1                 -- track append index (avoid #parts per cell)
         local last_color = nil
         for ox = 1, draw_w do
-            local sx = floor((ox - 0.5) * inv_dw) + 1
-            if sx < 1 then sx = 1 elseif sx > art_w then sx = art_w end
+            local sx = sx_map[ox]
             local ch = srow[sx] or " "
 
             if is_pass then
                 np = np + 1; parts[np] = ch
             else
-                -- ring position for this output cell
-                local dx = abs(ox - ocx) * cfg_cell_aspect
-                local pos = dist(dx, dy) * nine_over_maxd
-                if pos < 0 then pos = 0 elseif pos > 9 then pos = 9 end
-
                 local lvl, dlvl
                 if do_blend then
-                    local lo = floor(pos)
-                    if lo > 8 then lo = 8 end
-                    local frac = pos - lo
-                    local a = effective[lo + 1]; local b = effective[lo + 2]
-                    lvl = a + (b - a) * frac
-                    local da = bloom[lo + 1]; local db = bloom[lo + 2]
-                    dlvl = da + (db - da) * frac
+                    local lo, frac = rd.lo[ox], rd.frac[ox]
+                    lvl = effective[lo + 1] + (effective[lo + 2] - effective[lo + 1]) * frac
+                    dlvl = bloom[lo + 1] + (bloom[lo + 2] - bloom[lo + 1]) * frac
                 else
-                    local band = 1 + floor(pos + 0.5)
-                    if band < 1 then band = 1 elseif band > 10 then band = 10 end
+                    local band = rd.band[ox]
                     lvl = effective[band]
                     dlvl = bloom[band]
                 end
@@ -1400,17 +1452,11 @@ function p:render(bands, frame, rows, cols)
                 end
 
                 -- bloom: thicken braille glyph (cached lookup). braille cells only.
-                -- Dots fill TOWARD CENTER: pick the fill order by this cell's
-                -- direction from center (dirx selects within the row's diry table).
+                -- Fill order and dkey are precomputed in ring_cache.
                 if do_bloom and scode then
                     local base_cp = scode[sx]
                     if base_cp then
-                        local fo, dirx
-                        if ox < ocx then fo, dirx = fill_row, -1
-                        elseif ox > ocx then fo, dirx = fill_rgt, 1
-                        else fo, dirx = fill_mid, 0 end
-                        -- dkey 0..8 = (dirx+1)*3 + (diry+1): unique per direction.
-                        ch = thicken(base_cp, dlvl, fo, (dirx + 1) * 3 + (diry + 1))
+                        ch = thicken(base_cp, dlvl, rd.fo[ox], rd.dk[ox])
                     end
                 end
 
