@@ -32,6 +32,17 @@ local function clean(v)
     return v
 end
 
+-- Boolean config: accepts ONLY true, false, 1, 0. Everything else → default.
+local function bool_cfg(key, default)
+    local raw = p:config(key)
+    if type(raw) == "boolean" then return raw end
+    if type(raw) == "number" then
+        if raw == 1 then return true end
+        if raw == 0 then return false end
+    end
+    return default
+end
+
 local cfg_art_path   = clean(p:config("art_path"))
 -- start: the procedural wall's resting glyph when no art_path is given. The wall
 -- is generated on load (no file needed) -- "black" starts empty (⠀, U+2800) and
@@ -57,19 +68,7 @@ local cfg_cycle_secs = tonumber(clean(p:config("cycle_seconds"))) or 20
 if cfg_cycle_secs < 2 then cfg_cycle_secs = 2 end  -- guard against 0/typo thrash
 local cfg_fit        = clean(p:config("fit")) or "fill"
 
--- 8bit64k: let's simplify this. This is too accommodating. Either do true/false or 1/0-- my pref is 1/0
--- all boolean configuration flags should be simplified and standard on this approach.
--- Debug: when true, show the active preset name via cliamp.message() on change.
-local cfg_debug = false
-do
-    local raw = p:config("debug")
-    if type(raw) == "boolean" then
-        cfg_debug = raw
-    elseif raw ~= nil then
-        local v = clean(tostring(raw)):lower():gsub("%s+", "")
-        if v == "true" or v == "on" or v == "1" or v == "yes" then cfg_debug = true end
-    end
-end
+local cfg_debug = bool_cfg("debug", false)
 
 -- Gate: noise gate threshold — clamp bands below this to exactly 0 before the
 -- color and bloom paths read them. The round-mapping ramp-index fix bumped
@@ -137,53 +136,27 @@ if cfg_render_rate == nil then cfg_render_rate = 1.0 end
 if cfg_render_rate > 1.0 then cfg_render_rate = 1.0 end
 if cfg_render_rate < 0.25 then cfg_render_rate = 0.25 end
 
--- 8bit64k: cfg_frame_skip and associated logic should deprecated in favor of new should_render function.
--- Integer frames to skip between renders: we draw 1 of every (cfg_frame_skip + 1).
---local cfg_frame_skip = math.floor(1 / cfg_render_rate + 0.5) - 1
---if cfg_frame_skip < 0 then cfg_frame_skip = 0 end
--- 8bit64k modified: change frame_skip to be the modulo divisor instead
-local cfg_frame_skip = math.floor(cfg_render_rate * 20)
---math.max(1, math.floor(1 / cfg_render_rate + 0.5))--math.floor(1 / (1 - cfg_render_rate))
-
--- New logic to replace existing cfg_frame_skip logic-- this is more straight forward and simplified.
--- Bresenham-style even distribution is based on cfg_render_rate-- we accumuate and compare to render_rate
--- this is called immediately after render to short circuit. The old logic did buy much bc most
--- of the tracking logic was still being implemented.
+-- Bresenham-style render-rate gate: called at TOP of render() to bail before any work.
+-- Accumulates render_rate each frame; renders when accumulator crosses 1.0.
 local render_accum = 0
 
 function should_render(render_rate)
     if render_rate <= 0 then return false end
     if render_rate >= 1 then return true end
-
     render_accum = render_accum + render_rate
-    
     if render_accum >= 1 then
         render_accum = render_accum - 1
         return true
     end
-
     return false
 end
-
-
-
-
 
 -- Bloom: glyph bloom mutation — as a braille cell heats, OR in dots so the
 -- glyph thickens toward solid (toward full). Like CRT phosphor bloom: the wall
 -- gains matter on peaks. Only braille glyphs (U+2800..U+28FF) mutate; anything
 -- else is left as-is. Default ON (nova is a braille-wall plugin). Toggle off
 -- to keep glyphs fixed.
-local cfg_bloom = true
-do
-    local raw = p:config("bloom")
-    if type(raw) == "boolean" then
-        cfg_bloom = raw
-    elseif raw ~= nil then
-        local v = clean(tostring(raw)):lower():gsub("%s+", "")
-        if v == "false" or v == "off" or v == "0" or v == "no" then cfg_bloom = false end
-    end
-end
+local cfg_bloom = bool_cfg("bloom", true)
 
 -- Bloom envelope: dots fill/shed on their OWN attack/release, separate from
 -- color smoothing — so the wall can pop dots in fast and melt them away slowly,
@@ -201,33 +174,13 @@ if cfg_sustain < 0 then cfg_sustain = 0 elseif cfg_sustain > 0.97 then cfg_susta
 -- Blend: only when a bass ring punches PEAK FLARE does it warm the ring just
 -- outside it (band1->band2, band2->band3). Modest flares stay in place; only a
 -- full slam blooms outward. Default on; toggle off for clean rings (e.g. CRT art).
-local cfg_blend = true
-do
-    local raw = p:config("blend")
-    if type(raw) == "boolean" then
-        cfg_blend = raw
-    elseif raw ~= nil then
-        local v = clean(tostring(raw)):lower():gsub("%s+", "")
-        if v == "false" or v == "off" or v == "0" or v == "no" then cfg_blend = false end
-    end
-end
+local cfg_blend = bool_cfg("blend", true)
 
 -- ring_blend: smooth the band boundaries by interpolating the LEVEL between the
 -- two bands a cell sits between, instead of snapping to the nearest. Default ON.
 -- Config comes in as a string ("true"/"false") or possibly a real bool; treat
 -- anything explicitly falsey as off, everything else (incl. nil) as on.
-local cfg_ring_blend = true
-do
-    local raw = p:config("ring_blend")
-    if type(raw) == "boolean" then
-        cfg_ring_blend = raw
-    elseif raw ~= nil then
-        local v = clean(tostring(raw)):lower():gsub("%s+", "")
-        if v == "false" or v == "off" or v == "0" or v == "no" then
-            cfg_ring_blend = false
-        end
-    end
-end
+local cfg_ring_blend = bool_cfg("ring_blend", true)
 
 -- Track whether the user EXPLICITLY set each preset-controllable key.
 -- true = user set it (cfg_* holds their value); false/nil = use preset.
@@ -693,30 +646,12 @@ local PRESET_PROFILES = {
 -- as ring_shape cycle) so you can preview without config edits.
 local cfg_preset_name = clean(p:config("preset")) or "reference"
 
--- cycle_presets: auto-rotate presets. Read as bool (same defensive pattern).
-local cycle_presets = false
-do
-    local raw = p:config("cycle_presets")
-    if type(raw) == "boolean" then
-        cycle_presets = raw
-    elseif raw ~= nil then
-        local v = clean(tostring(raw)):lower():gsub("%s+", "")
-        if v == "true" or v == "on" or v == "1" or v == "yes" then cycle_presets = true end
-    end
-end
+-- cycle_presets: auto-rotate presets.
+local cycle_presets = bool_cfg("cycle_presets", false)
 
 -- cycle_themes: auto-rotate color themes independently of presets.
 -- Same timer (cycle_t0 + cycle_seconds) so both axes stay in sync.
-local cycle_themes = false
-do
-    local raw = p:config("cycle_themes")
-    if type(raw) == "boolean" then
-        cycle_themes = raw
-    elseif raw ~= nil then
-        local v = clean(tostring(raw)):lower():gsub("%s+", "")
-        if v == "true" or v == "on" or v == "1" or v == "yes" then cycle_themes = true end
-    end
-end
+local cycle_themes = bool_cfg("cycle_themes", false)
 
 local CYCLE_PRESET_NAMES = { "reference", "transient", "nebula", "plasma", "afterglow", "analog" }
 local CYCLE_THEME_NAMES  = { "sol", "sirius", "rigel", "antares", "aurora" }
@@ -754,50 +689,6 @@ local function glow_color(level, hot)
     return ramp[idx]
 end
 
-
--- 8bit64k: this might be defined ONCE but it's called every frame. Pure overhead for something 
--- that should be clean by now. Presets are CODE-- we have complete control over them
--- and they don't need to be validated 20x per second.
--- ---------- Preset application helpers (file-scope, avoid per-frame closure creation) --
--- VALIDATE clamps/converts preset profile values to the same form the config
--- reader produces. assign() binds a validated value to the right cfg_* upvalue.
--- Adding a knob = add one VALIDATE entry and one elseif branch in assign().
--- Defined ONCE at file scope instead of inside render() to eliminate ~25 closure
--- allocations per frame.
-local PRESET_VALIDATE = {
-    -- 0..1 numerics
-    attack       = function(v) if v<0 then return 0 elseif v>1 then return 1 end return v end,
-    release      = function(v) if v<0 then return 0 elseif v>1 then return 1 end return v end,
-    overdrive    = function(v) if v<0 then return 0 elseif v>1 then return 1 end return v end,
-    tilt         = function(v) if v<0 then return 0 elseif v>1 then return 1 end return v end,
-    bloom_attack = function(v) if v<0 then return 0 elseif v>1 then return 1 end return v end,
-    bloom_release= function(v) if v<0 then return 0 elseif v>1 then return 1 end return v end,
-    -- specialty numerics
-    gate         = function(v) if v<0 then return 0 elseif v>0.5 then return 0.5 end return v end,
-    ceiling      = function(v) if v<0.01 then return 0.01 elseif v>1.0 then return 1.0 end return v end,
-    knee         = function(v) if v<0.1 then return 0.1 elseif v>3.0 then return 3.0 end return v end,
-    sustain      = function(v) if v<0 then return 0 elseif v>0.97 then return 0.97 end return v end,
-    -- booleans (preset values are already Lua booleans)
-    blend        = function(v) return v end,
-    ring_blend   = function(v) return v end,
-    bloom        = function(v) return v end,
-    -- strings
-    theme        = function(v) return v end,
-    ring_shape   = function(v) return v end,
-    fit          = function(v) return v end,
-    start        = function(v) return v end,
-    color_mode   = function(v) return v end,
-    -- additional knobs (all preset-controllable now)
-    mono_color   = function(v) if v<0 then return 0 elseif v>255 then return 255 end return v end,
-    cycle_seconds= function(v) if v<2 then return 2 end return v end,
-    cell_aspect  = function(v) if v<0.2 then return 0.2 elseif v>2.0 then return 2.0 end return v end,
-    max_cols     = function(v) if v<0 then return 0 end return v end,
-    max_rows     = function(v) if v<0 then return 0 end return v end,
-    render_rate  = function(v) if v<0.25 then return 0.25 elseif v>1.0 then return 1.0 end return v end,
-    cycle_presets= function(v) return v end,
-    cycle_themes = function(v) return v end,
-    debug        = function(v) return v end,
-}
 
 local function preset_assign(key, v)
     if key == "theme" then
@@ -844,8 +735,6 @@ local function preset_assign(key, v)
     elseif key == "max_rows" then cfg_max_rows = v
     elseif key == "render_rate" then
         cfg_render_rate = v
-        cfg_frame_skip = math.floor(1 / v + 0.5) - 1
-        if cfg_frame_skip < 0 then cfg_frame_skip = 0 end
     elseif key == "cycle_presets" then
         cycle_presets = v
         cycle_t0 = os.time()
@@ -1042,11 +931,9 @@ local bloom      = {0,0,0,0,0,0,0,0,0,0}
 -- Set during the effective[] build phase, applied after the bloom envelope.
 local bloom_bleed = {0,0,0,0,0,0,0,0,0,0}
 
--- Frame-skip state: cache the last rendered string and a frame counter so we can
--- cheaply reuse output on skipped frames. onset_fired flags a bass transient this
--- frame so a skip can be overridden (flares must never be dropped).
+-- Cached last render output for should_render() to return on skipped frames.
+-- Pane dimensions cached so a resize forces a fresh render (stale cache = wrong shape).
 local last_output = nil
-local skip_counter = 0
 local last_rows = 0
 local last_cols = 0
 local last_shown_preset = nil
@@ -1071,18 +958,10 @@ function p:init(rows, cols)
     bass_base[1], bass_base[2] = 0, 0
     for i = 1, 10 do bloom_bleed[i] = 0 end
     last_output = nil
-    skip_counter = 0
     last_shown_preset = nil
     ring_cache = nil
     sx_map = nil
     load_art()
-    -- 8bit64k: dead code
-    -- Debug: show active preset once on visualizer selection. Safe here
-    -- (outside the render loop); cliamp.message blocks if called in render().
-    -- if cfg_debug and cliamp and cliamp.message then
-    --    local _, pname = active_profile()
-    --    cliamp.message("preset: " .. pname, 2)
-    --end
 end
 
 function p:destroy() end
@@ -1108,20 +987,24 @@ end
 
 function p:render(bands, frame, rows, cols)
     
-    -- 8bit64k modified: get out fast if we are tuned by render_rate
-    if (not should_render(cfg_render_rate) ) then return last_output end  
+    -- 8bit64k modified: get out fast if we are tuned by render_rate.
+    -- Respect pane resize: if dimensions changed, force a fresh render.
+    if (not should_render(cfg_render_rate))
+       and last_output ~= nil
+       and rows == last_rows and cols == last_cols then
+        return last_output
+    end  
     
     -- Profile overlay: if a named preset (or cycle_presets) is active, apply
     -- the profile's values to any config key the user didn't explicitly set.
     -- This runs first so the smoothing math and hot loop use the right values.
     -- Called every frame (not just on preset change) — cost is negligible.
     
-    -- 8bit64k modified: too much hedging- no need to validate presets 20x per second
     do
         local prof, _ = active_profile()
         for key, v in pairs(prof) do
-            if not user_set[key] then --and PRESET_VALIDATE[key] then
-                preset_assign(key, v) -- PRESET_VALIDATE[key](v))
+            if not user_set[key] then
+                preset_assign(key, v)
             end
         end
     end
@@ -1145,10 +1028,7 @@ function p:render(bands, frame, rows, cols)
         end
     end
 
-    -- 8bit64k: displaying on cliamp.message is dead code.
-    -- Debug: track preset changes so we can show the name on first render.
-    -- cliamp.message() is NOT safe inside render() (blocks the UI loop),
-    -- so we defer the actual message to init() and show the name inline.
+    -- Debug: track the active preset name so the footer can show it.
     if cfg_debug then
         local _, pname = active_profile()
         last_shown_preset = pname
@@ -1185,7 +1065,6 @@ function p:render(bands, frame, rows, cols)
     -- tail never dims below the live level. cfg_sustain=0 => no tail => snap.
     local BASE_RATE   = 0.05   -- baseline EMA: slow, so it tracks recent average
     local ONSET_MARGIN = 0.18  -- live must exceed baseline by this to be an onset
-    local onset_fired = false  -- a bass transient this frame -> override frame-skip
     -- The flare detector measures against the CEILING-LIMITED level, not the raw
     -- smoothed signal. Ceiling is a hard cap on what the wall can express, so a
     -- band can never behave as if it exceeded the cap: with ceiling=0.80 and
@@ -1197,7 +1076,6 @@ function p:render(bands, frame, rows, cols)
         if cfg_ceiling < 1.0 and s > cfg_ceiling then s = cfg_ceiling end
         local onset = (s >= cfg_overdrive)
                       and (s >= bass_base[i] + ONSET_MARGIN)
-        if onset then onset_fired = true end
         if onset and s > heat[i] then
             heat[i] = s                           -- latch hot on the punch
         else
@@ -1320,28 +1198,6 @@ function p:render(bands, frame, rows, cols)
         return placeholder(rows, cols, "nova: no art loaded")
     end
     if rows < 1 or cols < 1 then return "" end
-
-
-    -- 8bit64k modified: frame skip moved to the top of the function, so we get out fast if we are skipping this frame. onset_fired is still computed, but it won't override the skip if we are tuned to skip every N frames.
-    -- Frame-skip gate. All audio state (smoothing/heat/baseline/bloom) has been
-    -- advanced above, so skipping here only elides the expensive per-cell render
-    -- -- the envelope keeps moving underneath. Reuse the cached frame UNLESS:
-    --   * frame_skip is 0 (feature off), or
-    --   * we have no cached frame yet, or
-    --   * the pane size changed (cache would be the wrong dimensions), or
-    --   * a bass transient fired this frame (force a render so flares never drop).
-    -- The counter renders 1 frame then reuses for the next `frame_skip` frames.
-    --if cfg_frame_skip > 0
-    --    and last_output ~= nil
-    --    and last_rows == rows and last_cols == cols
-    --    and not onset_fired then
-    --    if skip_counter > 0 then
-    --        skip_counter = skip_counter - 1
-    --        return last_output
-    --    end
-    --end
-    -- About to render fresh: arm the skip counter for the next N frames.
-    --skip_counter = cfg_frame_skip
 
     -- Canvas cap: clamp the grid we actually DRAW into. The art is sized against
     -- the capped dimensions, then centered in the FULL pane below (existing
@@ -1539,8 +1395,6 @@ function p:render(bands, frame, rows, cols)
         out[rows] = fg256(244) .. bg256(232) .. string.rep(" ", pad) .. label .. reset()
     end
 
-    -- Cache the rendered frame so frame-skip can reuse it. Stash the pane size too
-    -- so a resize forces a fresh render (a stale cache would be the wrong shape).
     local result = table.concat(out, "\n")
     last_output = result
     last_rows = rows
