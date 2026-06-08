@@ -57,6 +57,8 @@ local cfg_cycle_secs = tonumber(clean(p:config("cycle_seconds"))) or 20
 if cfg_cycle_secs < 2 then cfg_cycle_secs = 2 end  -- guard against 0/typo thrash
 local cfg_fit        = clean(p:config("fit")) or "fill"
 
+-- 8bit64k: let's simplify this. This is too accommodating. Either do true/false or 1/0-- my pref is 1/0
+-- all boolean configuration flags should be simplified and standard on this approach.
 -- Debug: when true, show the active preset name via cliamp.message() on change.
 local cfg_debug = false
 do
@@ -134,9 +136,38 @@ local cfg_render_rate = tonumber(clean(p:config("render_rate")))
 if cfg_render_rate == nil then cfg_render_rate = 1.0 end
 if cfg_render_rate > 1.0 then cfg_render_rate = 1.0 end
 if cfg_render_rate < 0.25 then cfg_render_rate = 0.25 end
+
+-- 8bit64k: cfg_frame_skip and associated logic should deprecated in favor of new should_render function.
 -- Integer frames to skip between renders: we draw 1 of every (cfg_frame_skip + 1).
-local cfg_frame_skip = math.floor(1 / cfg_render_rate + 0.5) - 1
-if cfg_frame_skip < 0 then cfg_frame_skip = 0 end
+--local cfg_frame_skip = math.floor(1 / cfg_render_rate + 0.5) - 1
+--if cfg_frame_skip < 0 then cfg_frame_skip = 0 end
+-- 8bit64k modified: change frame_skip to be the modulo divisor instead
+local cfg_frame_skip = math.floor(cfg_render_rate * 20)
+--math.max(1, math.floor(1 / cfg_render_rate + 0.5))--math.floor(1 / (1 - cfg_render_rate))
+
+-- New logic to replace existing cfg_frame_skip logic-- this is more straight forward and simplified.
+-- Bresenham-style even distribution is based on cfg_render_rate-- we accumuate and compare to render_rate
+-- this is called immediately after render to short circuit. The old logic did buy much bc most
+-- of the tracking logic was still being implemented.
+local render_accum = 0
+
+function should_render(render_rate)
+    if render_rate <= 0 then return false end
+    if render_rate >= 1 then return true end
+
+    render_accum = render_accum + render_rate
+    
+    if render_accum >= 1 then
+        render_accum = render_accum - 1
+        return true
+    end
+
+    return false
+end
+
+
+
+
 
 -- Bloom: glyph bloom mutation — as a braille cell heats, OR in dots so the
 -- glyph thickens toward solid (toward full). Like CRT phosphor bloom: the wall
@@ -246,8 +277,10 @@ local function active_dist()
         local name = CYCLE_ORDER[idx]
         return DIST[name], name
     end
-    return (DIST[cfg_ring_shape] or DIST["circle"]),
-           (DIST[cfg_ring_shape] and cfg_ring_shape or "circle")
+    -- 8bit64k modified-- too much hedging
+    --return (DIST[cfg_ring_shape] or DIST["circle"]),
+    --       (DIST[cfg_ring_shape] and cfg_ring_shape or "circle")
+    return DIST[cfg_ring_shape], config_ring_shape
 end
 
 -- ---------- ANSI helpers -----------------------------------------------------
@@ -688,6 +721,8 @@ end
 local CYCLE_PRESET_NAMES = { "reference", "transient", "nebula", "plasma", "afterglow", "analog" }
 local CYCLE_THEME_NAMES  = { "sol", "sirius", "rigel", "antares", "aurora" }
 
+
+-- 8bit64k: again what is with all this hedging on the return values? Presets/configs should be clean by now.
 -- Resolve the active profile for THIS frame. In fixed mode this is constant;
 -- in cycle mode it advances with wall-clock time (same cycle_t0 as ring_shape).
 local function active_profile()
@@ -719,6 +754,10 @@ local function glow_color(level, hot)
     return ramp[idx]
 end
 
+
+-- 8bit64k: this might be defined ONCE but it's called every frame. Pure overhead for something 
+-- that should be clean by now. Presets are CODE-- we have complete control over them
+-- and they don't need to be validated 20x per second.
 -- ---------- Preset application helpers (file-scope, avoid per-frame closure creation) --
 -- VALIDATE clamps/converts preset profile values to the same form the config
 -- reader produces. assign() binds a validated value to the right cfg_* upvalue.
@@ -1037,12 +1076,13 @@ function p:init(rows, cols)
     ring_cache = nil
     sx_map = nil
     load_art()
+    -- 8bit64k: dead code
     -- Debug: show active preset once on visualizer selection. Safe here
     -- (outside the render loop); cliamp.message blocks if called in render().
-    if cfg_debug and cliamp and cliamp.message then
-        local _, pname = active_profile()
-        cliamp.message("preset: " .. pname, 2)
-    end
+    -- if cfg_debug and cliamp and cliamp.message then
+    --    local _, pname = active_profile()
+    --    cliamp.message("preset: " .. pname, 2)
+    --end
 end
 
 function p:destroy() end
@@ -1067,18 +1107,29 @@ end
 -- ---------- The render loop --------------------------------------------------
 
 function p:render(bands, frame, rows, cols)
+    
+    -- 8bit64k modified: get out fast if we are tuned by render_rate
+    if (not should_render(cfg_render_rate) ) then return last_output end  
+    
     -- Profile overlay: if a named preset (or cycle_presets) is active, apply
     -- the profile's values to any config key the user didn't explicitly set.
     -- This runs first so the smoothing math and hot loop use the right values.
     -- Called every frame (not just on preset change) — cost is negligible.
+    
+    -- 8bit64k modified: too much hedging- no need to validate presets 20x per second
     do
         local prof, _ = active_profile()
         for key, v in pairs(prof) do
-            if not user_set[key] and PRESET_VALIDATE[key] then
-                preset_assign(key, PRESET_VALIDATE[key](v))
+            if not user_set[key] then --and PRESET_VALIDATE[key] then
+                preset_assign(key, v) -- PRESET_VALIDATE[key](v))
             end
         end
     end
+
+    -- 8bit64k: something is wrong here. cycling themes and/or presets ADDs 5-7% to cpu overhead
+    -- moving to the next theme or preset should not be evaluated 20x per second; it should
+    -- be evaluated 1x every cycle_seconds. Reassess and use a simple queue datastructure
+    -- in conjunction with cliamp timer to trigger an eval.
 
     -- cycle_themes: independently rotate the color theme on the same timer.
     -- Runs after profile overlay so it can override a profile's theme choice.
@@ -1094,6 +1145,7 @@ function p:render(bands, frame, rows, cols)
         end
     end
 
+    -- 8bit64k: displaying on cliamp.message is dead code.
     -- Debug: track preset changes so we can show the name on first render.
     -- cliamp.message() is NOT safe inside render() (blocks the UI loop),
     -- so we defer the actual message to init() and show the name inline.
@@ -1269,6 +1321,8 @@ function p:render(bands, frame, rows, cols)
     end
     if rows < 1 or cols < 1 then return "" end
 
+
+    -- 8bit64k modified: frame skip moved to the top of the function, so we get out fast if we are skipping this frame. onset_fired is still computed, but it won't override the skip if we are tuned to skip every N frames.
     -- Frame-skip gate. All audio state (smoothing/heat/baseline/bloom) has been
     -- advanced above, so skipping here only elides the expensive per-cell render
     -- -- the envelope keeps moving underneath. Reuse the cached frame UNLESS:
@@ -1277,17 +1331,17 @@ function p:render(bands, frame, rows, cols)
     --   * the pane size changed (cache would be the wrong dimensions), or
     --   * a bass transient fired this frame (force a render so flares never drop).
     -- The counter renders 1 frame then reuses for the next `frame_skip` frames.
-    if cfg_frame_skip > 0
-        and last_output ~= nil
-        and last_rows == rows and last_cols == cols
-        and not onset_fired then
-        if skip_counter > 0 then
-            skip_counter = skip_counter - 1
-            return last_output
-        end
-    end
+    --if cfg_frame_skip > 0
+    --    and last_output ~= nil
+    --    and last_rows == rows and last_cols == cols
+    --    and not onset_fired then
+    --    if skip_counter > 0 then
+    --        skip_counter = skip_counter - 1
+    --        return last_output
+    --    end
+    --end
     -- About to render fresh: arm the skip counter for the next N frames.
-    skip_counter = cfg_frame_skip
+    --skip_counter = cfg_frame_skip
 
     -- Canvas cap: clamp the grid we actually DRAW into. The art is sized against
     -- the capped dimensions, then centered in the FULL pane below (existing
