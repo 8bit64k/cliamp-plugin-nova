@@ -593,13 +593,13 @@ local PRESETS = {
 -- ---------- Preset profiles (dynamics + behavior bundled for one-knob feel) ----
 -- Each profile sets defaults for the dynamics/config keys that shape how the
 -- wall MOVES and FEELS. The user's explicit TOML keys ALWAYS override. Keys not
--- listed in a profile fall back to their standard defaults (the "default" profile).
--- preset = default | punch | ethereal | plasma | ghost | classic
+-- listed in a profile fall back to the "reference" profile values.
+-- preset = reference | transient | nebula | plasma | afterglow | analog
 -- cycle_presets = true to auto-rotate through all of them on the cycle_seconds timer.
 local PRESET_PROFILES = {
     -- Presets bundle dynamics + theme + ring_shape into a single feel.
-    -- Keys not listed fall back to the "default" profile values.
-    ["default"] = {
+    -- Keys not listed fall back to the "reference" profile values.
+    ["reference"] = {
         -- theme = "aurora",  ring_shape = "circle",
         attack = 0.55,  release = 0.18,
         overdrive = 0.92,  sustain = 0.82,  blend = true,
@@ -607,7 +607,7 @@ local PRESET_PROFILES = {
         gate = 0.0,  knee = 1.0,  tilt = 0.0,
         ring_blend = true,
     },
-    punch = {
+    transient = {
         -- theme = "aurora",  ring_shape = "circle",
         attack = 1,  release = .25,
         overdrive = .96,  sustain = 0.9,  blend = true,
@@ -615,7 +615,7 @@ local PRESET_PROFILES = {
         gate = 0.2,  knee = 1,  tilt = 0.0,
         ring_blend = true,
     },
-    ethereal = {
+    nebula = {
         -- theme = "aurora",  ring_shape = "circle",
         attack = 0.3,  release = 0.08,
         overdrive = 0.97,  sustain = 0.9,  blend = false,
@@ -631,7 +631,7 @@ local PRESET_PROFILES = {
         gate = 0.03,  knee = 0.9,  tilt = 0.2,
         ring_blend = true,
     },
-    ghost = {
+    afterglow = {
         -- theme = "aurora",  ring_shape = "circle",
         attack = 0.3,  release = 0.05,
         overdrive = 0.98,  sustain = 0.9,  blend = false,
@@ -639,7 +639,7 @@ local PRESET_PROFILES = {
         gate = 0.00,  knee = 2.6,  tilt = 0.5,
         ring_blend = true,
     },
-    classic = {
+    analog = {
         -- theme = "aurora",  ring_shape = "circle",
         attack = 0.85,  release = 1,
         overdrive = 0.95,  sustain = 0.95,  blend = false,
@@ -658,7 +658,7 @@ local PRESET_PROFILES = {
 -- Resolve active behavior preset. preset = "default" | profile name.
 -- cycle_presets = true rotates through all profiles on cycle_seconds (same timer
 -- as ring_shape cycle) so you can preview without config edits.
-local cfg_preset_name = clean(p:config("preset")) or "default"
+local cfg_preset_name = clean(p:config("preset")) or "reference"
 
 -- cycle_presets: auto-rotate presets. Read as bool (same defensive pattern).
 local cycle_presets = false
@@ -685,7 +685,7 @@ do
     end
 end
 
-local CYCLE_PRESET_NAMES = { "default", "punch", "ethereal", "plasma", "ghost", "classic" }
+local CYCLE_PRESET_NAMES = { "reference", "transient", "nebula", "plasma", "afterglow", "analog" }
 local CYCLE_THEME_NAMES  = { "sol", "sirius", "rigel", "antares", "aurora" }
 
 -- Resolve the active profile for THIS frame. In fixed mode this is constant;
@@ -696,10 +696,10 @@ local function active_profile()
         if elapsed < 0 then elapsed = 0 end
         local idx = (math.floor(elapsed / cfg_cycle_secs) % #CYCLE_PRESET_NAMES) + 1
         local name = CYCLE_PRESET_NAMES[idx]
-        return PRESET_PROFILES[name] or PRESET_PROFILES["default"], name
+        return PRESET_PROFILES[name] or PRESET_PROFILES["reference"], name
     end
-    return PRESET_PROFILES[cfg_preset_name] or PRESET_PROFILES["default"],
-           (PRESET_PROFILES[cfg_preset_name] and cfg_preset_name or "default")
+    return PRESET_PROFILES[cfg_preset_name] or PRESET_PROFILES["reference"],
+           (PRESET_PROFILES[cfg_preset_name] and cfg_preset_name or "reference")
 end
 
 -- Resolve active preset (fall back to aurora on unknown name).
