@@ -40,6 +40,12 @@ local function bool_cfg(key, default)
         if raw == 1 then return true end
         if raw == 0 then return false end
     end
+    -- TOML parser may return booleans as strings.
+    if type(raw) == "string" then
+        local v = clean(raw):lower()
+        if v == "1" or v == "true" then return true end
+        if v == "0" or v == "false" then return false end
+    end
     return default
 end
 
