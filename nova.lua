@@ -1026,6 +1026,12 @@ local ring_cache_shape = ""
 local sx_map = nil
 local sx_map_w = 0
 
+-- Interlaced row cache: persistent out table, reused across frames.
+-- On even frames we render even rows, on odd frames odd rows.
+local out_cache = nil
+local out_cache_rows = 0
+local out_cache_cols = 0
+
 function p:init(rows, cols)
     for i = 1, 10 do smoothed[i] = 0; effective[i] = 0; bloom[i] = 0 end
     heat[1], heat[2] = 0, 0
@@ -1036,6 +1042,7 @@ function p:init(rows, cols)
     last_shown_preset = nil
     ring_cache = nil
     sx_map = nil
+    out_cache = nil
     load_art()
     -- Debug: show active preset once on visualizer selection. Safe here
     -- (outside the render loop); cliamp.message blocks if called in render().
@@ -1411,70 +1418,85 @@ function p:render(bands, frame, rows, cols)
         sx_map_w = draw_w
     end
 
-    local out = {}
-    for _ = 1, top_pad do out[#out + 1] = "" end
+    -- Interlace: halve per-cell work by rendering alternating rows each frame.
+    -- out_cache is persistent across frames; on even frames we render even rows,
+    -- on odd frames odd rows. onset_fired or pane resize forces full render.
+    local full_rebuild = (rows ~= out_cache_rows or cols ~= out_cache_cols)
+    local interlace_even = (frame % 2 == 0)
+    local force_full = onset_fired or not out_cache or out_cache_rows == 0
 
-    for oy = 1, draw_h do
-        -- map output row -> source row (nearest neighbor)
-        local sy = floor((oy - 0.5) * inv_dh) + 1
-        if sy < 1 then sy = 1 elseif sy > art_h then sy = art_h end
-        local srow  = art_cells[sy]
-        local scode = art_code[sy]
-
-        -- Precomputed ring geometry for this row (avoids sqrt/distance per cell).
-        local rd = ring_cache[oy]
-
-        local parts = { pad_str }
-        local np = 1                 -- track append index (avoid #parts per cell)
-        local last_color = nil
-        for ox = 1, draw_w do
-            local sx = sx_map[ox]
-            local ch = srow[sx] or " "
-
-            if is_pass then
-                np = np + 1; parts[np] = ch
-            else
-                local lvl, dlvl
-                if do_blend then
-                    local lo, frac = rd.lo[ox], rd.frac[ox]
-                    lvl = effective[lo + 1] + (effective[lo + 2] - effective[lo + 1]) * frac
-                    dlvl = bloom[lo + 1] + (bloom[lo + 2] - bloom[lo + 1]) * frac
-                else
-                    local band = rd.band[ox]
-                    lvl = effective[band]
-                    dlvl = bloom[band]
-                end
-
-                local color
-                if is_mono then
-                    color = cfg_mono_color
-                else
-                    color = glow_color(lvl, lvl >= cfg_overdrive)
-                end
-
-                -- bloom: thicken braille glyph (cached lookup). braille cells only.
-                -- Fill order and dkey are precomputed in ring_cache.
-                if do_bloom and scode then
-                    local base_cp = scode[sx]
-                    if base_cp then
-                        ch = thicken(base_cp, dlvl, rd.fo[ox], rd.dk[ox])
-                    end
-                end
-
-                if color ~= last_color then
-                    np = np + 1; parts[np] = FG[color] or fg256(color)
-                    last_color = color
-                end
-                np = np + 1; parts[np] = ch
-            end
-        end
-        if not is_pass then
-            np = np + 1; parts[np] = reset()
-        end
-        out[#out + 1] = table.concat(parts)
+    -- Build or rebuild the persistent row cache
+    if full_rebuild then
+        out_cache = {}
+        for _ = 1, top_pad do out_cache[#out_cache + 1] = "" end
+        for _ = 1, draw_h do out_cache[#out_cache + 1] = "" end
+        for _ = #out_cache + 1, rows do out_cache[#out_cache + 1] = "" end
+        out_cache_rows = rows
+        out_cache_cols = cols
     end
 
-    for _ = #out + 1, rows do out[#out + 1] = "" end
+    for oy = 1, draw_h do
+        local should_render = force_full or (interlace_even == (oy % 2 == 0))
+        if should_render then
+            -- map output row -> source row (nearest neighbor)
+            local sy = floor((oy - 0.5) * inv_dh) + 1
+            if sy < 1 then sy = 1 elseif sy > art_h then sy = art_h end
+            local srow  = art_cells[sy]
+            local scode = art_code[sy]
+
+            -- Precomputed ring geometry for this row (avoids sqrt/distance per cell).
+            local rd = ring_cache[oy]
+
+            local parts = { pad_str }
+            local np = 1                 -- track append index (avoid #parts per cell)
+            local last_color = nil
+            for ox = 1, draw_w do
+                local sx = sx_map[ox]
+                local ch = srow[sx] or " "
+
+                if is_pass then
+                    np = np + 1; parts[np] = ch
+                else
+                    local lvl, dlvl
+                    if do_blend then
+                        local lo, frac = rd.lo[ox], rd.frac[ox]
+                        lvl = effective[lo + 1] + (effective[lo + 2] - effective[lo + 1]) * frac
+                        dlvl = bloom[lo + 1] + (bloom[lo + 2] - bloom[lo + 1]) * frac
+                    else
+                        local band = rd.band[ox]
+                        lvl = effective[band]
+                        dlvl = bloom[band]
+                    end
+
+                    local color
+                    if is_mono then
+                        color = cfg_mono_color
+                    else
+                        color = glow_color(lvl, lvl >= cfg_overdrive)
+                    end
+
+                    -- bloom: thicken braille glyph (cached lookup). braille cells only.
+                    -- Fill order and dkey are precomputed in ring_cache.
+                    if do_bloom and scode then
+                        local base_cp = scode[sx]
+                        if base_cp then
+                            ch = thicken(base_cp, dlvl, rd.fo[ox], rd.dk[ox])
+                        end
+                    end
+
+                    if color ~= last_color then
+                        np = np + 1; parts[np] = FG[color] or fg256(color)
+                        last_color = color
+                    end
+                    np = np + 1; parts[np] = ch
+                end
+            end
+            if not is_pass then
+                np = np + 1; parts[np] = reset()
+            end
+            out_cache[top_pad + oy] = table.concat(parts)
+        end
+    end
 
     -- Debug footer: show preset + theme on the last row.
     if cfg_debug and rows > 0 and last_shown_preset then
@@ -1482,12 +1504,10 @@ function p:render(bands, frame, rows, cols)
         local lc = visible_cols(label)
         local pad = math.floor((cols - lc) / 2)
         if pad < 0 then pad = 0 end
-        out[rows] = fg256(244) .. bg256(232) .. string.rep(" ", pad) .. label .. reset()
+        out_cache[rows] = fg256(244) .. bg256(232) .. string.rep(" ", pad) .. label .. reset()
     end
 
-    -- Cache the rendered frame so frame-skip can reuse it. Stash the pane size too
-    -- so a resize forces a fresh render (a stale cache would be the wrong shape).
-    local result = table.concat(out, "\n")
+    local result = table.concat(out_cache, "\n")
     last_output = result
     last_rows = rows
     last_cols = cols
