@@ -719,6 +719,104 @@ local function glow_color(level, hot)
     return ramp[idx]
 end
 
+-- ---------- Preset application helpers (file-scope, avoid per-frame closure creation) --
+-- VALIDATE clamps/converts preset profile values to the same form the config
+-- reader produces. assign() binds a validated value to the right cfg_* upvalue.
+-- Adding a knob = add one VALIDATE entry and one elseif branch in assign().
+-- Defined ONCE at file scope instead of inside render() to eliminate ~25 closure
+-- allocations per frame.
+local PRESET_VALIDATE = {
+    -- 0..1 numerics
+    attack       = function(v) if v<0 then return 0 elseif v>1 then return 1 end return v end,
+    release      = function(v) if v<0 then return 0 elseif v>1 then return 1 end return v end,
+    overdrive    = function(v) if v<0 then return 0 elseif v>1 then return 1 end return v end,
+    tilt         = function(v) if v<0 then return 0 elseif v>1 then return 1 end return v end,
+    bloom_attack = function(v) if v<0 then return 0 elseif v>1 then return 1 end return v end,
+    bloom_release= function(v) if v<0 then return 0 elseif v>1 then return 1 end return v end,
+    -- specialty numerics
+    gate         = function(v) if v<0 then return 0 elseif v>0.5 then return 0.5 end return v end,
+    ceiling      = function(v) if v<0.01 then return 0.01 elseif v>1.0 then return 1.0 end return v end,
+    knee         = function(v) if v<0.1 then return 0.1 elseif v>3.0 then return 3.0 end return v end,
+    sustain      = function(v) if v<0 then return 0 elseif v>0.97 then return 0.97 end return v end,
+    -- booleans (preset values are already Lua booleans)
+    blend        = function(v) return v end,
+    ring_blend   = function(v) return v end,
+    bloom        = function(v) return v end,
+    -- strings
+    theme        = function(v) return v end,
+    ring_shape   = function(v) return v end,
+    fit          = function(v) return v end,
+    start        = function(v) return v end,
+    color_mode   = function(v) return v end,
+    -- additional knobs (all preset-controllable now)
+    mono_color   = function(v) if v<0 then return 0 elseif v>255 then return 255 end return v end,
+    cycle_seconds= function(v) if v<2 then return 2 end return v end,
+    cell_aspect  = function(v) if v<0.2 then return 0.2 elseif v>2.0 then return 2.0 end return v end,
+    max_cols     = function(v) if v<0 then return 0 end return v end,
+    max_rows     = function(v) if v<0 then return 0 end return v end,
+    render_rate  = function(v) if v<0.25 then return 0.25 elseif v>1.0 then return 1.0 end return v end,
+    cycle_presets= function(v) return v end,
+    cycle_themes = function(v) return v end,
+    debug        = function(v) return v end,
+}
+
+local function preset_assign(key, v)
+    if key == "theme" then
+        local tp = PRESETS[v]
+        if tp then
+            cfg_theme_name = v
+            glow_ramp, overdrive_ramp, glow_n, overdrive_n = resolve_theme(tp)
+        end
+    elseif key == "ring_shape" then
+        if v == "cycle" then
+            cfg_ring_shape = "cycle"
+            cycle_mode = true
+        elseif DIST[v] then
+            cfg_ring_shape = v
+            cycle_mode = false
+        end
+    elseif key == "fit" then
+        cfg_fit = v
+    elseif key == "start" then
+        cfg_start = v
+        start_cp = START_GLYPH[v] or START_GLYPH["stipple"]
+    elseif key == "color_mode" then
+        cfg_color_mode = v
+    -- numerics
+    elseif key == "attack" then cfg_attack = v
+    elseif key == "release" then cfg_release = v
+    elseif key == "overdrive" then cfg_overdrive = v
+    elseif key == "tilt" then cfg_tilt = v
+    elseif key == "gate" then cfg_gate = v
+    elseif key == "ceiling" then cfg_ceiling = v
+    elseif key == "knee" then cfg_knee = v
+    elseif key == "bloom_attack" then cfg_bloom_attack = v
+    elseif key == "bloom_release" then cfg_bloom_release = v
+    elseif key == "sustain" then cfg_sustain = v
+    -- booleans
+    elseif key == "blend" then cfg_blend = v
+    elseif key == "ring_blend" then cfg_ring_blend = v
+    elseif key == "bloom" then cfg_bloom = v
+    -- additional knobs
+    elseif key == "mono_color" then cfg_mono_color = v
+    elseif key == "cycle_seconds" then cfg_cycle_secs = v
+    elseif key == "cell_aspect" then cfg_cell_aspect = v
+    elseif key == "max_cols" then cfg_max_cols = v
+    elseif key == "max_rows" then cfg_max_rows = v
+    elseif key == "render_rate" then
+        cfg_render_rate = v
+        cfg_frame_skip = math.floor(1 / v + 0.5) - 1
+        if cfg_frame_skip < 0 then cfg_frame_skip = 0 end
+    elseif key == "cycle_presets" then
+        cycle_presets = v
+        cycle_t0 = os.time()
+    elseif key == "cycle_themes" then
+        cycle_themes = v
+        cycle_t0 = os.time()
+    elseif key == "debug" then cfg_debug = v
+    end
+end
+
 -- ---------- Art loading + ring precompute ------------------------------------
 -- Loaded once. art_cells[y][x] = display-cell glyph; art_code[y][x] = braille
 -- codepoint (or nil for non-braille). Ring band index is computed per-cell in
@@ -975,106 +1073,9 @@ function p:render(bands, frame, rows, cols)
     -- Called every frame (not just on preset change) — cost is negligible.
     do
         local prof, _ = active_profile()
-
-        -- Generic preset application.  VALIDATE clamps/converts the value
-        -- to the same form the config reader produces; assign() binds it to
-        -- the right cfg_* upvalue.  Adding a knob = add one VALIDATE entry
-        -- and one elseif branch in assign().
-        local VALIDATE = {
-            -- 0..1 numerics
-            attack       = function(v) if v<0 then return 0 elseif v>1 then return 1 end return v end,
-            release      = function(v) if v<0 then return 0 elseif v>1 then return 1 end return v end,
-            overdrive    = function(v) if v<0 then return 0 elseif v>1 then return 1 end return v end,
-            tilt         = function(v) if v<0 then return 0 elseif v>1 then return 1 end return v end,
-            bloom_attack = function(v) if v<0 then return 0 elseif v>1 then return 1 end return v end,
-            bloom_release= function(v) if v<0 then return 0 elseif v>1 then return 1 end return v end,
-            -- specialty numerics
-            gate         = function(v) if v<0 then return 0 elseif v>0.5 then return 0.5 end return v end,
-            ceiling      = function(v) if v<0.01 then return 0.01 elseif v>1.0 then return 1.0 end return v end,
-            knee         = function(v) if v<0.1 then return 0.1 elseif v>3.0 then return 3.0 end return v end,
-            sustain      = function(v) if v<0 then return 0 elseif v>0.97 then return 0.97 end return v end,
-            -- booleans (preset values are already Lua booleans)
-            blend        = function(v) return v end,
-            ring_blend   = function(v) return v end,
-            bloom        = function(v) return v end,
-            -- strings
-            theme        = function(v) return v end,
-            ring_shape   = function(v) return v end,
-            fit          = function(v) return v end,
-            start        = function(v) return v end,
-            color_mode   = function(v) return v end,
-            -- additional knobs (all preset-controllable now)
-            mono_color   = function(v) if v<0 then return 0 elseif v>255 then return 255 end return v end,
-            cycle_seconds= function(v) if v<2 then return 2 end return v end,
-            cell_aspect  = function(v) if v<0.2 then return 0.2 elseif v>2.0 then return 2.0 end return v end,
-            max_cols     = function(v) if v<0 then return 0 end return v end,
-            max_rows     = function(v) if v<0 then return 0 end return v end,
-            render_rate  = function(v) if v<0.25 then return 0.25 elseif v>1.0 then return 1.0 end return v end,
-            cycle_presets= function(v) return v end,
-            cycle_themes = function(v) return v end,
-            debug        = function(v) return v end,
-        }
-
-        local function assign(key, v)
-            if key == "theme" then
-                local tp = PRESETS[v]
-                if tp then
-                    cfg_theme_name = v
-                    glow_ramp, overdrive_ramp, glow_n, overdrive_n = resolve_theme(tp)
-                end
-            elseif key == "ring_shape" then
-                if v == "cycle" then
-                    cfg_ring_shape = "cycle"
-                    cycle_mode = true
-                elseif DIST[v] then
-                    cfg_ring_shape = v
-                    cycle_mode = false
-                end
-            elseif key == "fit" then
-                cfg_fit = v
-            elseif key == "start" then
-                cfg_start = v
-                start_cp = START_GLYPH[v] or START_GLYPH["stipple"]
-            elseif key == "color_mode" then
-                cfg_color_mode = v
-            -- numerics
-            elseif key == "attack" then cfg_attack = v
-            elseif key == "release" then cfg_release = v
-            elseif key == "overdrive" then cfg_overdrive = v
-            elseif key == "tilt" then cfg_tilt = v
-            elseif key == "gate" then cfg_gate = v
-            elseif key == "ceiling" then cfg_ceiling = v
-            elseif key == "knee" then cfg_knee = v
-            elseif key == "bloom_attack" then cfg_bloom_attack = v
-            elseif key == "bloom_release" then cfg_bloom_release = v
-            elseif key == "sustain" then cfg_sustain = v
-            -- booleans
-            elseif key == "blend" then cfg_blend = v
-            elseif key == "ring_blend" then cfg_ring_blend = v
-            elseif key == "bloom" then cfg_bloom = v
-            -- additional knobs
-            elseif key == "mono_color" then cfg_mono_color = v
-            elseif key == "cycle_seconds" then cfg_cycle_secs = v
-            elseif key == "cell_aspect" then cfg_cell_aspect = v
-            elseif key == "max_cols" then cfg_max_cols = v
-            elseif key == "max_rows" then cfg_max_rows = v
-            elseif key == "render_rate" then
-                cfg_render_rate = v
-                cfg_frame_skip = math.floor(1 / v + 0.5) - 1
-                if cfg_frame_skip < 0 then cfg_frame_skip = 0 end
-            elseif key == "cycle_presets" then
-                cycle_presets = v
-                cycle_t0 = os.time()
-            elseif key == "cycle_themes" then
-                cycle_themes = v
-                cycle_t0 = os.time()
-            elseif key == "debug" then cfg_debug = v
-            end
-        end
-
         for key, v in pairs(prof) do
-            if not user_set[key] and VALIDATE[key] then
-                assign(key, VALIDATE[key](v))
+            if not user_set[key] and PRESET_VALIDATE[key] then
+                preset_assign(key, PRESET_VALIDATE[key](v))
             end
         end
     end
