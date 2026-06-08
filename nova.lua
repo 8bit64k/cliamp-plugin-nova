@@ -945,6 +945,7 @@ local last_output = nil
 local last_rows = 0
 local last_cols = 0
 local last_shown_preset = nil
+local last_profile_name = nil
 
 -- Ring geometry cache: precomputed per-cell values to avoid sqrt/distance math
 -- in the hot render loop. Rebuilt when draw_w, draw_h, cell_aspect, or ring_shape
@@ -967,6 +968,7 @@ function p:init(rows, cols)
     for i = 1, 10 do bloom_bleed[i] = 0 end
     last_output = nil
     last_shown_preset = nil
+    last_profile_name = nil
     ring_cache = nil
     sx_map = nil
     load_art()
@@ -1003,13 +1005,11 @@ function p:render(bands, frame, rows, cols)
         return last_output
     end  
     
-    -- Profile overlay: if a named preset (or cycle_presets) is active, apply
-    -- the profile's values to any config key the user didn't explicitly set.
-    -- This runs first so the smoothing math and hot loop use the right values.
-    -- Called every frame (not just on preset change) — cost is negligible.
-    
-    do
-        local prof, _ = active_profile()
+    -- Resolve active profile once per rendered frame. Guard on name change:
+    -- only re-apply preset values when the profile actually rotates.
+    local prof, pname = active_profile()
+    if pname ~= last_profile_name then
+        last_profile_name = pname
         for key, v in pairs(prof) do
             if not user_set[key] then
                 preset_assign(key, v)
@@ -1035,7 +1035,6 @@ function p:render(bands, frame, rows, cols)
 
     -- Debug: track the active preset name so the footer can show it.
     if cfg_debug then
-        local _, pname = active_profile()
         last_shown_preset = pname
     end
 
