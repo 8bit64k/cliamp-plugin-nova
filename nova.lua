@@ -698,10 +698,12 @@ end
 
 local function preset_assign(key, v)
     if key == "theme" then
-        local tp = PRESETS[v]
-        if tp then
-            cfg_theme_name = v
-            glow_ramp, overdrive_ramp, glow_n, overdrive_n = resolve_theme(tp)
+        if v ~= cfg_theme_name then
+            local tp = PRESETS[v]
+            if tp then
+                cfg_theme_name = v
+                glow_ramp, overdrive_ramp, glow_n, overdrive_n = resolve_theme(tp)
+            end
         end
     elseif key == "ring_shape" then
         if v == "cycle" then
@@ -1015,11 +1017,6 @@ function p:render(bands, frame, rows, cols)
         end
     end
 
-    -- 8bit64k: something is wrong here. cycling themes and/or presets ADDs 5-7% to cpu overhead
-    -- moving to the next theme or preset should not be evaluated 20x per second; it should
-    -- be evaluated 1x every cycle_seconds. Reassess and use a simple queue datastructure
-    -- in conjunction with cliamp timer to trigger an eval.
-
     -- cycle_themes: independently rotate the color theme on the same timer.
     -- Runs after profile overlay so it can override a profile's theme choice.
     if cycle_themes and not user_set["theme"] then
@@ -1027,10 +1024,12 @@ function p:render(bands, frame, rows, cols)
         if elapsed < 0 then elapsed = 0 end
         local idx = (math.floor(elapsed / cfg_cycle_secs) % #CYCLE_THEME_NAMES) + 1
         local tname = CYCLE_THEME_NAMES[idx]
-        local tp = PRESETS[tname]
-        if tp then
-            cfg_theme_name = tname
-            glow_ramp, overdrive_ramp, glow_n, overdrive_n = resolve_theme(tp)
+        if tname ~= cfg_theme_name then
+            local tp = PRESETS[tname]
+            if tp then
+                cfg_theme_name = tname
+                glow_ramp, overdrive_ramp, glow_n, overdrive_n = resolve_theme(tp)
+            end
         end
     end
 
