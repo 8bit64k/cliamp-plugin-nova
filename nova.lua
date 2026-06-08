@@ -1471,7 +1471,8 @@ function p:render(bands, frame, rows, cols)
         if not is_pass then
             np = np + 1; parts[np] = reset()
         end
-        out[#out + 1] = table.concat(parts)
+        -- DIAGNOSTIC: skip per-row concat, build parts but discard
+        out[#out + 1] = ""  -- was: table.concat(parts)
     end
 
     for _ = #out + 1, rows do out[#out + 1] = "" end
@@ -1485,9 +1486,9 @@ function p:render(bands, frame, rows, cols)
         out[rows] = fg256(244) .. bg256(232) .. string.rep(" ", pad) .. label .. reset()
     end
 
-    -- Cache the rendered frame so frame-skip can reuse it. Stash the pane size too
-    -- so a resize forces a fresh render (a stale cache would be the wrong shape).
-    local result = table.concat(out, "\n")
+    -- DIAGNOSTIC: skip final table.concat, return trivial string.
+    -- This isolates Lua compute cost from string-building/output cost.
+    local result = "diag " .. tostring(os.clock())
     last_output = result
     last_rows = rows
     last_cols = cols
