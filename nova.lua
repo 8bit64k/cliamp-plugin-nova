@@ -488,8 +488,8 @@ end
 -- builds a dynamic glow ramp from the hex anchor colors.
 
 local PRESETS = {
-    amber = {
-        name = "Amber (tubeamp family)",
+    sol = {
+        name = "Sol (G-type main sequence, ~5,800K)",
         -- 15-stop skewed: subsampled from 21-stop power-curve (pos = (i/20)^0.7).
         -- Dark-end detail preserved; bright-end snap coarsened proportionally.
         glow = {
@@ -523,8 +523,8 @@ local PRESETS = {
             {0,255,255}, {255,255,255},
         },
     },
-    whitehot = {
-        name = "White Hot (high contrast)",
+    sirius = {
+        name = "Sirius (A1 main sequence, ~9,900K)",
         glow = {
             {0,0,0}, {4,4,4},
             {23,23,23}, {38,38,38},
@@ -553,6 +553,38 @@ local PRESETS = {
         },
         overdrive = {
             {215,255,175}, {215,255,255},
+            {0,255,255}, {255,255,255},
+        },
+    },
+    rigel = {
+        name = "Rigel (B8 blue supergiant, ~12,000K)",
+        glow = {
+            {4,4,24}, {4,8,51},
+            {0,24,95}, {0,51,135},
+            {0,87,175}, {0,135,215},
+            {0,175,255}, {51,195,255}, {95,215,255},
+            {135,231,255}, {175,243,255},
+            {195,247,255}, {215,251,255},
+            {231,253,255}, {247,255,255},
+        },
+        overdrive = {
+            {231,253,255}, {247,255,255},
+            {0,255,255}, {255,255,255},
+        },
+    },
+    antares = {
+        name = "Antares (M1 red supergiant, ~3,500K)",
+        glow = {
+            {12,3,3}, {28,3,3},
+            {55,0,0}, {87,0,0},
+            {119,0,0}, {151,8,0},
+            {183,24,0}, {207,40,0}, {227,56,0},
+            {243,72,0}, {255,88,0},
+            {255,108,0}, {255,128,0},
+            {255,151,0}, {255,175,0},
+        },
+        overdrive = {
+            {255,151,0}, {255,175,0},
             {0,255,255}, {255,255,255},
         },
     },
@@ -617,7 +649,7 @@ local PRESET_PROFILES = {
     },
     demo = {
         cycle_presets = true, cycle_themes = true, cycle_seconds = 7, debug = true,
-        theme = "amber",  ring_shape = "circle",
+        theme = "sol",  ring_shape = "circle",
         bloom = true,  start = "black",
     },
 
@@ -654,7 +686,7 @@ do
 end
 
 local CYCLE_PRESET_NAMES = { "default", "punch", "ethereal", "plasma", "ghost", "classic" }
-local CYCLE_THEME_NAMES  = { "amber", "crt", "whitehot", "aurora" }
+local CYCLE_THEME_NAMES  = { "sol", "sirius", "rigel", "antares", "aurora" }
 
 -- Resolve the active profile for THIS frame. In fixed mode this is constant;
 -- in cycle mode it advances with wall-clock time (same cycle_t0 as ring_shape).
