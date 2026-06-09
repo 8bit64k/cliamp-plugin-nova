@@ -98,6 +98,9 @@ render_rate = 1.0      # 0.25–1.0, fraction of frames to render
 The full config surface with every knob, the audio signal chain, and
 implementation details: [docs/DESIGN.md](docs/DESIGN.md).
 
+To learn how to tune nova — presets as case studies, the compressor lane
+explained, and common recipes: [docs/USAGE.md](docs/USAGE.md).
+
 ---
 
 ## Tips
