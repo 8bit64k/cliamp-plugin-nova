@@ -157,6 +157,10 @@ function should_render(render_rate)
     return false
 end
 
+-- Interlace: render alternating even/odd rows per frame to reduce per-cell cost.
+-- Flips each rendered frame (unaffected by render_rate skipping).
+local cfg_interlace = bool_cfg("interlace", false)
+
 -- Bloom: glyph bloom mutation — as a braille cell heats, OR in dots so the
 -- glyph thickens toward solid (toward full). Like CRT phosphor bloom: the wall
 -- gains matter on peaks. Only braille glyphs (U+2800..U+28FF) mutate; anything
@@ -944,6 +948,10 @@ local last_cols = 0
 local last_shown_preset = nil
 local last_profile_name = nil
 
+-- Interlace state: toggle flips each rendered frame; row cache for skipped rows.
+local render_toggle = false
+local last_rows_table = {}
+
 -- Ring geometry cache: precomputed per-cell values to avoid sqrt/distance math
 -- in the hot render loop. Rebuilt when draw_w, draw_h, cell_aspect, or ring_shape
 -- changes. ring_cache[oy] = {lo={}, frac={}, band={}, fo={}, dk={}}
@@ -966,6 +974,8 @@ function p:init(rows, cols)
     last_output = nil
     last_shown_preset = nil
     last_profile_name = nil
+    render_toggle = false
+    last_rows_table = {}
     ring_cache = nil
     sx_map = nil
     load_art()
@@ -1007,6 +1017,7 @@ function p:render(bands, frame, rows, cols)
     local prof, pname = active_profile()
     if pname ~= last_profile_name then
         last_profile_name = pname
+        last_rows_table = {}
         for key, v in pairs(prof) do
             if not user_set[key] then
                 preset_assign(key, v)
@@ -1022,6 +1033,7 @@ function p:render(bands, frame, rows, cols)
         local idx = (math.floor(elapsed / cfg_cycle_secs) % #CYCLE_THEME_NAMES) + 1
         local tname = CYCLE_THEME_NAMES[idx]
         if tname ~= cfg_theme_name then
+            last_rows_table = {}
             local tp = PRESETS[tname]
             if tp then
                 cfg_theme_name = tname
@@ -1325,7 +1337,23 @@ function p:render(bands, frame, rows, cols)
     local out = {}
     for _ = 1, top_pad do out[#out + 1] = "" end
 
+    -- Interlace: render half the rows per frame, copy the rest from cache.
+    -- Toggle flips each rendered frame (independent of render_rate skip).
+    -- First frame / pane resize: cache mismatch -> full render to repopulate.
+    local interlace_pass = nil  -- nil=full render, true=even rows, false=odd rows
+    if cfg_interlace then
+        if #last_rows_table ~= draw_h then
+            last_rows_table = {}
+            render_toggle = false
+        end
+        render_toggle = not render_toggle
+        interlace_pass = render_toggle
+    end
+
     for oy = 1, draw_h do
+        if interlace_pass ~= nil and (oy % 2 == 0) ~= interlace_pass then
+            out[#out + 1] = last_rows_table[oy] or ""
+        else
         -- map output row -> source row (nearest neighbor)
         local sy = floor((oy - 0.5) * inv_dh) + 1
         if sy < 1 then sy = 1 elseif sy > art_h then sy = art_h end
@@ -1382,7 +1410,10 @@ function p:render(bands, frame, rows, cols)
         if not is_pass then
             np = np + 1; parts[np] = reset()
         end
-        out[#out + 1] = table.concat(parts)
+            local row_str = table.concat(parts)
+            out[#out + 1] = row_str
+            last_rows_table[oy] = row_str
+        end
     end
 
     for _ = #out + 1, rows do out[#out + 1] = "" end
