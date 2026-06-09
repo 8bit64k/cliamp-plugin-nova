@@ -34,10 +34,8 @@ Six themes, each a 15-stop RGB glow ramp with truecolor-native ANSI:
 | sirius  | Black → gray → pure white          |
 | rigel   | Navy → electric blue → blue-white  |
 | antares | Crimson → neon red → pink → white  |
-| crt     | Green phosphor *(easter egg)*      |
 
-Set `cycle_themes = true` to rotate through sol → sirius → rigel → antares →
-aurora. CRT is available by name but excluded from the cycle.
+Set `cycle_themes = true` to rotate through sol → sirius → rigel → antares → aurora.
 
 ---
 
@@ -67,7 +65,7 @@ ring blending and bloom. Add a `[plugins.nova]` block to
 [plugins.nova]
 
 # --- look ---
-theme = "aurora"       # sol | sirius | rigel | antares | aurora | crt
+theme = "aurora"       # sol | sirius | rigel | antares | aurora
 ring_shape = "circle"
 ring_blend = true
 cycle_themes = false   # rotate through all 5 themes automatically
@@ -108,7 +106,7 @@ explained, and common recipes: [docs/USAGE.md](docs/USAGE.md).
 - Press **Shift+V** in cliamp for fullscreen — nova shines when it fills the
   terminal.
 - `cycle_presets = true` rotates through all six presets automatically.
-- `cycle_themes = true` rotates through all five themes automatically (crt excluded).
+- `cycle_themes = true` rotates through all five themes automatically.
 - For subtle density with barely any color: `gate = 0.03, ceiling = 0.20`.
 - For a CRT-era hard-edged look: `preset = "afterglow"` with
   `ring_blend = false`.
