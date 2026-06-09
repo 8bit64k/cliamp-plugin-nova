@@ -663,7 +663,6 @@ local CYCLE_PRESET_NAMES = { "reference", "transient", "nebula", "plasma", "afte
 local CYCLE_THEME_NAMES  = { "sol", "sirius", "rigel", "antares", "aurora" }
 
 
--- 8bit64k: again what is with all this hedging on the return values? Presets/configs should be clean by now.
 -- Resolve the active profile for THIS frame. In fixed mode this is constant;
 -- in cycle mode it advances with wall-clock time (same cycle_t0 as ring_shape).
 local function active_profile()
@@ -672,14 +671,12 @@ local function active_profile()
         if elapsed < 0 then elapsed = 0 end
         local idx = (math.floor(elapsed / cfg_cycle_secs) % #CYCLE_PRESET_NAMES) + 1
         local name = CYCLE_PRESET_NAMES[idx]
-        return PRESET_PROFILES[name] or PRESET_PROFILES["reference"], name
+        return PRESET_PROFILES[name] or {}, name
     end
-    return PRESET_PROFILES[cfg_preset_name] or PRESET_PROFILES["reference"],
-           (PRESET_PROFILES[cfg_preset_name] and cfg_preset_name or "reference")
+    return PRESET_PROFILES[cfg_preset_name] or {}, cfg_preset_name
 end
 
--- Resolve active preset (fall back to aurora on unknown name).
-local active_preset = PRESETS[cfg_theme_name] or PRESETS["aurora"]
+local active_preset = PRESETS[cfg_theme_name]
 local glow_ramp, overdrive_ramp, glow_n, overdrive_n = resolve_theme(active_preset)
 
 local function glow_color(level, hot)
