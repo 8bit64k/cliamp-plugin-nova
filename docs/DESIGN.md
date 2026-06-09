@@ -5,7 +5,7 @@
 > glyph bloom that thickens toward center as rings heat. Procedurally generated
 > — no art file required.
 >
-> v0.1.0. Single Lua file (~1232 lines). gopher-lua 5.1 sandbox.
+> v0.1.0. Single Lua file (~1404 lines). gopher-lua 5.1 sandbox.
 >
 > **Repo:** `8bit64k/cliamp-plugin-nova` (public)
 > **Install:** `cliamp plugins install 8bit64k/cliamp-plugin-nova`
@@ -50,7 +50,7 @@ thickens (gains dots toward center) as the ring heats.
 | Bloom bleed | Overdrive transients thicken +1/+2 adjacent rings |
 | Overdrive | Transient-onset flare on bass bands, latch-and-decay tail |
 | Pipeline | gate → knee → ceiling compressor lane + tilt EQ |
-| Performance | `render_rate` frame-skip, `max_cols`/`max_rows` canvas cap |
+| Performance | `render_rate` frame throttling, `max_cols`/`max_rows` canvas cap |
 | Procedural wall | `start = "black"` (empty) or `"stipple"` (faint texture). `art_path` override |
 
 **Defaults:** theme=aurora, ring_shape=circle, fit=fill, start=black.
@@ -218,7 +218,7 @@ bloom_bleed[10] — bloom bleed boost (latch-and-decay at sustain)
 bleeding        — set during effective[] build, read by debug footer
 ```
 
-Frame-skip state: `last_output`, `skip_counter`, `last_rows`, `last_cols`.
+Render-rate state: `last_output`, `last_rows`, `last_cols`.
 
 ### Render pipeline
 
@@ -249,9 +249,10 @@ Each `render()` call:
 5. **Apply bloom bleed boost** — `bloom[i] += bloom_bleed[i]`. Added AFTER
    the envelope so bleed decays at `sustain`, not `bloom_release`.
 6. **Lazy-load guard** — load art if `art_cells` is nil.
-7. **Frame-skip gate** — if `cfg_frame_skip > 0` and cached frame exists and
-   pane size unchanged and no bass onset: reuse `last_output`. Audio state
-   always advances. Onset force-renders so flares never drop.
+7. **Render-rate gate** — `should_render()` Bresenham accumulator gate drops
+   frames at `render_rate` (0.25–1.0). When skipping, reuse cached
+   `last_output`. Audio state always advances even on skipped frames.
+   Pane resize always forces a render (resets accumulator).
 8. **Canvas cap** — clamp draw grid to `max_cols`/`max_rows` if set.
 9. **Fit art to canvas** — `fit = "fill"` stretches (default for the wall).
    `fit = "contain"` preserves aspect.
@@ -268,7 +269,7 @@ Each `render()` call:
     - Track append index instead of `#parts`. End each row with `reset()`.
 12. **Debug footer** — if `cfg_debug`, paint `[preset + theme + BLD]` centered on
     last output row.
-13. **Cache** — stash result for frame-skip reuse.
+13. **Cache** — stash result for render-rate skip reuse.
 14. Return the assembled string.
 
 ---
@@ -543,7 +544,7 @@ cliamp-plugin-nova/
 ├── .gitignore              # AGENTS.md, CHECKPOINT*.md, scratchpad/
 ├── LICENSE                 # MIT, © 8bit64k
 ├── README.md               # User-facing install + config
-├── nova.lua                # The plugin (single file, ~1232 lines)
+├── nova.lua                # The plugin (single file, ~1404 lines)
 ├── AGENTS.md               # Durable design principles (gitignored, local)
 ├── docs/
 │   └── DESIGN.md           # This document
@@ -557,4 +558,4 @@ cliamp-plugin-nova/
 
 ---
 
-*Last reviewed: 2026-06-05. Version: nova 0.1.0.*
+*Last reviewed: 2026-06-08. Version: nova 0.1.0.*

@@ -1,21 +1,15 @@
 # nova
 
-<p align="center">
-  <img src="assets/nova-demo.gif" alt="nova visualizer demo" width="400">
-</p>
-
 A music visualizer for [cliamp](https://cliamp.stream) that turns your terminal
 into a living wall of light.
 
-**What makes nova different:** instead of bouncing bars or scrolling waveforms,
-nova maps the 10-band EQ into **concentric rings** radiating from the center of
-your screen. Bass pulses from the middle. Treble shimmers at the edges. As the
-music heats up, the rings don't just change color — the braille dots themselves
-**thicken toward center**, gaining mass on the beat and melting away slowly
-after, like phosphor burning into a CRT.
+nova maps the 10-band EQ into concentric rings radiating from the center of your
+screen. Bass pulses from the middle. Treble shimmers at the edges. As the music
+heats up, braille dots thicken toward center on peaks and melt away slowly after
+— like phosphor burning into a CRT.
 
-It needs no art files, no setup, no config. Install it, press `v` until you
-reach nova, and play something.
+No art files, no setup. Install, press `V` until you reach nova, and play
+something.
 
 ---
 
@@ -25,92 +19,96 @@ reach nova, and play something.
 cliamp plugins install 8bit64k/cliamp-plugin-nova
 ```
 
-Restart cliamp, press `v` to cycle visualizers until nova appears.
+Restart cliamp, press `V` to cycle visualizers until nova appears.
 
 ---
 
-## Color Themes
+## Themes
 
-Six themes — five named for stars across the temperature spectrum, plus aurora.
-Each is a 15-stop RGB glow ramp with a 4-stop overdrive ramp. Truecolor-native,
-ANSI 256 fallback.
+Six themes, each a 15-stop RGB glow ramp with truecolor-native ANSI:
 
-| Theme | Star | Color |
-|-------|------|-------|
-| sol | Sol (G2, 5,800K) | Amber → gold → yellow |
-| sirius | Sirius (A1, 9,900K) | Black → gray → pure white |
-| rigel | Rigel (B8, 12,000K) | Navy → electric blue → blue-white |
-| antares | Antares (M1, 3,500K) | Crimson → neon red → pink → white |
-| aurora | — (default) | Teal → cyan → green |
-| crt | — (easter egg) | Green phosphor |
+| Theme   | Color                              |
+|---------|------------------------------------|
+| aurora  | Teal → cyan → green *(default)*    |
+| sol     | Amber → gold → yellow              |
+| sirius  | Black → gray → pure white          |
+| rigel   | Navy → electric blue → blue-white  |
+| antares | Crimson → neon red → pink → white  |
+| crt     | Green phosphor *(easter egg)*      |
 
-Set `cycle_themes = true` to rotate through sol → sirius → rigel → antares → aurora.
-CRT is available by name but excluded from the cycle.
+Set `cycle_themes = true` to rotate through sol → sirius → rigel → antares →
+aurora. CRT is available by name but excluded from the cycle.
 
 ---
 
-## Ring Shape
+## Presets
 
-Nova uses a single radial distance metric: **circle** (Euclidean). Bass lives at
-the center, treble at the edges.
+Six one-knob feels. Each bundles theme + shape + dynamics into a named preset.
+User-set TOML keys override the preset defaults.
 
-<p align="center">
-  <img src="assets/aurora-theme-colors.png" width="220" alt="circle">
-</p>
+| Preset     | Feel                                    |
+|------------|-----------------------------------------|
+| reference  | Balanced baseline                       |
+| transient  | Snappy and percussive — kick-driven     |
+| nebula     | Diffuse and billowy — treble-biased     |
+| plasma     | Energetic and sustained — all-rounder   |
+| afterglow  | Slow phosphor persistence, slow fade    |
+| analog     | Hard-banded rings — old-school EQ look  |
 
 ---
 
 ## Quick config
 
-Everything is optional. With no config at all, nova renders in aurora + circle
-with smooth ring blending and dot bloom. Add a `[plugins.nova]` block to
+Everything is optional. With no config, nova renders aurora + circle with smooth
+ring blending and bloom. Add a `[plugins.nova]` block to
 `~/.config/cliamp/config.toml`:
 
 ```toml
 [plugins.nova]
 
 # --- look ---
-theme = "aurora"
-#   sol | sirius | rigel | antares | aurora | crt
+theme = "aurora"       # sol | sirius | rigel | antares | aurora | crt
 ring_shape = "circle"
 ring_blend = true
+cycle_themes = false   # rotate through all 5 themes automatically
 
 # --- feel ---
-preset = "reference"
-#   reference | transient | nebula | plasma | afterglow | analog
-cycle_presets = false
-cycle_themes = false
+preset = "reference"   # reference | transient | nebula | plasma | afterglow | analog
+cycle_presets = false  # rotate through all 6 presets automatically
+cycle_seconds = 20     # seconds per theme/preset when cycling
 
-# --- bloom (glyph density) ---
-bloom = true
+# --- bloom ---
+bloom = true           # braille dots thicken toward center on peaks
 
 # --- dynamics ---
 attack = 0.55
 release = 0.18
 overdrive = 0.78
 sustain = 0.82
-blend = true
-gate = 0.0
-ceiling = 1.0
+blend = true           # overdrive spills into adjacent rings
+gate = 0.0             # noise gate (0–0.5)
+ceiling = 1.0          # limiter (0.01–1.0)
+knee = 1.0             # response curve (0.1–3.0, 1.0 = linear)
+tilt = 0.0             # per-band treble boost
 
 # --- performance ---
-render_rate = 1.0
+render_rate = 1.0      # 0.25–1.0, fraction of frames to render
 ```
 
-The full config surface with every knob, the Visual Dynamics preset table, and
-the audio signal chain is documented in [docs/DESIGN.md](docs/DESIGN.md).
-
-All theme + shape screenshots: [assets/](assets/)
+The full config surface with every knob, the audio signal chain, and
+implementation details: [docs/DESIGN.md](docs/DESIGN.md).
 
 ---
 
 ## Tips
 
-- Press **Shift+V** in cliamp for fullscreen — nova shines when it fills the terminal.
-- Set `cycle_presets = true` to rotate through all six presets.
-- Set `cycle_themes = true` to rotate through all five themes.
-- For subtle density animation with barely any color, try `gate = 0.03, ceiling = 0.20`.
-- For a CRT-era hard-edged look: `preset = "afterglow"` with `ring_blend = false`.
+- Press **Shift+V** in cliamp for fullscreen — nova shines when it fills the
+  terminal.
+- `cycle_presets = true` rotates through all six presets automatically.
+- `cycle_themes = true` rotates through all five themes automatically.
+- For subtle density with barely any color: `gate = 0.03, ceiling = 0.20`.
+- For a CRT-era hard-edged look: `preset = "afterglow"` with
+  `ring_blend = false`.
 
 ---
 
