@@ -951,6 +951,7 @@ local last_profile_name = nil
 -- Interlace state: toggle flips each rendered frame; row cache for skipped rows.
 local render_toggle = false
 local last_rows_table = {}
+local last_rows_cache_n = 0
 
 -- Ring geometry cache: precomputed per-cell values to avoid sqrt/distance math
 -- in the hot render loop. Rebuilt when draw_w, draw_h, cell_aspect, or ring_shape
@@ -976,6 +977,7 @@ function p:init(rows, cols)
     last_profile_name = nil
     render_toggle = false
     last_rows_table = {}
+    last_rows_cache_n = 0
     ring_cache = nil
     sx_map = nil
     load_art()
@@ -1018,6 +1020,7 @@ function p:render(bands, frame, rows, cols)
     if pname ~= last_profile_name then
         last_profile_name = pname
         last_rows_table = {}
+        last_rows_cache_n = 0
         for key, v in pairs(prof) do
             if not user_set[key] then
                 preset_assign(key, v)
@@ -1034,6 +1037,7 @@ function p:render(bands, frame, rows, cols)
         local tname = CYCLE_THEME_NAMES[idx]
         if tname ~= cfg_theme_name then
             last_rows_table = {}
+            last_rows_cache_n = 0
             local tp = PRESETS[tname]
             if tp then
                 cfg_theme_name = tname
@@ -1339,15 +1343,17 @@ function p:render(bands, frame, rows, cols)
 
     -- Interlace: render half the rows per frame, copy the rest from cache.
     -- Toggle flips each rendered frame (independent of render_rate skip).
-    -- First frame / pane resize: cache mismatch -> full render to repopulate.
+    -- Cache invalidation (resize/profile/theme change) forces a full render.
     local interlace_pass = nil  -- nil=full render, true=even rows, false=odd rows
     if cfg_interlace then
-        if #last_rows_table ~= draw_h then
+        if last_rows_cache_n ~= draw_h then
             last_rows_table = {}
-            render_toggle = false
+            last_rows_cache_n = 0
+            -- leave interlace_pass = nil -> full render to populate cache
+        else
+            render_toggle = not render_toggle
+            interlace_pass = render_toggle
         end
-        render_toggle = not render_toggle
-        interlace_pass = render_toggle
     end
 
     for oy = 1, draw_h do
@@ -1415,6 +1421,9 @@ function p:render(bands, frame, rows, cols)
             last_rows_table[oy] = row_str
         end
     end
+
+    -- Cache size tracks actual populated rows (avoids # operator on sparse table).
+    last_rows_cache_n = draw_h
 
     for _ = #out + 1, rows do out[#out + 1] = "" end
 
