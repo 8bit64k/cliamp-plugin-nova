@@ -50,8 +50,8 @@ honest — it shows you what nova actually does with no stylistic spin.
 ```
 attack = 0.55   release = 0.18
 overdrive = 0.92   sustain = 0.82   blend = true
-bloom_attack = 0.6   bloom_release = 0.25
-gate = 0.0   knee = 1.0   tilt = 0.0
+bloom_attack = 0.60   bloom_release = 0.25
+gate = 0.00   knee = 1.00   tilt = 0.00
 ring_blend = true
 ```
 
@@ -72,23 +72,23 @@ Built for music with sharp attacks — rock, metal, drum-heavy electronic. The
 wall snaps to attention on every hit and stays lit.
 
 ```
-attack = 1.0   release = 0.25
-overdrive = 0.96   sustain = 0.9   blend = true
-bloom_attack = 1.0   bloom_release = 0.95
-gate = 0.2   knee = 1.0   tilt = 0.0
+attack = 1.00   release = 0.25
+overdrive = 0.96   sustain = 0.90   blend = true
+bloom_attack = 1.00   bloom_release = 0.95
+gate = 0.20   knee = 1.00   tilt = 0.00
 ring_blend = true
 ```
 
 **What it's going for:** Instant response. attack=1.0 means zero smoothing lag —
 the wall jumps on the first tick of any new sound. Bloom is also max attack,
 so dots thicken instantly. sustain=0.9 means flares hold on for a long time.
-gate=0.2 raises the noise floor, so quiet passages go dark and only real hits
+gate=0.20 raises the noise floor, so quiet passages go dark and only real hits
 register. The combination of max attack + gate means the wall pulses hard on
 beats and goes quiet between them.
 
-**Why bloom_release = 0.95:** Normally bloom release is short — dots melt away
-fast. Here it's nearly maxed. Combined with max bloom attack, dots snap to full
-density and then barely fade. The wall stays "charged" between hits.
+**Why bloom_release = 0.95:** High release means fast decay — dots melt away
+quickly. Combined with max bloom attack, dots snap to full density on every hit
+then clear fast. The wall stays responsive and never clogs up between beats.
 
 **Try tweaking:** Lower `gate` to 0.1 if the wall feels too dark between hits.
 Lower `sustain` to 0.7 if the flare overstays. Try `bloom = false` to see what
@@ -102,10 +102,10 @@ The opposite of transient. Soft, shimmering, treble-forward. Sounds like looking
 at clouds through heat haze.
 
 ```
-attack = 0.3   release = 0.08
-overdrive = 0.97   sustain = 0.9   blend = false
-bloom_attack = 0.4   bloom_release = 0.05
-gate = 0.0   knee = 0.6   tilt = 0.4
+attack = 0.30   release = 0.08
+overdrive = 0.97   sustain = 0.90   blend = false
+bloom_attack = 0.40   bloom_release = 0.05
+gate = 0.00   knee = 0.60   tilt = 0.40
 ring_blend = true
 ```
 
@@ -119,8 +119,10 @@ rings more active than inner — the opposite of bass-heavy presets. knee=0.6
 rings. Nebula kills it. Flares stay confined to their own bands. Combined with
 tilt pushing energy outward, this creates distinct ring separation at the edges.
 
-**Why bloom_release = 0.05:** Dots melt almost instantly. The glyph wall barely
-thickens — it's a pure color show with brief texture flashes on peaks.
+**Why bloom_release = 0.05:** Low release means slow decay — dots linger
+long after the signal fades. Combined with moderate bloom_attack (0.40),
+the wall builds at a moderate pace and then holds its texture for a long
+tail. It's mostly a color show, but when dots do appear they stick around.
 
 **Try tweaking:** Drop `tilt` to 0.0 to hear what the preset sounds like
 without the treble bias — the bass rings will come back. Raise `attack` to
@@ -135,10 +137,10 @@ Energetic, sustained, works with everything. The preset to pick when you don't
 want to think about presets.
 
 ```
-attack = 0.65   release = 0.1
+attack = 0.65   release = 0.10
 overdrive = 0.90   sustain = 0.88   blend = true
 bloom_attack = 0.45   bloom_release = 0.23
-gate = 0.03   knee = 0.9   tilt = 0.2
+gate = 0.03   knee = 0.90   tilt = 0.20
 ring_blend = true
 ```
 
@@ -161,22 +163,22 @@ feel from the same dynamics.
 
 ### afterglow — slow phosphor persistence
 
-The CRT burn-in preset. Slow to wake, slow to fade, treble-biased for a
+The CRT charge-up preset. Slow to wake, fast to clear, treble-biased for a
 ghostly glow. Named for the green phosphor afterimage on old monitors.
 
 ```
-attack = 0.3   release = 0.05
-overdrive = 0.98   sustain = 0.9   blend = false
-bloom_attack = 0.05   bloom_release = 0.9
-gate = 0.0   knee = 2.6   tilt = 0.5
+attack = 0.30   release = 0.05
+overdrive = 0.98   sustain = 0.90   blend = false
+bloom_attack = 0.05   bloom_release = 0.90
+gate = 0.00   knee = 2.60   tilt = 0.50
 ring_blend = true
 ```
 
-**What it's going for:** Persistence. The key numbers are bloom_attack=0.05 and
-bloom_release=0.9. Dots take forever to wake up and even longer to fade. A big
-hit lights the wall, the hit passes, and the dots linger — sometimes across
-multiple beats. It's the visual equivalent of looking at a bright light and
-still seeing it when you close your eyes.
+**What it's going for:** Slow wake, fast clear. The key numbers are
+bloom_attack=0.05 and bloom_release=0.90. Dots take a long time to build up
+(low attack), but once the signal drops they clear quickly (high release). The
+visual effect is a slow-building glow that snaps clean between events — like a
+CRT phosphor that charges slowly but resets fast.
 
 **Why knee = 2.6:** This is the hardest knee of any preset. The response curve
 is strongly concave — low levels are dark, high levels hit hard. Combined with
@@ -184,11 +186,11 @@ tilt=0.5 pushing energy to the edges, the outer rings glow persistently while
 the center stays dark until genuine bass events.
 
 **Why blend = false:** Like nebula, afterglow keeps flares in their lanes. But
-for a different reason — with bloom holding dots for so long, bleed would
+for a different reason — with bloom building dots slowly, bleed would
 smear the ring boundaries into mud.
 
-**Try tweaking:** Lower `bloom_release` to 0.5 for faster dot fade — still
-persistent, but less extreme. Drop `knee` to 1.5 if the contrast feels too
+**Try tweaking:** Lower `bloom_release` to 0.50 for slower dot fade — dots
+linger longer after events. Drop `knee` to 1.50 if the contrast feels too
 stark. Try `bloom = false` — the color-only version is a completely different
 vibe, more "aurora borealis" than "CRT burn."
 
@@ -196,26 +198,28 @@ vibe, more "aurora borealis" than "CRT burn."
 
 ### analog — hard-banded old-school EQ
 
-The hardware EQ look. Distinct ring bands, fast attack, slow release. Like
+The hardware EQ look. Distinct ring bands, fast attack, fast release. Like
 watching a 10-band graphic equalizer rendered as concentric circles.
 
 ```
-attack = 0.85   release = 1.0
+attack = 0.85   release = 1.00
 overdrive = 0.95   sustain = 0.95   blend = false
-bloom_attack = 1.0   bloom_release = 0.85
-tilt = 0.3
+bloom_attack = 1.00   bloom_release = 0.85
+tilt = 0.30
 ring_blend = true
 ```
 
-**What it's going for:** Discrete band response. attack=0.85 and release=1.0
-mean bands snap up fast and hold — a snare hit lights its ring and that ring
-stays lit for the full decay window. bloom attack is instant, bloom release is
-slow. The wall pulses in distinct rings rather than a smooth gradient.
+**What it's going for:** Discrete band response. attack=0.85 and release=1.00
+mean bands snap up and snap back — a snare hit lights its ring and it drops
+as soon as the signal does. sustain=0.95 holds the overdrive heat for a long
+tail, so flares linger even though the band response is instant. bloom attack
+is instant, bloom release is fast (0.85 — dots clear quickly).
+The wall pulses in distinct rings rather than a smooth gradient.
 
 **Note:** analog doesn't set `gate`, `knee`, or `ceiling` — it inherits those
 from your config (or reference defaults: gate=0, knee=1.0, ceiling=1.0).
 
-**Why release = 1.0:** This is the maximum — bands never decay on their own,
+**Why release = 1.00:** This is the maximum — bands never decay on their own,
 they only drop when the music drops. Every hit leaves a visible "hold" on its
 ring. In practice the band smoothing means they still move, but each ring has
 a pronounced sustained presence.
@@ -266,7 +270,7 @@ clamped flat. 1.0 = off. Lower values create a narrow shimmer band — try
 0.2–0.6 with gate=0.03 to constrain color to a thin slice while bloom still
 animates.
 
-**Putting them together:** `gate = 0.08, knee = 2.0, ceiling = 0.5` creates a
+**Putting them together:** `gate = 0.08, knee = 2.00, ceiling = 0.50` creates a
 narrow, high-contrast window — bands below 8% are silent, bands above 50% are
 clamped flat, and the remaining 8–50% range is aggressively curved for maximum
 contrast. The wall barely flickers until a real hit, then slams to full.
@@ -280,7 +284,7 @@ contrast. The wall barely flickers until a real hit, then slams to full.
 sweep. Raise `release` (0.3–0.5) so they linger. The wall "breathes."
 
 **"I want less color, more texture"**
-→ Lower `ceiling` to 0.3–0.5. Set `knee = 0.5`. Colors stay muted and narrow.
+→ Lower `ceiling` to 0.30–0.50. Set `knee = 0.50`. Colors stay muted and narrow.
 Bloom (which reads from the same signal but has its own envelope) still
 animates fully — the wall pulses in density rather than color.
 
@@ -290,7 +294,7 @@ green phosphor. The slow bloom release + hard ring boundaries + green glow is
 as close to an old monitor as nova gets.
 
 **"I want the wall to barely move"**
-→ `attack = 0.1, release = 0.02`. `gate = 0.03, ceiling = 0.2, knee = 0.5`.
+→ `attack = 0.10, release = 0.02`. `gate = 0.03, ceiling = 0.20, knee = 0.50`.
 The wall shimmers faintly. Almost ambient. Works well as a background
 visualizer for coding or reading.
 
@@ -313,14 +317,16 @@ screen as rings heat up. It has its own attack/release envelope (separate from
 the color envelope), so dots can move at a different speed than color.
 
 - **bloom_attack:** How fast dots thicken when a ring heats. Low = slow creep
-  (afterglow's 0.05). High = instant snap (transient's 1.0).
-- **bloom_release:** How fast dots melt back. Low = quick dissolve (nebula's
-  0.05). High = persistent burn (afterglow's 0.9).
+  (afterglow's 0.05). High = instant snap (transient's 1.00).
+- **bloom_release:** How fast dots melt back when the signal drops. Low =
+  slow fade, dots linger (nebula's 0.05). High = fast clear, dots melt
+  quickly (transient's 0.95).
 
 The interplay of color envelope and bloom envelope is where nova's personality
-lives. afterglow is the clearest example: color fades fast (release=0.05) but
-dots hold for nearly a second (bloom_release=0.9). You see the color flash pass,
-and the dot pattern lingers like a ghost.
+lives. afterglow is the clearest example: color fades slow (attack=0.30) and
+dots build slowly (bloom_attack=0.05) but clear fast once the signal drops
+(bloom_release=0.90). nebula is the opposite: dots linger after the signal
+fades (bloom_release=0.05) and build at a moderate pace (bloom_attack=0.40).
 
 Set `bloom = false` to turn off dot mutation entirely — the glyphs stay fixed
 and only color changes. This isn't "worse" — it's a different visual.
@@ -360,29 +366,29 @@ The complete list. For the audio signal chain and implementation details, see
 | `overdrive` | 0–1 | 0.78 | Flare trigger threshold |
 | `sustain` | 0–0.97 | 0.82 | Flare decay per frame |
 | `blend` | true/false | true | Flare spills into adjacent rings |
-| `tilt` | 0–1 | 0.0 | Per-band treble boost |
+| `tilt` | 0–1 | 0.00 | Per-band treble boost |
 
 ### Bloom
 | Key | Range | Default | What it does |
 |-----|-------|---------|--------------|
 | `bloom` | true/false | true | Braille dot thickening |
-| `bloom_attack` | 0–1 | 0.6 | Dot thickening speed |
+| `bloom_attack` | 0–1 | 0.60 | Dot thickening speed |
 | `bloom_release` | 0–1 | 0.15 | Dot melting speed |
 
 ### Compressor lane
 | Key | Range | Default | What it does |
 |-----|-------|---------|--------------|
-| `gate` | 0–0.5 | 0.0 | Noise gate threshold |
-| `knee` | 0.1–3.0 | 1.0 | Response curve (1.0 = linear) |
-| `ceiling` | 0.01–1.0 | 1.0 | Limiter ceiling |
+| `gate` | 0–0.50 | 0.00 | Noise gate threshold |
+| `knee` | 0.10–3.00 | 1.00 | Response curve (1.00 = linear) |
+| `ceiling` | 0.01–1.00 | 1.00 | Limiter ceiling |
 
 ### Performance
 | Key | Range | Default | What it does |
 |-----|-------|---------|--------------|
-| `render_rate` | 0.25–1.0 | 1.0 | Fraction of frames rendered |
+| `render_rate` | 0.25–1.00 | 1.00 | Fraction of frames rendered |
 | `max_cols` | 0+ | 0 | Canvas width cap (0 = unlimited) |
 | `max_rows` | 0+ | 0 | Canvas height cap (0 = unlimited) |
-| `cell_aspect` | 0.2–2.0 | 0.5 | Terminal cell aspect ratio |
+| `cell_aspect` | 0.20–2.00 | 0.50 | Terminal cell aspect ratio |
 
 ### Advanced
 | Key | Values | Default | What it does |
@@ -393,4 +399,4 @@ The complete list. For the audio signal chain and implementation details, see
 
 ---
 
-*Last reviewed: 2026-06-08.*
+*Last reviewed: 2026-06-09.*

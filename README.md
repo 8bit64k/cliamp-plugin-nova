@@ -86,13 +86,13 @@ release = 0.18
 overdrive = 0.78
 sustain = 0.82
 blend = true           # overdrive spills into adjacent rings
-gate = 0.0             # noise gate (0–0.5)
-ceiling = 1.0          # limiter (0.01–1.0)
-knee = 1.0             # response curve (0.1–3.0, 1.0 = linear)
-tilt = 0.0             # per-band treble boost
+gate = 0.00            # noise gate (0–0.50)
+ceiling = 1.00         # limiter (0.01–1.00)
+knee = 1.00            # response curve (0.10–3.00, 1.00 = linear)
+tilt = 0.00            # per-band treble boost
 
 # --- performance ---
-render_rate = 1.0      # 0.25–1.0, fraction of frames to render
+render_rate = 1.00     # 0.25–1.00, fraction of frames to render
 ```
 
 The full config surface with every knob, the audio signal chain, and
@@ -108,7 +108,7 @@ explained, and common recipes: [docs/USAGE.md](docs/USAGE.md).
 - Press **Shift+V** in cliamp for fullscreen — nova shines when it fills the
   terminal.
 - `cycle_presets = true` rotates through all six presets automatically.
-- `cycle_themes = true` rotates through all five themes automatically.
+- `cycle_themes = true` rotates through all five themes automatically (crt excluded).
 - For subtle density with barely any color: `gate = 0.03, ceiling = 0.20`.
 - For a CRT-era hard-edged look: `preset = "afterglow"` with
   `ring_blend = false`.

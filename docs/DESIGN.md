@@ -148,14 +148,16 @@ local p = plugin.register({
 
 Every `p:config(key)` goes through `clean()` which strips trailing `#`-comments
 (cliamp's TOML parser leaks them) and surrounding quotes. Booleans parsed
-defensively: real bool first, then string `"true"`/`"false"`/`"on"`/`"off"` etc.
+defensively: real bool first, then string `"true"`/`"false"`/`"1"`/`"0"`.
 
-User-set tracking: `user_set_attack = (p:config("attack") ~= nil)` etc. These
-flags let the preset profile overlay skip keys the user explicitly set.
+User-set tracking: a `user_set` table keyed by config name.
+`user_set[key] = (p:config(key) ~= nil)` for every key in `PRESET_KEYS`.
+These flags let the preset profile overlay skip keys the user explicitly set.
 
 ### Ring distance metrics
 
-Three pure distance-metric functions in a `DIST` table. The caller applies
+One distance-metric function in a `DIST` table (circle). Additional shapes
+(diamond, wings) are preserved on the `vnext-shapes` branch. The caller applies
 `cfg_cell_aspect` x-scaling (default 0.5) BEFORE calling `dist()`, so `dist()`
 is pure geometry with no aspect logic. The same `dist()` is used for both
 `max_d` normalization and per-cell band lookup — they CANNOT diverge.
@@ -215,7 +217,7 @@ bass_base[2]    — slow baseline EMA for transient onset detection
 effective[10]   — the final level COLORS read (after all effects)
 bloom[10]       — bloom envelope (chases effective[] with own attack/release)
 bloom_bleed[10] — bloom bleed boost (latch-and-decay at sustain)
-bleeding        — set during effective[] build, read by debug footer
+
 ```
 
 Render-rate state: `last_output`, `last_rows`, `last_cols`.
@@ -267,8 +269,8 @@ Each `render()` call:
     - Bloom: if `cfg_bloom` and cell is braille, `thicken(base_cp, dlvl, fill_order, dkey)`.
     - Color-run optimization: emit ANSI only when `color != last_color`.
     - Track append index instead of `#parts`. End each row with `reset()`.
-12. **Debug footer** — if `cfg_debug`, paint `[preset + theme + BLD]` centered on
-    last output row.
+12. **Debug footer** — if `cfg_debug`, paint `[preset + theme]` centered on
+    last output row. Also tracks `last_shown_preset` and `last_profile_name`.
 13. **Cache** — stash result for render-rate skip reuse.
 14. Return the assembled string.
 
@@ -367,7 +369,7 @@ cycle_themes = false
 # --- bloom (glyph density) ---
 bloom = true
 #   false = color only, dots stay fixed
-bloom_attack = 0.6
+bloom_attack = 0.60
 bloom_release = 0.15
 
 # --- dynamics (all 0–1 unless noted) ---
@@ -378,14 +380,14 @@ sustain = 0.82
 #   0–0.97, fraction of heat retained per frame (0 = instant snap)
 blend = true
 #   overdrive color + bloom spill into adjacent rings
-tilt = 0.0
-#   per-band treble boost (try 0.3–0.5)
-gate = 0.0
-#   0–0.5, noise gate — silence below this level
-ceiling = 1.0
-#   0.01–1.0, limiter — clamp above this (1.0 = off)
-knee = 1.0
-#   0.1–3.0, response curve (<1 softer, >1 harder, 1.0 linear)
+tilt = 0.00
+#   per-band treble boost (try 0.30–0.50)
+gate = 0.00
+#   0–0.50, noise gate — silence below this level
+ceiling = 1.00
+#   0.01–1.00, limiter — clamp above this (1.00 = off)
+knee = 1.00
+#   0.10–3.00, response curve (<1 softer, >1 harder, 1.00 linear)
 
 # --- procedural wall ---
 start = "black"
@@ -395,7 +397,7 @@ start = "black"
 #   optional file override (stays in your clone)
 
 # --- advanced ---
-cell_aspect = 0.5
+cell_aspect = 0.50
 color_mode = "glow"
 #   "glow" | "mono" | "passthrough" (no color, no bloom)
 mono_color = 11
@@ -404,12 +406,12 @@ mono_color = 11
 max_cols = 0
 max_rows = 0
 #   cap drawn area (0 = unlimited)
-render_rate = 1.0
-#   0.25–1.0, fraction of frames rendered
+render_rate = 1.00
+#   0.25–1.00, fraction of frames rendered
 ```
 
 All keys optional. With no config block, nova renders a procedural wall in
-aurora + circle + fill with the `default` preset dynamics.
+aurora + circle + fill with the `reference` preset dynamics.
 
 ---
 
@@ -558,4 +560,4 @@ cliamp-plugin-nova/
 
 ---
 
-*Last reviewed: 2026-06-08. Version: nova 0.1.0.*
+*Last reviewed: 2026-06-09. Version: nova 0.1.0.*

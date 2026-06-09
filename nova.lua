@@ -146,7 +146,7 @@ if cfg_render_rate < 0.25 then cfg_render_rate = 0.25 end
 -- Accumulates render_rate each frame; renders when accumulator crosses 1.0.
 local render_accum = 0
 
-function should_render(render_rate)
+local function should_render(render_rate)
     if render_rate <= 0 then return false end
     if render_rate >= 1 then return true end
     render_accum = render_accum + render_rate
@@ -239,7 +239,7 @@ local function active_dist()
     -- 8bit64k modified-- too much hedging
     --return (DIST[cfg_ring_shape] or DIST["circle"]),
     --       (DIST[cfg_ring_shape] and cfg_ring_shape or "circle")
-    return DIST[cfg_ring_shape], config_ring_shape
+    return DIST[cfg_ring_shape], cfg_ring_shape
 end
 
 -- ---------- ANSI helpers -----------------------------------------------------
@@ -595,48 +595,48 @@ local PRESET_PROFILES = {
         -- theme = "aurora",  ring_shape = "circle",
         attack = 0.55,  release = 0.18,
         overdrive = 0.92,  sustain = 0.82,  blend = true,
-        bloom_attack = 0.6,  bloom_release = 0.25,
-        gate = 0.0,  knee = 1.0,  tilt = 0.0,
+        bloom_attack = 0.60,  bloom_release = 0.25,
+        gate = 0.00,  knee = 1.00,  tilt = 0.00,
         ring_blend = true,
     },
     transient = {
         -- theme = "aurora",  ring_shape = "circle",
-        attack = 1,  release = .25,
-        overdrive = .96,  sustain = 0.9,  blend = true,
-        bloom_attack = 1,  bloom_release = .95,
-        gate = 0.2,  knee = 1,  tilt = 0.0,
+        attack = 1.00,  release = 0.25,
+        overdrive = 0.96,  sustain = 0.90,  blend = true,
+        bloom_attack = 1.00,  bloom_release = 0.95,
+        gate = 0.20,  knee = 1.00,  tilt = 0.00,
         ring_blend = true,
     },
     nebula = {
         -- theme = "aurora",  ring_shape = "circle",
-        attack = 0.3,  release = 0.08,
-        overdrive = 0.97,  sustain = 0.9,  blend = false,
-        bloom_attack = 0.4,  bloom_release = 0.05,
-        gate = 0.0,  knee = 0.6,  tilt = 0.4,
+        attack = 0.30,  release = 0.08,
+        overdrive = 0.97,  sustain = 0.90,  blend = false,
+        bloom_attack = 0.40,  bloom_release = 0.05,
+        gate = 0.00,  knee = 0.60,  tilt = 0.40,
         ring_blend = true,
     },
     plasma = {
         -- theme = "aurora",  ring_shape = "circle",
-        attack = 0.65,  release = 0.1,
+        attack = 0.65,  release = 0.10,
         overdrive = 0.90,  sustain = 0.88,  blend = true,
         bloom_attack = 0.45,  bloom_release = 0.23,
-        gate = 0.03,  knee = 0.9,  tilt = 0.2,
+        gate = 0.03,  knee = 0.90,  tilt = 0.20,
         ring_blend = true,
     },
     afterglow = {
         -- theme = "aurora",  ring_shape = "circle",
-        attack = 0.3,  release = 0.05,
-        overdrive = 0.98,  sustain = 0.9,  blend = false,
-        bloom_attack = 0.05,  bloom_release = 0.9,
-        gate = 0.00,  knee = 2.6,  tilt = 0.5,
+        attack = 0.30,  release = 0.05,
+        overdrive = 0.98,  sustain = 0.90,  blend = false,
+        bloom_attack = 0.05,  bloom_release = 0.90,
+        gate = 0.00,  knee = 2.60,  tilt = 0.50,
         ring_blend = true,
     },
     analog = {
         -- theme = "aurora",  ring_shape = "circle",
-        attack = 0.85,  release = 1,
+        attack = 0.85,  release = 1.00,
         overdrive = 0.95,  sustain = 0.95,  blend = false,
-        bloom_attack = 1,  bloom_release = 0.85,
-        tilt = 0.3,
+        bloom_attack = 1.00,  bloom_release = 0.85,
+        tilt = 0.30,
         ring_blend = true,
     },
     demo = {
