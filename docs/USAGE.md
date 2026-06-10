@@ -46,7 +46,7 @@ most define that preset's personality.
 
 The standard everything is measured against. Not the most exciting, but the most
 honest — it shows you what Nova actually does with no stylistic spin.
-[youtube video](https://youtu.be/-kUL8GQezgg)
+#### [youtube video](https://youtu.be/-kUL8GQezgg)
 ```
 attack = 0.55   release = 0.18
 overdrive = 0.92   sustain = 0.82   blend = true
@@ -70,7 +70,7 @@ rarer but more dramatic when they happen.
 
 Built for music with sharp attacks — rock, metal, drum-heavy electronic. The
 wall snaps to attention on every hit and stays lit.
-[youtube video](https://youtu.be/BICxgN1le8A)
+#### [youtube video](https://youtu.be/BICxgN1le8A)
 ```
 attack = 1.00   release = 0.25
 overdrive = 0.96   sustain = 0.90   blend = true
@@ -100,7 +100,7 @@ transient looks like as pure color with no dot texture — a different animal.
 
 The opposite of transient. Soft, shimmering, treble-forward. Sounds like looking
 at clouds through heat haze.
-[youtube video](https://youtu.be/AY4WOqBnt7k)
+#### [youtube video](https://youtu.be/AY4WOqBnt7k)
 ```
 attack = 0.30   release = 0.08
 overdrive = 0.97   sustain = 0.90   blend = false
@@ -135,7 +135,7 @@ the hard ring boundaries.
 
 Energetic, sustained, works with everything. The preset to pick when you don't
 want to think about presets.
-[youtube video](https://youtu.be/CgfPWGx17NE)
+#### [youtube video](https://youtu.be/CgfPWGx17NE)
 ```
 attack = 0.65   release = 0.10
 overdrive = 0.90   sustain = 0.88   blend = true
@@ -165,7 +165,7 @@ feel from the same dynamics.
 
 The CRT charge-up preset. Slow to wake, fast to clear, treble-biased for a
 ghostly glow. Named for the green phosphor afterimage on old monitors.
-[youtube video](https://youtu.be/yQjxMjq3wgs)
+#### [youtube video](https://youtu.be/yQjxMjq3wgs)
 ```
 attack = 0.30   release = 0.05
 overdrive = 0.98   sustain = 0.90   blend = false
@@ -200,7 +200,7 @@ vibe, more "aurora borealis" than "CRT burn."
 
 (the best one) The hardware EQ look. Distinct ring bands, fast attack, fast release. Like
 watching a 10-band graphic equalizer rendered as concentric circles.
-[youtube video](https://youtu.be/_nxDfeKojeQ)
+#### [youtube video](https://youtu.be/_nxDfeKojeQ)
 ```
 attack = 0.85   release = 1.00
 overdrive = 0.95   sustain = 0.95   blend = false
