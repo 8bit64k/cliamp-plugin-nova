@@ -1,13 +1,13 @@
 # USAGE.md — cliamp-plugin-nova
 
-> How to tune nova to get the look and feel you want. Presets as case studies,
+> How to tune Nova to get the look and feel you want. Presets as case studies,
 > the compressor lane explained, and common recipes.
 
 ---
 
 ## 1. Orientation — three layers
 
-Think of nova as three layers stacked on top of each other:
+Think of Nova as three layers stacked on top of each other:
 
 | Layer    | What it does                                          | Key knobs              |
 |----------|-------------------------------------------------------|------------------------|
@@ -23,7 +23,7 @@ choice.
 
 ## 2. How presets work
 
-When you set `preset = "plasma"`, nova applies plasma's profile at the start of
+When you set `preset = "plasma"`, Nova applies plasma's profile at the start of
 every frame. But here's the key: **any knob you explicitly set in your TOML
 config survives the overlay.** The preset only fills in what you didn't set.
 
@@ -45,7 +45,7 @@ most define that preset's personality.
 ### reference — the balanced baseline
 
 The standard everything is measured against. Not the most exciting, but the most
-honest — it shows you what nova actually does with no stylistic spin.
+honest — it shows you what Nova actually does with no stylistic spin.
 
 ```
 attack = 0.55   release = 0.18
@@ -291,7 +291,7 @@ animates fully — the wall pulses in density rather than color.
 **"I want a retro CRT look"**
 → `preset = "afterglow"` with `ring_blend = false`. Try `theme = "crt"` for
 green phosphor. The slow bloom release + hard ring boundaries + green glow is
-as close to an old monitor as nova gets.
+as close to an old monitor as Nova gets.
 
 **"I want the wall to barely move"**
 → `attack = 0.10, release = 0.02`. `gate = 0.03, ceiling = 0.20, knee = 0.50`.
@@ -305,14 +305,14 @@ and the flash are simultaneous.
 
 **"Cycle everything and watch"**
 → `cycle_presets = true, cycle_themes = true, cycle_seconds = 15`. Every 15
-seconds nova switches to a new preset and theme. A zero-effort way to preview
+seconds Nova switches to a new preset and theme. A zero-effort way to preview
 all the feels and find what you like.
 
 ---
 
 ## 6. The bloom layer — what the dots are doing
 
-Bloom is nova's signature: braille dots that thicken toward the center of the
+Bloom is Nova's signature: braille dots that thicken toward the center of the
 screen as rings heat up. It has its own attack/release envelope (separate from
 the color envelope), so dots can move at a different speed than color.
 
@@ -322,7 +322,7 @@ the color envelope), so dots can move at a different speed than color.
   slow fade, dots linger (nebula's 0.05). High = fast clear, dots melt
   quickly (transient's 0.95).
 
-The interplay of color envelope and bloom envelope is where nova's personality
+The interplay of color envelope and bloom envelope is where Nova's personality
 lives. afterglow is the clearest example: color fades slow (attack=0.30) and
 dots build slowly (bloom_attack=0.05) but clear fast once the signal drops
 (bloom_release=0.90). nebula is the opposite: dots linger after the signal

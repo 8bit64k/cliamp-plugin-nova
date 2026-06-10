@@ -33,7 +33,7 @@
 
 ## 1. What this plugin is
 
-`nova` is a visualizer plugin for cliamp. It generates a uniform braille wall
+`Nova` is a visualizer plugin for cliamp. It generates a uniform braille wall
 at load time and maps it into 10 concentric rings centered on the pane. Each
 ring is driven by one EQ band — bass (32 Hz) at center, treble (16 kHz) at the
 edge. Every cell recolors by its ring's smoothed level and its braille glyph
@@ -139,7 +139,7 @@ Everything in `nova.lua`. Single file, no requires.
 
 ```lua
 local p = plugin.register({
-    name = "nova", type = "visualizer", version = "0.1.0",
+    name = "Nova", type = "visualizer", version = "0.1.0",
     description = "Braille wall visualizer — EQ-driven glow with presets, themes, and bloom mutation",
 })
 ```
@@ -410,7 +410,7 @@ render_rate = 1.00
 #   0.25–1.00, fraction of frames rendered
 ```
 
-All keys optional. With no config block, nova renders a procedural wall in
+All keys optional. With no config block, Nova renders a procedural wall in
 aurora + circle + fill with the `reference` preset dynamics.
 
 ---
@@ -517,7 +517,7 @@ lua scratchpad/test_ceiling_bleed.lua
 
 ### In-host
 1. `cp nova.lua ~/.config/cliamp/plugins/nova.lua`
-2. Start cliamp, press `v` to cycle to `nova`
+2. Start cliamp, press `v` to cycle to `Nova`
 3. Check `~/.config/cliamp/plugins.log` for `[nova] error:` lines
 
 ---
@@ -527,7 +527,7 @@ lua scratchpad/test_ceiling_bleed.lua
 ### Limitations
 - **No truecolor.** ANSI 256 only. A `COLORTERM=truecolor` secondary path is a v2 idea.
 - **No responsive layout tiers.** Unlike tubeamp (FULL/COMPACT/MINI/HIDDEN),
-  nova renders at whatever pane size it gets.
+  Nova renders at whatever pane size it gets.
 - **Smoothing not dt-aware.** Same per-tick rate at both TickFast and TickSlow.
   In practice fine — visible motion during slow ticks is minimal.
 - **Single-pipe limitation.** `attack=0` kills bloom too (both read from
@@ -560,4 +560,4 @@ cliamp-plugin-nova/
 
 ---
 
-*Last reviewed: 2026-06-09. Version: nova 0.1.0.*
+*Last reviewed: 2026-06-09. Version: Nova 0.1.0.*

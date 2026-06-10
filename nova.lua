@@ -11,7 +11,7 @@
 -- See AGENTS.md for durable design principles, CHECKPOINT.md for session state.
 
 local p = plugin.register({
-    name        = "nova",
+    name        = "Nova",
     type        = "visualizer",
     version     = "0.1.0",
     description = "Braille wall visualizer — EQ-driven glow with presets, themes, and bloom mutation",
