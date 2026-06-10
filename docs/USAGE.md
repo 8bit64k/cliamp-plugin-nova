@@ -100,7 +100,7 @@ transient looks like as pure color with no dot texture — a different animal.
 
 The opposite of transient. Soft, shimmering, treble-forward. Sounds like looking
 at clouds through heat haze.
-[youtube video](Nebula https://youtu.be/AY4WOqBnt7k)
+[youtube video](https://youtu.be/AY4WOqBnt7k)
 ```
 attack = 0.30   release = 0.08
 overdrive = 0.97   sustain = 0.90   blend = false
