@@ -13,8 +13,8 @@
 local p = plugin.register({
     name        = "Nova",
     type        = "visualizer",
-    version     = "0.1.0",
-    description = "Braille wall visualizer — EQ-driven glow with presets, themes, and bloom mutation",
+    version     = "1.0.0",
+    description = "Braille/Light wall visualizer — EQ-driven glow with presets, themes, and bloom mutation",
 })
 
 -- ---------- Configuration (read once at load) --------------------------------
