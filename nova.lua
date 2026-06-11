@@ -564,6 +564,22 @@ local PRESETS = {
             {0,255,255}, {255,255,255},
         },
     },
+    rigel_inv = {
+        name = "Rigel Inverse (blue reverse ramp — hot at edge, cool at center)",
+        glow = {
+            {247,255,255}, {231,253,255},
+            {215,251,255}, {195,247,255},
+            {175,243,255}, {135,231,255},
+            {95,215,255}, {51,195,255}, {0,175,255},
+            {0,135,215}, {0,87,175},
+            {0,51,135}, {0,24,95},
+            {4,8,51}, {4,4,24},
+        },
+        overdrive = {
+            {255,255,255}, {0,255,255},
+            {247,255,255}, {231,253,255},
+        },
+    },
     antares = {
         name = "Antares (M1 red supergiant, ~3,500K)",
         glow = {
@@ -660,7 +676,7 @@ local cycle_presets = bool_cfg("cycle_presets", false)
 local cycle_themes = bool_cfg("cycle_themes", false)
 
 local CYCLE_PRESET_NAMES = { "reference", "transient", "nebula", "plasma", "afterglow", "analog" }
-local CYCLE_THEME_NAMES  = { "sol", "sirius", "rigel", "antares", "aurora" }
+local CYCLE_THEME_NAMES  = { "sol", "sirius", "rigel", "rigel_inv", "antares", "aurora" }
 
 
 -- Resolve the active profile for THIS frame. In fixed mode this is constant;
