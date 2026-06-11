@@ -1289,7 +1289,7 @@ function p:render(bands, frame, rows, cols)
                 if lo > 8 then lo = 8 end
                 row.lo[ox] = lo
                 row.frac[ox] = pos - lo
-                row.band[ox] = 1 + floor(pos + 0.5)
+                row.band[ox] = 10 - floor(pos + 0.5)
                 if row.band[ox] < 1 then row.band[ox] = 1
                 elseif row.band[ox] > 10 then row.band[ox] = 10 end
                 if ox < ocx then
