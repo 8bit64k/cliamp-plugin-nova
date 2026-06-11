@@ -1285,10 +1285,11 @@ function p:render(bands, frame, rows, cols)
                 local dx = abs(ox - ocx) * cell_aspect
                 local pos = dist(dx, dy) * nine_over_maxd
                 if pos < 0 then pos = 0 elseif pos > 9 then pos = 9 end
-                local lo = floor(pos)
+                local pos_inv = 9 - pos     -- inverse: treble→center, bass→edge
+                local lo = floor(pos_inv)
                 if lo > 8 then lo = 8 end
                 row.lo[ox] = lo
-                row.frac[ox] = pos - lo
+                row.frac[ox] = pos_inv - lo
                 row.band[ox] = 10 - floor(pos + 0.5)
                 if row.band[ox] < 1 then row.band[ox] = 1
                 elseif row.band[ox] > 10 then row.band[ox] = 10 end
