@@ -966,13 +966,14 @@ local last_shown_preset = nil
 local last_profile_name = nil
 
 -- Ring geometry cache: precomputed per-cell values to avoid sqrt/distance math
--- in the hot render loop. Rebuilt when draw_w, draw_h, cell_aspect, or ring_shape
--- changes. ring_cache[oy] = {lo={}, frac={}, band={}, fo={}, dk={}}
+-- in the hot render loop. Rebuilt when draw_w, draw_h, cell_aspect, ring_shape,
+-- or inverse_bands changes. ring_cache[oy] = {lo={}, frac={}, band={}, fo={}, dk={}}
 local ring_cache = nil
 local ring_cache_w = 0
 local ring_cache_h = 0
 local ring_cache_aspect = 0
 local ring_cache_shape = ""
+local ring_cache_inverse = false
 
 -- Source column map: sx_map[ox] = source column for output column ox.
 -- Rebuilt when draw_w changes.
@@ -988,6 +989,7 @@ function p:init(rows, cols)
     last_shown_preset = nil
     last_profile_name = nil
     ring_cache = nil
+    ring_cache_inverse = false
     sx_map = nil
     load_art()
 end

@@ -308,6 +308,18 @@ and the flash are simultaneous.
 seconds Nova switches to a new preset and theme. A zero-effort way to preview
 all the feels and find what you like.
 
+**"I want the frame to light up instead of the center"**
+→ `inverse_bands = true` swaps the EQ-to-ring mapping: treble lights the center
+rings and bass lights the outer frame. The wall becomes a reactive frame rather
+than a centered spotlight. Because the core can go dark with this flip, pair it
+with aggressive treble lift and a hard knee:
+```toml
+inverse_bands = true
+knee = 3.00   tilt = 1.00   gate = 0.40
+overdrive = 0.90   sustain = 0.60
+theme = "rigel"
+```
+
 ---
 
 ## 6. The bloom layer — what the dots are doing
