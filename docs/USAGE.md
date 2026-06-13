@@ -346,6 +346,7 @@ The complete list. For the audio signal chain and implementation details, see
 | `theme` | aurora, sol, sirius, rigel, antares, crt | aurora | Color theme |
 | `ring_shape` | circle | circle | Ring geometry |
 | `ring_blend` | true/false | true | Smooth gradient between rings |
+| `inverse_bands` | true/false | false | Swap bass/treble ring mapping |
 | `fit` | fill, contain | fill | How art fits the pane |
 | `start` | black, stipple | black | Resting glyph density |
 | `art_path` | file path | — | External art file (optional) |

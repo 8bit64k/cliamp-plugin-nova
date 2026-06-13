@@ -188,6 +188,10 @@ local cfg_blend = bool_cfg("blend", true)
 -- anything explicitly falsey as off, everything else (incl. nil) as on.
 local cfg_ring_blend = bool_cfg("ring_blend", true)
 
+-- inverse_bands: swap the ring-to-EQ mapping so treble lights the center rings
+-- and bass lights the outer frame. Default off (bass center, treble edge).
+local cfg_inverse_bands = bool_cfg("inverse_bands", false)
+
 -- Track whether the user EXPLICITLY set each preset-controllable key.
 -- true = user set it (cfg_* holds their value); false/nil = use preset.
 -- user_set is a table keyed by config name so new knobs auto-register.
@@ -197,7 +201,7 @@ local user_set = {}
 local PRESET_KEYS = {
     "attack", "release", "overdrive", "tilt", "gate", "ceiling", "knee",
     "bloom_attack", "bloom_release", "sustain",
-    "blend", "ring_blend", "bloom",
+    "blend", "ring_blend", "bloom", "inverse_bands",
     "theme", "ring_shape", "fit", "start", "color_mode",
     "mono_color", "cycle_seconds", "cell_aspect",
     "max_cols", "max_rows", "render_rate",
@@ -748,6 +752,7 @@ local function preset_assign(key, v)
     elseif key == "blend" then cfg_blend = v
     elseif key == "ring_blend" then cfg_ring_blend = v
     elseif key == "bloom" then cfg_bloom = v
+    elseif key == "inverse_bands" then cfg_inverse_bands = v
     -- additional knobs
     elseif key == "mono_color" then cfg_mono_color = v
     elseif key == "cycle_seconds" then cfg_cycle_secs = v
@@ -1284,10 +1289,11 @@ function p:render(bands, frame, rows, cols)
     local do_bloom  = cfg_bloom
     local do_blend = cfg_ring_blend
 
-    -- Rebuild ring geometry cache if pane dimensions, aspect, or shape changed.
-    -- This eliminates sqrt/distance math from the per-cell hot loop.
+    -- Rebuild ring geometry cache if pane dimensions, aspect, shape, or band
+    -- direction changed. This eliminates sqrt/distance math from the per-cell hot loop.
     if ring_cache == nil or ring_cache_w ~= draw_w or ring_cache_h ~= draw_h
-       or ring_cache_aspect ~= cfg_cell_aspect or ring_cache_shape ~= shape_name then
+       or ring_cache_aspect ~= cfg_cell_aspect or ring_cache_shape ~= shape_name
+       or ring_cache_inverse ~= cfg_inverse_bands then
         local cell_aspect = cfg_cell_aspect
         ring_cache = {}
         for oy = 1, draw_h do
@@ -1301,12 +1307,12 @@ function p:render(bands, frame, rows, cols)
                 local dx = abs(ox - ocx) * cell_aspect
                 local pos = dist(dx, dy) * nine_over_maxd
                 if pos < 0 then pos = 0 elseif pos > 9 then pos = 9 end
-                local pos_inv = 9 - pos     -- inverse: treble→center, bass→edge
-                local lo = floor(pos_inv)
+                local pcell = cfg_inverse_bands and (9 - pos) or pos
+                local lo = floor(pcell)
                 if lo > 8 then lo = 8 end
                 row.lo[ox] = lo
-                row.frac[ox] = pos_inv - lo
-                row.band[ox] = 10 - floor(pos + 0.5)
+                row.frac[ox] = pcell - lo
+                row.band[ox] = 1 + floor(pcell + 0.5)
                 if row.band[ox] < 1 then row.band[ox] = 1
                 elseif row.band[ox] > 10 then row.band[ox] = 10 end
                 if ox < ocx then
@@ -1326,6 +1332,7 @@ function p:render(bands, frame, rows, cols)
         ring_cache_h = draw_h
         ring_cache_aspect = cfg_cell_aspect
         ring_cache_shape = shape_name
+        ring_cache_inverse = cfg_inverse_bands
     end
 
     -- Rebuild source column map when draw_w changes.
